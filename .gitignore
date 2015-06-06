@@ -1,5 +1,6 @@
 # Python binaries
 *.py[cod]
+*.c
 
 # C extensions
 *.so

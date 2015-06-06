@@ -1,4 +1,15 @@
-from setuptools import setup
+"""
+Install script for pystif.
+
+Usage:
+    python setup.py install
+
+Before running this script, install 'cython' and 'numpy'.
+"""
+
+from setuptools import setup, Extension
+from Cython.Build import cythonize
+import numpy
 
 setup(
     name='pystif',
@@ -8,10 +19,30 @@ setup(
     author='Thomas Gläßle',
     author_email='t_glaessle@gmx.de',
     url=None,
-    license='Public Domain',
-    packages=['pystif'],
+    license='GPLv3',
+    packages=[
+        'pystif',
+        'pystif.core',
+    ],
+    ext_modules=cythonize([
+        Extension(
+            'pystif.core.lp', ['pystif/core/lp.pyx'],
+            include_dirs=[numpy.get_include()],
+            libraries=['glpk'],
+        ),
+        Extension(
+            'pystif.core.*', ['pystif/core/*.pyx'],
+            include_dirs=[numpy.get_include()],
+        ),
+    ]),
     install_requires=[
-        'scipy',
+        'numpy',
+        'docopt',
+    ],
+    setup_requires=[
+        # In fact, these need to be installed before running setup.py - they
+        # are listed here only for documentational purposes:
+        'cython',
         'numpy',
     ],
     classifiers=[
@@ -24,4 +55,3 @@ setup(
         'License :: CC0 1.0 Universal (CC0 1.0) Public Domain Dedication',
     ],
 )
-
