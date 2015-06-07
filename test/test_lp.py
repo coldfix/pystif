@@ -41,12 +41,9 @@ class TestLP(unittest.TestCase):
             lp.get_col(1)
 
     def test_get_mat(self):
-        lp = Problem()
         rows = [[1,2,3,4,5],
                 [6,7,8,9,0]]
-        lp.add_cols(len(rows[0]))
-        lp.add_row(rows[0])
-        lp.add_row(rows[1])
+        lp = Problem.from_matrix(rows)
         assert_array_equal(lp.get_mat(), rows)
 
     def test_set_row_bnds(self):
