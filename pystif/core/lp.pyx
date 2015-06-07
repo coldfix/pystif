@@ -245,15 +245,23 @@ cdef class Problem:
                 buf[ind[j]-1] = val[j]
         return ret
 
-    def set_row_bnds(self, int row, double lb, double ub):
-        """Set bounds of the specified row."""
+    def set_row_bnds(self, rows, double lb, double ub):
+        """Set bounds of the specified row(s)."""
+        if isinstance(rows, int):
+            rows = [rows]
         cdef int vartype = get_vartype(lb, ub)
-        glp.set_row_bnds(self._lp, row+1, vartype, lb, ub)
+        cdef int row
+        for row in rows:
+            glp.set_row_bnds(self._lp, row+1, vartype, lb, ub)
 
-    def set_col_bnds(self, int col, double lb, double ub):
+    def set_col_bnds(self, cols, double lb, double ub):
         """Set bounds of the specified col."""
+        if isinstance(cols, int):
+            cols = [cols]
         cdef int vartype = get_vartype(lb, ub)
-        glp.set_col_bnds(self._lp, col+1, vartype, lb, ub)
+        cdef int col
+        for col in cols:
+            glp.set_col_bnds(self._lp, col+1, vartype, lb, ub)
 
     def get_row_bnds(self, int row):
         """Get bounds (lb, ub) of the specified row."""
