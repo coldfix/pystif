@@ -42,7 +42,7 @@ cdef double[:] double_view(x):
     except (ValueError, TypeError):
         # ValueError: numpy dtype mismatch (e.g. int)
         # TypeError: x doesn't support buffer interface (e.g. list)
-        return np.ascontiguousarray(x, np.float64).view(np.float64)
+        return np.ascontiguousarray(x, np.float64)
 
 
 cdef int get_vartype(double lb, double ub) except *:
@@ -104,6 +104,20 @@ cdef class Problem:
         """Current number of cols."""
         def __get__(self):
             return glp.get_num_cols(self._lp)
+
+    @classmethod
+    def from_matrix(cls, matrix,
+                    double lb_row=-INF, double ub_row=INF,
+                    double lb_col=-INF, double ub_col=INF):
+        """Create a Problem from a matrix."""
+        matrix = np.ascontiguousarray(matrix, np.float64)
+        num_rows, num_cols = matrix.shape
+        lp = cls()
+        lp.add_rows(num_rows, lb_row, ub_row)
+        lp.add_cols(num_cols, lb_col, ub_col)
+        for i, row in enumerate(matrix):
+            lp.set_row(i, row)
+        return lp
 
     def add_row(self, coefs=None, double lb=-INF, double ub=INF):
         """
