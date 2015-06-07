@@ -45,7 +45,7 @@ cdef double[:] double_view(x):
         return np.ascontiguousarray(x, np.float64)
 
 
-cdef int get_vartype(double lb, double ub) except *:
+cdef int get_vartype(double lb, double ub):
     if lb == ub:
         return glp.FX
     if lb == -INF and ub == +INF:
@@ -57,16 +57,19 @@ cdef int get_vartype(double lb, double ub) except *:
     return glp.DB
 
 
-class UnknownError(RuntimeError):
+class OptimizeError(RuntimeError):
+    """Any error that occured during optimization."""
+
+class UnknownError(OptimizeError):
     """Unknown error in glpk."""
 
-class UnboundedError(RuntimeError):
+class UnboundedError(OptimizeError):
     """Objective is unbounded."""
 
-class InfeasibleError(RuntimeError):
+class InfeasibleError(OptimizeError):
     """Current solution is infeasible."""
 
-class NofeasibleError(RuntimeError):
+class NofeasibleError(OptimizeError):
     """No feasible solution exists."""
 
 
