@@ -10,6 +10,7 @@ Options:
     -o OUTPUT, --output OUTPUT      Save results to this file
 """
 
+import sys
 from math import log2
 import numpy as np
 import scipy.spatial
@@ -69,6 +70,10 @@ def convex_hull(xrays):
     ))
 
 
+def info(*args, file=sys.stderr):
+    print('\r', *args, end='', file=file)
+
+
 def filter_equations(big_system, equations):
 
     dim = big_system.shape[1]
@@ -78,15 +83,18 @@ def filter_equations(big_system, equations):
     lp_origin = Problem.from_matrix(big_system, lb_row=0)
     lp_target = Problem.from_matrix(el_ineq, lb_row=0)
 
-    for eq in equations:
+    num_trivial = 0
+    for i, eq in enumerate(equations):
+        info("Progress: {:5}/{} | {:4}"
+             .format(i, len(equations), num_trivial))
         eq = scale_to_int(eq)
         eq_embedded = np.hstack((eq, np.zeros(dim-subdim)))
         if not lp_origin.has_optimal_solution(eq_embedded):
-            print("# Not valid :(")
             # TODO: this case can be used to search for points
+            info("# " + format_vector(eq) + "\n")
             continue
         if lp_target.has_optimal_solution(eq):
-            print("# Nothing new :(")
+            num_trivial += 1
             continue
         lp_target.add_row(eq, lb=0)
         yield eq
@@ -101,6 +109,7 @@ def main(args=None):
 
     for eq in filter_equations(system, equations):
         print(format_vector(eq))
+    print("", file=sys.stderr)
 
 if __name__ == '__main__':
     main()
