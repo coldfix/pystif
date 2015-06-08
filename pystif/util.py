@@ -33,10 +33,17 @@ def make_int_exact(c, threshold=1e-10):
     return c
 
 
+def scale_to_min(v):
+    """Scale v such that its lowest non-zero component is one."""
+    inf = float('inf')
+    return v / min((abs(c) if c != 0 else inf for c in v), default=1)
+
+
 def scale_to_int(v):
     """Scale v such that it has only integer components."""
     v = make_int_exact(v)
-    for c in range(2, 100):     # brute force:(
+    v = scale_to_min(v)
+    for c in range(1, 100):     # brute force:(
         cv = c*v
         r = np.round(cv)
         if all(r == make_int_exact(cv)):
