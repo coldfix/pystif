@@ -2,22 +2,24 @@
 Find hull off a convex cone that may not have full dimensionality.
 
 Usage:
-    chull -i INPUT -x XRAYS [-o OUTPUT]
+    chull -i INPUT -x XRAYS [-o OUTPUT] [-f FEEDBACK]
 
 Options:
     -i INPUT, --input INPUT         Load initial (big) system from this file
     -x XRAYS, --xrays XRAYS         Load extremal rays from this file
     -o OUTPUT, --output OUTPUT      Save results to this file
+    -f FILE, --feedback FILE        Save pending normal vectors to file
 """
 
 import sys
 from math import log2
+from functools import partial
 import numpy as np
 import scipy.spatial
 from docopt import docopt
 from .core.lp import Problem, UnboundedError
 from .core.it import elemental_inequalities
-from .util import format_vector, scale_to_int
+from .util import format_vector, scale_to_int, VectorMemory
 
 
 def num_vars(dim):
@@ -77,7 +79,7 @@ def info(*args, file=sys.stderr):
     print('\r', *args, end='', file=file)
 
 
-def filter_equations(big_system, equations):
+def filter_equations(big_system, equations, feedback):
 
     dim = big_system.shape[1]
     subdim = equations.shape[1]
@@ -86,15 +88,18 @@ def filter_equations(big_system, equations):
     lp_origin = Problem.from_matrix(big_system, lb_row=0)
     lp_target = Problem.from_matrix(el_ineq, lb_row=0)
 
+    seen = VectorMemory()
+
     num_trivial = 0
     for i, eq in enumerate(equations):
         info("Progress: {:5}/{} | {:4}"
              .format(i, len(equations), num_trivial))
         eq = scale_to_int(eq)
+        if seen(eq):
+            continue
         eq_embedded = np.hstack((eq, np.zeros(dim-subdim)))
         if not lp_origin.has_optimal_solution(eq_embedded):
-            # TODO: this case can be used to search for points
-            info("# " + format_vector(eq) + "\n")
+            feedback(format_vector(eq))
             continue
         if lp_target.has_optimal_solution(eq):
             num_trivial += 1
@@ -110,10 +115,16 @@ def main(args=None):
     dataset = np.loadtxt(opts['--xrays'])
     equations = convex_hull(dataset)
 
-    for eq in filter_equations(system, equations):
+    if opts['--feedback']:
+        feedback_file = open(opts['--feedback'], 'w')
+        feedback = partial(print, file=feedback_file)
+    else:
+        feedback = partial(print, '#', file=sys.stdout)
+
+    for eq in filter_equations(system, equations, feedback):
         print(format_vector(eq))
     print("", file=sys.stderr)
 
+
 if __name__ == '__main__':
     main()
-
