@@ -47,12 +47,7 @@ def principal_components(data_points, s_limit=1e-10):
 
 def convex_hull(xrays):
 
-    # Optimization: Project out one dimension based on the consideration that
-    # we only care about planes that include the point at the origin. The mean
-    # must be somewhere inside the cone, so its safe to project on this axis:
-    mean = np.mean(xrays, axis=0)
-    orth_basis = orthogonal_complement(mean)
-    points = np.dot(xrays, orth_basis)
+    points = xrays
 
     # Now make sure the dataset lives in a full dimensional subspace
     principal_basis, subordinate_basis = principal_components(points)
@@ -64,9 +59,8 @@ def convex_hull(xrays):
 
     # add back the removed dimensions
     equations = np.dot(equations, principal_basis.T)
-    equations = np.dot(equations, orth_basis.T)
 
-    subord = np.dot(subordinate_basis.T, orth_basis.T)
+    subord = subordinate_basis.T
     return np.vstack((
         subord,
         -subord,
