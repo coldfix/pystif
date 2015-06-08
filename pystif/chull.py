@@ -87,14 +87,11 @@ def filter_equations(big_system, equations):
     for eq in equations:
         eq = scale_to_int(eq)
         eq_embedded = np.hstack((eq, np.zeros(dim-subdim)))
-        try:
-            lp_origin.minimize(eq_embedded)
-        except UnboundedError:
+        if not lp_origin.has_optimal_solution(eq_embedded):
             print("# Not valid :(")
+            # TODO: this case can be used to search for points
             continue
-        try:
-            lp_target.minimize(eq)
-        except UnboundedError:
+        if lp_target.has_optimal_solution(eq):
             print("# Nothing new :(")
             continue
         lp_target.add_row(eq, lb=0)

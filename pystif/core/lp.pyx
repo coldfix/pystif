@@ -344,6 +344,14 @@ cdef class Problem:
     def maximize(self, objective):
         return self.optimize(objective, glp.MAX)
 
+    def has_optimal_solution(self, objective, sense=glp.MIN):
+        """Check if the system has an optimal solution."""
+        try:
+            self.optimize(objective, sense)
+            return True
+        except (UnboundedError, InfeasibleError, NofeasibleError):
+            return False
+
     @cython.boundscheck(False)
     @cython.wraparound(False)
     def get_prim_solution(self):
