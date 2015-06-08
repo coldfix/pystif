@@ -42,3 +42,24 @@ def scale_to_int(v):
         if all(r == make_int_exact(cv)):
             return r
     return make_int_exact(v)
+
+
+class VectorMemory:
+
+    """
+    Remember vectors and return if they have been seen.
+
+    Currently works only for int vectors.
+    """
+
+    def __init__(self):
+        self.seen = set()
+
+    def __call__(self, v):
+        if any(v != np.round(v)):
+            return False
+        v = tuple(int(c) for c in v)
+        if v in self.seen:
+            return True
+        self.seen.add(v)
+        return False
