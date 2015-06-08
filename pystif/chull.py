@@ -48,7 +48,7 @@ def principal_components(data_points, s_limit=1e-10):
 
 def convex_hull(xrays):
 
-    points = xrays
+    points = np.vstack((np.zeros(xrays.shape[1]), xrays))
 
     # Now make sure the dataset lives in a full dimensional subspace
     principal_basis, subordinate_basis = principal_components(points)
@@ -56,7 +56,10 @@ def convex_hull(xrays):
 
     hull = scipy.spatial.ConvexHull(points)
     equations = hull.equations
-    equations = equations[:,:-1]        # TODO: last component
+
+    equations = np.array([
+        eq[:-1] for eq in equations
+        if abs(eq[-1]) < 1e-5])
 
     # add back the removed dimensions
     equations = np.dot(equations, principal_basis.T)
@@ -65,8 +68,8 @@ def convex_hull(xrays):
     return np.vstack((
         subord,
         -subord,
-        equations,
         -equations,
+        equations,
     ))
 
 
