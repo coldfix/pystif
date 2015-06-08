@@ -2,14 +2,15 @@
 XRay - Random search for inequalities in subspace.
 
 Usage:
-    xray -i INPUT  [-o OUTPUT] [-s SUBDIM] [-l LIMIT] [-n NUM]
+    xray -i INPUT  [-o OUTPUT] [-s SUBDIM] [-l LIMIT] [-n NUM | -d FILE]
 
 Options:
     -i INPUT, --input INPUT         Read constraints matrix from file
     -o OUTPUT, --output OUTPUT      Write found constraints to this file
     -s SUBDIM, --subdim SUBDIM      Dimension of reduced space
     -l LIMIT, --limit LIMIT         Add constraints H(i)≤LIMIT for i<SUBDIM
-    -n NUM, --no-samples NUM        Number of trials [default: 100000]
+    -n NUM, --num-samples NUM       Number of trials [default: 100000]
+    -d FILE, --directions FILE      Load directions from this file
 
 
 Note:
@@ -30,6 +31,8 @@ The outline of the algorithm is as follows:
         b) FME on collected active constraints
 """
 
+import sys
+from os import path
 from math import sqrt
 from docopt import docopt
 import numpy as np
@@ -42,8 +45,17 @@ from .util import (repeat, take, basis_vector, format_vector,
 def random_direction_vector(dim, embed_dim):
     v = np.random.normal(size=dim)
     v /= np.linalg.norm(v)
-    v.resize(embed_dim)
     return v
+
+
+def find_xray(lp, direction):
+    subdim = len(direction)
+    direction = np.hstack((direction, np.zeros(lp.num_cols-subdim)))
+    xray = lp.maximize(direction)
+    xray.resize(subdim)
+    xray = scale_to_int(xray)
+    # TODO: output active constraints
+    return xray
 
 
 def main(args=None):
@@ -63,22 +75,31 @@ def main(args=None):
         for i in range(subdim):
             lp.add_row(basis_vector(dim, i), ub=limit)
 
-    num_samples = int(opts['--no-samples'])
+    if opts['--directions']:
+        directions = np.loadtxt(opts['--directions'])
+    else:
+        num_samples = int(opts['--num-samples'])
+        directions = repeat(random_direction_vector, subdim, dim)
+        directions = take(num_samples, directions)
 
-    directions = repeat(random_direction_vector, subdim, dim)
-    directions = take(num_samples, directions)
     seen = VectorMemory()
     seen(np.zeros(subdim))
 
-    for v in directions:
-        solution = lp.maximize(v)
-        solution.resize(subdim)
-        solution = scale_to_int(solution)
-        if seen(solution):
-            continue
-        # TODO: output active constraints
-        # TODO: stream this to OUTPUT
-        print(format_vector(solution))
+    output_file = opts['--output']
+    if output_file:
+        if path.exists(output_file):
+            old_findings = np.loadtxt(output_file)
+            for ray in old_findings:
+                seen(ray)
+        out = open(output_file, 'a')
+    else:
+        out = sys.stdout
+
+    rays = (find_xray(lp, v) for v in directions)
+    rays = (ray for ray in rays if not seen(ray))
+
+    for ray in rays:
+        print(format_vector(ray), file=out)
 
 
 if __name__ == '__main__':
