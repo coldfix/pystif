@@ -91,7 +91,7 @@ def main(args=None):
             old_findings = np.loadtxt(output_file)
             for ray in old_findings:
                 seen(ray)
-        out = open(output_file, 'a')
+        out = open(output_file, 'a', buffering=1)
     else:
         out = sys.stdout
 
