@@ -19,9 +19,15 @@ def project_to_plane(v, n):
     return v - n * np.dot(v, n) / np.linalg.norm(n)
 
 
+def fmt_num(num):
+    if round(num) == make_int_exact(num):
+        return "{:3}".format(int(round(num)))
+    return "{:22.15e}".format(num)
+
+
 def format_vector(v):
     """Convert vector to high-precision string, readable by np.loadtxt."""
-    return " ".join("{:22.15e}".format(c) for c in v)
+    return " ".join(map(fmt_num, v))
 
 
 @np.vectorize
@@ -49,6 +55,10 @@ def scale_to_int(v):
         if all(r == make_int_exact(cv)):
             return r
     return make_int_exact(v)
+
+
+def is_int_vector(v):
+    return all(np.round(v) == make_int_exact(v))
 
 
 class VectorMemory:
