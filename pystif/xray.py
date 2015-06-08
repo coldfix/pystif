@@ -34,7 +34,7 @@ from docopt import docopt
 import numpy as np
 import numpy.random
 from .core.lp import Problem
-from .util import repeat, basis_vector, format_vector
+from .util import repeat, basis_vector, format_vector, scale_to_int
 
 
 def random_direction_vector(dim, embed_dim):
@@ -64,17 +64,17 @@ def main(args=None):
     directions = repeat(random_direction_vector, subdim, dim)
 
     for i, v in enumerate(directions):
+        # TODO: specify max samples on command line
+        if i >= 1000000:
+            return
         solution = lp.maximize(v)
         if all(solution == np.zeros(dim)):
             continue
         solution.resize(subdim)
-        solution /= np.linalg.norm(solution)
+        solution = scale_to_int(solution)
         # TODO: output active constraints
         # TODO: stream this to OUTPUT
         print(format_vector(solution))
-        # TODO: specify max samples on command line
-        if i >= 1000000:
-            return
 
 
 if __name__ == '__main__':

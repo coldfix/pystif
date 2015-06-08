@@ -16,7 +16,7 @@ import scipy.spatial
 from docopt import docopt
 from .core.lp import Problem, UnboundedError
 from .core.it import elemental_inequalities
-from .util import format_vector
+from .util import format_vector, scale_to_int
 
 
 def num_vars(dim):
@@ -85,6 +85,7 @@ def filter_equations(big_system, equations):
     lp_target = Problem.from_matrix(el_ineq, lb_row=0)
 
     for eq in equations:
+        eq = scale_to_int(eq)
         eq_embedded = np.hstack((eq, np.zeros(dim-subdim)))
         try:
             lp_origin.minimize(eq_embedded)
