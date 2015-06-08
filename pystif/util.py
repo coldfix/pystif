@@ -14,6 +14,12 @@ def repeat(func, *args, **kwargs):
         yield func(*args, **kwargs)
 
 
+def take(count, iterable):
+    """Take count elements from iterable."""
+    for i, v in zip(range(count), iterable):
+        yield v
+
+
 def project_to_plane(v, n):
     """Project v into the subspace defined by x∙n = 0."""
     return v - n * np.dot(v, n) / np.linalg.norm(n)

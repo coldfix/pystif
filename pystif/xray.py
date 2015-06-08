@@ -2,13 +2,14 @@
 XRay - Random search for inequalities in subspace.
 
 Usage:
-    xray -i INPUT  [-o OUTPUT] [-s SUBDIM] [-l LIMIT]
+    xray -i INPUT  [-o OUTPUT] [-s SUBDIM] [-l LIMIT] [-n NUM]
 
 Options:
     -i INPUT, --input INPUT         Read constraints matrix from file
     -o OUTPUT, --output OUTPUT      Write found constraints to this file
     -s SUBDIM, --subdim SUBDIM      Dimension of reduced space
     -l LIMIT, --limit LIMIT         Add constraints H(i)≤LIMIT for i<SUBDIM
+    -n NUM, --no-samples NUM        Number of trials [default: 100000]
 
 
 Note:
@@ -34,7 +35,7 @@ from docopt import docopt
 import numpy as np
 import numpy.random
 from .core.lp import Problem
-from .util import (repeat, basis_vector, format_vector,
+from .util import (repeat, take, basis_vector, format_vector,
                    scale_to_int, VectorMemory)
 
 
@@ -62,14 +63,14 @@ def main(args=None):
         for i in range(subdim):
             lp.add_row(basis_vector(dim, i), ub=limit)
 
+    num_samples = int(opts['--no-samples'])
+
     directions = repeat(random_direction_vector, subdim, dim)
+    directions = take(num_samples, directions)
     seen = VectorMemory()
     seen(np.zeros(subdim))
 
-    for i, v in enumerate(directions):
-        # TODO: specify max samples on command line
-        if i >= 1000000:
-            return
+    for v in directions:
         solution = lp.maximize(v)
         solution.resize(subdim)
         solution = scale_to_int(solution)
