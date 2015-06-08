@@ -116,7 +116,7 @@ def main(args=None):
     equations = convex_hull(dataset)
 
     if opts['--feedback']:
-        feedback_file = open(opts['--feedback'], 'w')
+        feedback_file = open(opts['--feedback'], 'w', buffering=1)
         feedback = partial(print, file=feedback_file)
     else:
         feedback = partial(print, '#', file=sys.stdout)
