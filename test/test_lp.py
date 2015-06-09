@@ -102,6 +102,13 @@ class TestLP(unittest.TestCase):
         with self.assertRaises(NofeasibleError):
             lp.maximize([1, 2])        # max[ s = x + 2y ]
 
+    def test_implies(self):
+        L = [[1,  0],   # x ≥ 0 (area left to y axis)
+             [0,  1],   # y ≥ 0 (area above x axis)
+             [1, -1]]   # x ≥ y (area under x=y axis)
+        lp = Problem.from_matrix(L, lb_row=0)
+        self.assertTrue(lp.implies([1, -1], 1))
+        self.assertFalse(lp.implies([1, -1], -1))
 
 if __name__ == '__main__':
     unittest.main()

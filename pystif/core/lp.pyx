@@ -45,6 +45,11 @@ cdef double[:] double_view(x):
         return np.ascontiguousarray(x, np.float64)
 
 
+def _as_np_array(x):
+    """Create a numpy array from x suited for further processing."""
+    return np.ascontiguousarray(x, np.float64)
+
+
 cdef int get_vartype(double lb, double ub):
     if lb == ub:
         return glp.FX
@@ -344,6 +349,10 @@ cdef class Problem:
     def maximize(self, objective):
         return self.optimize(objective, glp.MAX)
 
+    def get_objective_value(self):
+        """Get value of objective achieved in last optimization task."""
+        return glp.get_obj_val(self._lp)
+
     def has_optimal_solution(self, objective, sense=glp.MIN):
         """Check if the system has an optimal solution."""
         try:
@@ -351,6 +360,34 @@ cdef class Problem:
             return True
         except (UnboundedError, InfeasibleError, NofeasibleError):
             return False
+
+    def implies(self, constraint, bound=0, sense=glp.MIN):
+        """
+        Check if the inequality represented by the constraint vector C and
+        bound b is redundant.
+
+        The direction of the inequality depends on the value of ``sense``:
+
+            - C∙x ≥ b   if sense=lp.MIN (default)
+            - C∙x ≤ b   if sense=lp.MAX
+
+        For convenience, ``constraint`` can be a matrix containing multiple
+        constraint queries. In this case ``bound`` and ``sense`` are allowed
+        to be vectors (but don't need to be).
+        """
+        def _implies(c, b, s):
+            if not self.has_optimal_solution(c, s):
+                return False
+            obj_val = self.get_objective_value()
+            return obj_val <= b if s == glp.MIN else obj_val >= b
+        constraint = _as_np_array(constraint)
+        if len(constraint.shape) == 1:
+            constraint = [constraint]
+        if isinstance(bound, (float, int)):
+            bound = repeat(bound)
+        if isinstance(sense, int):
+            sense = repeat(sense)
+        return all(starmap(_implies, zip(constraint, bound, sense)))
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
