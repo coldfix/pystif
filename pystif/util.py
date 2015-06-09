@@ -51,6 +51,31 @@ def scale_to_min(v):
     return v / min((abs(c) if c != 0 else inf for c in v), default=1)
 
 
+def gcd(a, b):
+    """Return greatest common divisor using Euclid's Algorithm."""
+    while b:
+        a, b = b, a % b
+    return a
+
+
+def normalize(v):
+    """Inplace normalization of coefficients."""
+    # cancel gcd of coefficients
+    if not v:
+        return
+    it = iter(v)
+    for v in it:
+        if v:
+            div = abs(v)
+            break
+    for v in it:
+        if v:
+            div = gcd(div, abs(v))
+            if div == 1:
+                return v
+    return v / div
+
+
 def scale_to_int(v):
     """Scale v such that it has only integer components."""
     v = make_int_exact(v)
@@ -59,7 +84,7 @@ def scale_to_int(v):
         cv = c*v
         r = np.round(cv)
         if all(r == make_int_exact(cv)):
-            return r
+            return normalize(r)
     return make_int_exact(v)
 
 
