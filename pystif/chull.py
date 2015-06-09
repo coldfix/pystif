@@ -41,8 +41,7 @@ def principal_components(data_points, s_limit=1e-10):
     Get the (orthonormal) basis vectors of the principal components of the
     data set specified by the rows of M.
     """
-    centered = data_points - np.mean(data_points, axis=0)
-    cov_mat = np.cov(centered.T)
+    cov_mat = np.cov(data_points.T)
     u, s, v = np.linalg.svd(cov_mat)
     num_comp = next((i for i, c in enumerate(s) if c < s_limit), len(s))
     return u[:,:num_comp], u[:,num_comp:]
