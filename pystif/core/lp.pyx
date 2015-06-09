@@ -4,6 +4,7 @@ cimport glpk as glp
 
 from cpython cimport array as c_array
 from array import array
+from itertools import repeat, starmap
 
 import numpy as np
 
@@ -118,14 +119,21 @@ cdef class Problem:
                     double lb_row=-INF, double ub_row=INF,
                     double lb_col=-INF, double ub_col=INF):
         """Create a Problem from a matrix."""
-        matrix = np.ascontiguousarray(matrix, np.float64)
-        num_rows, num_cols = matrix.shape
+        matrix = _as_np_array(matrix)
         lp = cls()
-        lp.add_rows(num_rows, lb_row, ub_row)
-        lp.add_cols(num_cols, lb_col, ub_col)
-        for i, row in enumerate(matrix):
-            lp.set_row(i, row)
+        lp.add_cols(matrix.shape[1], lb_col, ub_col)
+        lp.add_matrix(matrix, lb_row, ub_row)
         return lp
+
+    def add_matrix(self, matrix, double lb_row=-INF, double ub_row=INF):
+        """Add matrix."""
+        matrix = _as_np_array(matrix)
+        num_rows, num_cols = matrix.shape
+        if self.num_cols == 0:
+            self.add_cols(num_cols)
+        start = self.add_rows(num_rows, lb_row, ub_row)
+        for i, row in enumerate(matrix):
+            self.set_row(start+i, row)
 
     def add_row(self, coefs=None, double lb=-INF, double ub=INF):
         """
