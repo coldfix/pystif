@@ -52,8 +52,8 @@ def check_implies(sys_a, sys_b, name_a, name_b, elem_ineqs=False, quiet=False):
 
 def main(args=None):
     opts = docopt(__doc__)
-    sys_a = np.loadtxt(opts['A'])
-    sys_b = np.loadtxt(opts['B'])
+    sys_a = np.loadtxt(opts['A'], ndmin=2)
+    sys_b = np.loadtxt(opts['B'], ndmin=2)
     status = 0
     kwd = {'elem_ineqs': opts['--elem-ineqs'],
            'quiet': opts['--quiet']}

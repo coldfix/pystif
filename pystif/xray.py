@@ -64,7 +64,7 @@ def find_xray(lp, direction):
 def main(args=None):
     opts = docopt(__doc__, args)
 
-    system = np.loadtxt(opts['--input'])
+    system = np.loadtxt(opts['--input'], ndmin=2)
     lp = Problem(system)
     dim = lp.num_cols
 
@@ -79,7 +79,7 @@ def main(args=None):
             lp.set_col_bnds(i, 0, limit)
 
     if opts['--directions']:
-        directions = np.loadtxt(opts['--directions'])[:,1:]
+        directions = np.loadtxt(opts['--directions'], ndmin=2)[:,1:]
     else:
         num_samples = int(opts['--num-samples'])
         directions = repeat(random_direction_vector, subdim-1)
@@ -90,7 +90,7 @@ def main(args=None):
 
     output_file = opts['--output']
     if output_file and path.exists(output_file):
-        old_findings = np.loadtxt(output_file)
+        old_findings = np.loadtxt(output_file, ndmin=2)
         for ray in old_findings:
             seen(ray)
     output = print_to(output_file, append=True)
@@ -103,4 +103,4 @@ def main(args=None):
 
 
 if __name__ == '__main__':
-    hull = main()
+    main()

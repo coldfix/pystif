@@ -123,8 +123,8 @@ def filter_equations(big_system, equations, feedback, el_ineqs, info):
 def main(args=None):
     opts = docopt(__doc__, args)
 
-    system = np.loadtxt(opts['--input'])
-    dataset = np.loadtxt(opts['--xrays'])
+    system = np.loadtxt(opts['--input'], ndmin=2)
+    dataset = np.loadtxt(opts['--xrays'], ndmin=2)
     equations = convex_hull(dataset)
     feedback = print_to(opts['--feedback'], '#', default=sys.stdout)
     output = print_to(opts['--output'])
