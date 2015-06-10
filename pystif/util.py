@@ -1,6 +1,7 @@
 import numpy as np
 import sys
 from functools import partial
+from .core.lp import format_vector
 
 
 def print_to(filename=None, append=False):
@@ -39,17 +40,6 @@ def take(count, iterable):
 def project_to_plane(v, n):
     """Project v into the subspace defined by x∙n = 0."""
     return v - n * np.dot(v, n) / np.linalg.norm(n)
-
-
-def fmt_num(num):
-    if round(num) == make_int_exact(num):
-        return "{:3}".format(int(round(num)))
-    return "{:22.15e}".format(num)
-
-
-def format_vector(v):
-    """Convert vector to high-precision string, readable by np.loadtxt."""
-    return " ".join(map(fmt_num, v))
 
 
 @np.vectorize

@@ -100,6 +100,21 @@ class NofeasibleError(OptimizeError):
     """No feasible solution exists."""
 
 
+cdef str fmt_num(float num, float threshold=1e-10):
+    cdef float r = round(num)
+    if abs(num - r) < threshold:
+        return "{:3}".format(int(r))
+    return "{:22.15e}".format(num)
+
+
+# Call me crazy for optimizing this function using cython, but this actually
+# reduces the runtime of pystif.el_ineqs by about a factor 20.
+def format_vector(v):
+    """Convert vector to high-precision string, readable by np.loadtxt."""
+    cdef double[:] c = double_view(v)
+    return " ".join(fmt_num(x) for x in c)
+
+
 cdef class Problem:
 
     """
