@@ -44,7 +44,7 @@ def show_missing_constraints(lp, constraints, name_a, name_b):
 def check_implies(sys_a, sys_b, name_a, name_b, elem_ineqs=False, quiet=False):
     lp = Problem(sys_a)
     if elem_ineqs:
-        lp.add(elemental_inequalities(num_vars(lp.num_cols)))
+        lp.add(list(elemental_inequalities(num_vars(lp.num_cols))))
     if quiet:
         return lp.implies(sys_b)
     return show_missing_constraints(lp, sys_b, name_a, name_b) == 0
