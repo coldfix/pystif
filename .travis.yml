@@ -21,10 +21,19 @@ env:
     - IPATH=$PREFIX/usr/include
 
 install:
+  # download GLPK
   - apt-get download libglpk-dev
   - dpkg -x libglpk-dev* $PREFIX
+
+  # cache dependencies
+  - pip wheel -v cython scipy docopt
+
+  # install build dependency
   - pip install cython
+
+  # prepare package for use
   - python setup.py build_ext -R $RPATH -I $IPATH
+  - python setup.py develop
 
 script:
   - nosetests
