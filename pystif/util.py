@@ -1,4 +1,20 @@
 import numpy as np
+import sys
+from functools import partial
+
+
+def print_to(filename=None, append=False):
+    """
+    Return a print function that prints to filename.
+
+    If filename is left empty, prints to STDOUT.
+    """
+    if filename:
+        mode = 'a' if append else 'w'
+        file = open(filename, mode)
+    else:
+        file = sys.stdout
+    return partial(print, file=file)
 
 
 def basis_vector(dim, index):
