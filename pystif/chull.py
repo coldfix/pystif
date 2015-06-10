@@ -12,18 +12,13 @@ Options:
 """
 
 import sys
-from math import log2
 from functools import partial
 import numpy as np
 import scipy.spatial
 from docopt import docopt
 from .core.lp import Problem, UnboundedError
-from .core.it import elemental_inequalities
+from .core.it import elemental_inequalities, num_vars
 from .util import format_vector, scale_to_int, VectorMemory
-
-
-def num_vars(dim):
-    return int(round(log2(dim+1)))
 
 
 def orthogonal_complement(v):

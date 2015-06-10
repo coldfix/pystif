@@ -34,6 +34,11 @@ def _nCr(n, r):
     return fac(n) // fac(r) // fac(n-r)
 
 
+def num_vars(dim):
+    """Get the number of random variables from the entropy space dimension."""
+    return int(round(math.log2(dim)))
+
+
 def num_elemental_inequalities(num_vars):
     """Get number of elemental inequalities given number of variables."""
     return num_vars + _nCr(num_vars, 2) * 2**(num_vars-2)
