@@ -4,12 +4,11 @@ Install script for pystif.
 Usage:
     python setup.py install
 
-Before running this script, install 'cython' and 'numpy'.
+Before running this script, install 'cython'.
 """
 
 from setuptools import setup, Extension
 from Cython.Build import cythonize
-import numpy
 
 setup(
     name='pystif',
@@ -27,12 +26,10 @@ setup(
     ext_modules=cythonize([
         Extension(
             'pystif.core.lp', ['pystif/core/lp.pyx'],
-            include_dirs=[numpy.get_include()],
             libraries=['glpk'],
         ),
         Extension(
             'pystif.core.*', ['pystif/core/*.pyx'],
-            include_dirs=[numpy.get_include()],
         ),
     ]),
     install_requires=[
@@ -44,7 +41,6 @@ setup(
         # In fact, these need to be installed before running setup.py - they
         # are listed here only for documentational purposes:
         'cython',
-        'numpy',
     ],
     classifiers=[
         'Development Status :: 3 - Alpha',
