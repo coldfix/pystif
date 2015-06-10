@@ -17,9 +17,9 @@ from functools import partial
 import numpy as np
 import scipy.spatial
 from docopt import docopt
-from .core.lp import Problem, UnboundedError
+from .core.lp import Problem
 from .core.it import elemental_inequalities, num_vars
-from .util import format_vector, scale_to_int, VectorMemory
+from .util import format_vector, scale_to_int, VectorMemory, print_to
 
 
 def orthogonal_complement(v):
@@ -81,11 +81,8 @@ def convex_hull(xrays):
     ))
 
 
-def info(*args, file=sys.stderr):
-    print('\r', *args, end='', file=file)
 
-
-def filter_equations(big_system, equations, feedback, el_ineqs):
+def filter_equations(big_system, equations, feedback, el_ineqs, info):
 
     dim = big_system.shape[1]
     subdim = equations.shape[1]
@@ -126,18 +123,14 @@ def main(args=None):
     system = np.loadtxt(opts['--input'])
     dataset = np.loadtxt(opts['--xrays'])
     equations = convex_hull(dataset)
-
-    if opts['--feedback']:
-        feedback_file = open(opts['--feedback'], 'w', buffering=1)
-        feedback = partial(print, file=feedback_file)
-    else:
-        feedback = partial(print, '#', file=sys.stdout)
-
+    feedback = print_to(opts['--feedback'], '#', default=sys.stdout)
+    output = print_to(opts['--output'])
     el_ineqs = opts['--el-ineqs']
+    info = partial(print, '\r', end='', file=sys.stderr)
 
-    for eq in filter_equations(system, equations, feedback, el_ineqs):
-        print(format_vector(eq))
-    print("", file=sys.stderr)
+    for eq in filter_equations(system, equations, feedback, el_ineqs, info):
+        output(format_vector(eq))
+    print("\n", file=sys.stderr)
 
 
 if __name__ == '__main__':

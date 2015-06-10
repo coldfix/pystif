@@ -29,7 +29,7 @@ from .util import format_vector, print_to
 
 def main(args=None):
     opts = docopt(__doc__, args)
-    print_ = print_to(opts['--output'], opts['--append'])
+    print_ = print_to(opts['--output'], append=opts['--append'])
     num_vars = int(opts['NUM_VARS'])
     for v in elemental_inequalities(num_vars):
         print_(format_vector(v))

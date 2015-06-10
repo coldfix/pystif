@@ -4,18 +4,19 @@ from functools import partial
 from .core.lp import format_vector
 
 
-def print_to(filename=None, append=False):
+def print_to(filename=None, *default_prefix,
+             append=False, default=sys.stdout):
     """
     Return a print function that prints to filename.
 
     If filename is left empty, prints to STDOUT.
     """
-    if filename:
+    if filename and filename != '-':
         mode = 'a' if append else 'w'
-        file = open(filename, mode)
+        file = open(filename, mode, buffering=1)
+        return partial(print, file=file)
     else:
-        file = sys.stdout
-    return partial(print, file=file)
+        return partial(print, *default_prefix, file=default)
 
 
 def basis_vector(dim, index):

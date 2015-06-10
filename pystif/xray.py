@@ -39,7 +39,7 @@ import numpy as np
 import numpy.random
 from .core.lp import Problem
 from .util import (repeat, take, basis_vector, format_vector,
-                   scale_to_int, VectorMemory)
+                   scale_to_int, VectorMemory, print_to)
 
 
 def random_direction_vector(dim):
@@ -89,20 +89,17 @@ def main(args=None):
     seen(np.zeros(subdim))
 
     output_file = opts['--output']
-    if output_file:
-        if path.exists(output_file):
-            old_findings = np.loadtxt(output_file)
-            for ray in old_findings:
-                seen(ray)
-        out = open(output_file, 'a', buffering=1)
-    else:
-        out = sys.stdout
+    if output_file and path.exists(output_file):
+        old_findings = np.loadtxt(output_file)
+        for ray in old_findings:
+            seen(ray)
+    output = print_to(output_file, append=True)
 
     rays = (find_xray(lp, v) for v in directions)
     rays = (ray for ray in rays if not seen(ray))
 
     for ray in rays:
-        print(format_vector(ray), file=out)
+        output(format_vector(ray))
 
 
 if __name__ == '__main__':
