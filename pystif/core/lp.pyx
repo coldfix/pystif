@@ -1,3 +1,9 @@
+"""
+Cython Wrapper for GLPK.
+
+The wrapper API can be used nicely with numpy and features zero based
+indexing.
+"""
 
 cimport cython
 cimport glpk as glp
@@ -7,6 +13,21 @@ from array import array
 from itertools import repeat, starmap
 
 import numpy as np
+
+
+__all__ = [
+    'MIN',
+    'MAX',
+    'PRIMAL',
+    'DUAL',
+    'OptimizeError',
+    'UnknownError',
+    'UnboundedError',
+    'InfeasibleError',
+    'NofeasibleError',
+    'Problem',
+]
+
 
 cdef extern from "math.h":
     double INF "INFINITY"
