@@ -2,13 +2,14 @@
 Find hull off a convex cone that may not have full dimensionality.
 
 Usage:
-    chull -i INPUT -x XRAYS [-o OUTPUT] [-f FEEDBACK]
+    chull -i INPUT -x XRAYS [-o OUTPUT] [-f FEEDBACK] [-e]
 
 Options:
     -i INPUT, --input INPUT         Load initial (big) system from this file
     -x XRAYS, --xrays XRAYS         Load extremal rays from this file
     -o OUTPUT, --output OUTPUT      Save results to this file
     -f FILE, --feedback FILE        Save pending normal vectors to file
+    -e, --el-ineqs                  Don't show elemental inequalities
 """
 
 import sys
@@ -84,13 +85,15 @@ def info(*args, file=sys.stderr):
     print('\r', *args, end='', file=file)
 
 
-def filter_equations(big_system, equations, feedback):
+def filter_equations(big_system, equations, feedback, el_ineqs):
 
     dim = big_system.shape[1]
     subdim = equations.shape[1]
 
     lp_origin = Problem(big_system)
-    lp_target = Problem(list(elemental_inequalities(num_vars(subdim))))
+    lp_target = Problem(num_cols=subdim)
+    if el_ineqs:
+        lp_target.add(list(elemental_inequalities(num_vars(subdim))))
 
     seen = VectorMemory()
 
@@ -130,7 +133,9 @@ def main(args=None):
     else:
         feedback = partial(print, '#', file=sys.stdout)
 
-    for eq in filter_equations(system, equations, feedback):
+    el_ineqs = opts['--el-ineqs']
+
+    for eq in filter_equations(system, equations, feedback, el_ineqs):
         print(format_vector(eq))
     print("", file=sys.stderr)
 
