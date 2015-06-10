@@ -11,34 +11,31 @@ sudo: false
 
 env:
   global:
-    # Enable caching of python wheels
-    - PIP_FIND_LINKS=file://$HOME/.pip-cache
-    - PIP_WHEEL_DIR=$HOME/.pip-cache
-
     # download binary GLPK
     - PREFIX=$HOME/install
-    - RPATH=$PREFIX/usr/lib/x68_64-linux-gnu
-    - IPATH=$PREFIX/usr/include
+    - LIBRARY_PATH=$PREFIX/usr/lib
+    - CPATH=$PREFIX/usr/include
 
-install:
+    - MINICONDA_URL=https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
+    - PATH=$HOME/miniconda/bin:$PATH
+
+before_install:
   # download GLPK
   - apt-get download libglpk-dev
   - dpkg -x libglpk-dev* $PREFIX
 
-  # cache dependencies
-  - pip wheel cython scipy docopt
+install:
+  - env
 
-  # install build dependency
-  - pip install cython
+  # setup miniconda in order to install expensive dependencies…
+  - wget $MINICONDA_URL -O miniconda.sh
+  - bash miniconda.sh -b -p $HOME/miniconda
+  - export PATH=$HOME/miniconda/bin:$PATH
+  - conda create -n testenv --yes cython scipy python=$TRAVIS_PYTHON_VERSION
+  - source activate testenv
 
   # prepare package for use
-  - python setup.py build_ext -R $RPATH -I $IPATH
   - python setup.py develop
 
 script:
   - nosetests
-
-cache:
-  apt: true
-  directories:
-    - $PIP_WHEEL_DIR
