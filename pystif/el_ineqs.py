@@ -15,10 +15,10 @@ row ``q`` corresponds to one inequality
 
 The columns correspond to the entropies of
 
-    X₀, X₁, X₀X₁, X₂, X₀X₂, X₁X₂, X₀X₁X₂, …
+    ∅, X₀, X₁, X₀X₁, X₂, X₀X₂, X₁X₂, X₀X₁X₂, …
 
-and so on, i.e. the bit representation of the column number corresponds to the
-subset of variables.
+and so on, i.e. the bit representation of the column index corresponds to the
+subset of variables. The zero-th column will always be zero.
 """
 
 import sys
@@ -30,11 +30,9 @@ from .util import format_vector, print_to
 def main(args=None):
     opts = docopt(__doc__, args)
     print_ = print_to(opts['--output'], opts['--append'])
-
     num_vars = int(opts['NUM_VARS'])
-
     for v in elemental_inequalities(num_vars):
-        print_(format_vector(v[1:]))
+        print_(format_vector(v))
 
 
 if __name__ == '__main__':

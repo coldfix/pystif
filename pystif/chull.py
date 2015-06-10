@@ -42,9 +42,18 @@ def principal_components(data_points, s_limit=1e-10):
     return u[:,:num_comp], u[:,num_comp:]
 
 
+def del_const_col(mat):
+    return mat[:,1:]
+
+
+def add_left_zero(mat):
+    return np.hstack((np.zeros((mat.shape[0], 1)), mat))
+
+
 def convex_hull(xrays):
 
-    points = np.vstack((np.zeros(xrays.shape[1]), xrays))
+    points = del_const_col(xrays)
+    points = np.vstack((np.zeros(points.shape[1]), points))
 
     # Now make sure the dataset lives in a full dimensional subspace
     principal_basis, subordinate_basis = principal_components(points)
@@ -61,6 +70,8 @@ def convex_hull(xrays):
     equations = np.dot(equations, principal_basis.T)
 
     subord = subordinate_basis.T
+    subord = add_left_zero(subord)
+    equations = add_left_zero(equations)
     return np.vstack((
         subord,
         -subord,
@@ -78,9 +89,8 @@ def filter_equations(big_system, equations, feedback):
     dim = big_system.shape[1]
     subdim = equations.shape[1]
 
-    el_ineq = [ineq[1:] for ineq in elemental_inequalities(num_vars(subdim))]
-    lp_origin = Problem.from_matrix(big_system, lb_row=0)
-    lp_target = Problem.from_matrix(el_ineq, lb_row=0)
+    lp_origin = Problem(big_system)
+    lp_target = Problem(list(elemental_inequalities(num_vars(subdim))))
 
     seen = VectorMemory()
 

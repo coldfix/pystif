@@ -42,17 +42,20 @@ from .util import (repeat, take, basis_vector, format_vector,
                    scale_to_int, VectorMemory)
 
 
-def random_direction_vector(dim, embed_dim):
+def random_direction_vector(dim):
     v = np.random.normal(size=dim)
     v /= np.linalg.norm(v)
     return v
 
 
 def find_xray(lp, direction):
-    subdim = len(direction)
-    direction = np.hstack((direction, np.zeros(lp.num_cols-subdim)))
+    subdim = 1+len(direction)
+    direction = np.hstack((0, direction, np.zeros(lp.num_cols-subdim)))
     xray = lp.maximize(direction)
     xray.resize(subdim)
+    # xray[0] is always -1, this prevents any shortening if we decide to that
+    # later on, so just set it to 0.
+    xray[0] = 0
     xray = scale_to_int(xray)
     # TODO: output active constraints
     return xray
@@ -62,24 +65,24 @@ def main(args=None):
     opts = docopt(__doc__, args)
 
     system = np.loadtxt(opts['--input'])
-    lp = Problem.from_matrix(system, lb_row=0)
+    lp = Problem(system)
     dim = lp.num_cols
 
     if opts['--subdim'] is not None:
         subdim = int(opts['--subdim'])
     else:
-        subdim = int(round(sqrt(dim + 1))) - 1
+        subdim = int(round(sqrt(dim)))
 
     if opts['--limit'] is not None:
         limit = float(opts['--limit'])
-        for i in range(subdim):
-            lp.add_row(basis_vector(dim, i), ub=limit)
+        for i in range(1, subdim):
+            lp.set_col_bnds(i, 0, limit)
 
     if opts['--directions']:
-        directions = np.loadtxt(opts['--directions'])
+        directions = np.loadtxt(opts['--directions'])[:,1:]
     else:
         num_samples = int(opts['--num-samples'])
-        directions = repeat(random_direction_vector, subdim, dim)
+        directions = repeat(random_direction_vector, subdim-1)
         directions = take(num_samples, directions)
 
     seen = VectorMemory()

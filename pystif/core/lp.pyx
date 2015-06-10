@@ -1,8 +1,5 @@
 """
-Cython Wrapper for GLPK.
-
-The wrapper API can be used nicely with numpy and features zero based
-indexing.
+Cython Wrapper for GLPK. For more information, see :class:`Problem`.
 """
 
 cimport cython
@@ -10,7 +7,6 @@ cimport glpk as glp
 
 from cpython cimport array as c_array
 from array import array
-from itertools import repeat, starmap
 
 import numpy as np
 
@@ -72,6 +68,13 @@ def _as_np_array(x):
     return np.ascontiguousarray(x, np.float64)
 
 
+def _as_matrix(x):
+    x = _as_np_array(x)
+    if len(x.shape) == 1:
+        return np.array([x])
+    return x
+
+
 cdef int get_vartype(double lb, double ub):
     if lb == ub:
         return glp.FX
@@ -126,16 +129,42 @@ cdef class Problem:
     vectors you should use numpy arrays or other objects that export the
     buffer API to get the best performance.
 
-    The wrapper is not complete. I'm adding what I need as I go forward.
+    In general, input vectors q represent inequalities q∙x ≥ 0. There is a
+    simple way to include an inhomogeneity in the vector q: Just set the
+    bounds of the zero-th column to be exactly -1. Then the inequality
+    represented by a vector q is:
+
+            q∙x ≥ q₀
+
+    In fact, this behaviour is enabled by default and all of the pystif
+    modules assume equations in this form. For your own LPs this mode can be
+    disabled by specifying ``const_col=False`` in the constructor.
+
+    By default rows are lower-bounded by zero (see above) and columns are
+    unbounded (i.e. variables may assume any value).
     """
 
     cdef glp.Prob* _lp
 
-    def __cinit__(self, int num_cols=0):
-        """Init empty system and optionally set number of columns."""
+    def __cinit__(self, L=None, *,
+                  int num_cols=0,
+                  double lb_row=0, double ub_row=INF,
+                  double lb_col=-INF, double ub_col=INF,
+                  bint const_col=True):
+        """
+        Init system from constraint matrix L.
+
+        You must either specify the constraint matrix or a positive value for
+        the number of columns for ``const_col`` to take effect.
+        """
         self._lp = glp.create_prob()
-        if num_cols > 0:
-            self.add_cols(num_cols)
+        if L is not None:
+            L = _as_matrix(L)
+            self.add(L, lb_row, ub_row, lb_col, ub_col)
+        elif num_cols > 0:
+            self.add_cols(num_cols, lb_col, ub_col)
+        if self.num_cols > 0 and const_col:
+            self.set_col_bnds(0, -1, -1)
 
     def __dealloc__(self):
         glp.delete_prob(self._lp)
@@ -150,40 +179,45 @@ cdef class Problem:
         def __get__(self):
             return glp.get_num_cols(self._lp)
 
-    @classmethod
-    def from_matrix(cls, matrix,
-                    double lb_row=-INF, double ub_row=INF,
-                    double lb_col=-INF, double ub_col=INF):
-        """Create a Problem from a matrix."""
-        matrix = _as_np_array(matrix)
-        lp = cls()
-        lp.add_cols(matrix.shape[1], lb_col, ub_col)
-        lp.add_matrix(matrix, lb_row, ub_row)
-        return lp
+    property shape:
+        """Shape of the matrix you will get from get_matrix()."""
+        def __get__(self):
+            return self.num_rows, self.num_cols
 
-    def add_matrix(self, matrix, double lb_row=-INF, double ub_row=INF):
-        """Add matrix."""
-        matrix = _as_np_array(matrix)
-        num_rows, num_cols = matrix.shape
+    def add(self, L,
+            double lb_row=0, double ub_row=INF,
+            double lb_col=-INF, double ub_col=INF):
+        """
+        Add the constraint matrix L∙x ≥ 0. Return the row index of the first
+        added constraint.
+        """
+        L = _as_matrix(L)
+        num_rows, num_cols = L.shape
+        cdef int i
+        cdef int s = self.add_rows(num_rows, lb_row, ub_row)
         if self.num_cols == 0:
-            self.add_cols(num_cols)
-        start = self.add_rows(num_rows, lb_row, ub_row)
-        for i, row in enumerate(matrix):
-            self.set_row(start+i, row)
+            self.add_cols(num_cols, lb_col, ub_col)
+        try:
+            for i, row in enumerate(L):
+                self.set_row(s+i, row)
+            return s
+        except:
+            self.del_rows(range(s, s+num_rows))
+            raise
 
-    def add_row(self, coefs=None, double lb=-INF, double ub=INF):
+    def add_row(self, coefs=None, double lb=0, double ub=INF):
         """
         Add one row with specified bounds. If coefs is given, its size must be
-        equal to the current number of cols.
+        equal to the current number of cols. Return the row index.
         """
         cdef int i = self.add_rows(1, lb, ub)
-        if coefs is not None:
-            try:
+        try:
+            if coefs is not None:
                 self.set_row(i, coefs)
-            except ValueError:
-                self.del_row(i)
-                raise
-        return i
+            return i
+        except:
+            self.del_row(i)
+            raise
 
     def add_col(self, coefs=None, double lb=-INF, double ub=INF):
         """
@@ -191,79 +225,94 @@ cdef class Problem:
         equal to the current number of rows.
         """
         cdef int i = self.add_cols(1, lb, ub)
-        if coefs is not None:
-            try:
+        try:
+            if coefs is not None:
                 self.set_col(i, coefs)
-            except ValueError:
-                self.del_col(i)
-                raise
-        return i
+            return i
+        except:
+            self.del_col(i)
+            raise
 
-    def add_rows(self, int num_rows, double lb=-INF, double ub=INF):
+    def add_rows(self, int num_rows, double lb=0, double ub=INF):
         """Add multiple rows and set their bounds."""
         cdef int s = glp.add_rows(self._lp, num_rows)-1
-        cdef int i
-        for i in range(s, s+num_rows):
-            self.set_row_bnds(i, lb, ub)
-        return s
+        try:
+            self.set_row_bnds(range(s, s+num_rows), lb, ub)
+            return s
+        except:
+            self.del_rows(range(s, s+num_rows))
+            raise
 
     def add_cols(self, int num_cols, double lb=-INF, double ub=INF):
         """Add multiple cols and set their bounds."""
         cdef int s = glp.add_cols(self._lp, num_cols)-1
+        try:
+            self.set_col_bnds(range(s, s+num_cols), lb, ub)
+            return s
+        except:
+            self.del_cols(range(s, s+num_cols))
+            raise
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    def del_rows(self, rows):
+        cdef int[:] buf = np.array(rows)
         cdef int i
-        for i in range(s, s+num_cols):
-            self.set_col_bnds(i, lb, ub)
-        return s
+        for i in range(buf.size):
+            self._check_row_index(i)
+            buf[i] += 1
+        glp.del_rows(self._lp, buf.size, &buf[0]-1)
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    def del_cols(self, cols):
+        cdef int[:] buf = np.array(cols)
+        cdef int i
+        for i in range(buf.size):
+            self._check_col_index(i)
+            buf[i] += 1
+        glp.del_cols(self._lp, buf.size, &buf[0]-1)
 
     def del_row(self, int row):
         """Delete one row."""
+        self._check_row_index(row)
         row += 1
         glp.del_rows(self._lp, 1, &row-1)
 
     def del_col(self, int col):
         """Delete one col."""
+        self._check_col_index(col)
         col += 1
         glp.del_cols(self._lp, 1, &col-1)
 
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
     def set_row(self, int row, coefs):
         """Set coefficients of one row."""
-        cdef int num_rows = self.num_rows
+        self._check_row_index(row)
         cdef int num_cols = self.num_cols
-        if row < 0 or row >= num_rows:
-            raise ValueError("Row {} is out of range (0, {})."
-                             .format(row, num_rows))
         # TODO: more efficient to forward only the nonzero components?
         cdef int   [:] ind = np.arange(1, num_cols+1, dtype=np.intc)
         cdef double[:] val = double_view(coefs)
-        if val.size != num_cols:
-            raise ValueError("Row size must be {}, got {}."
-                             .format(num_cols, val.size))
+        self._check_row_size(val.size)
         glp.set_mat_row(self._lp, row+1, num_cols, &ind[0]-1, &val[0]-1)
 
     def set_col(self, int col, coefs):
         """Set coefficients of one col."""
+        self._check_col_index(col)
         cdef int num_rows = self.num_rows
-        cdef int num_cols = self.num_cols
-        if col < 0 or col >= num_cols:
-            raise ValueError("Col {} is out of range (0, {})."
-                             .format(col, num_cols))
         # TODO: more efficient to forward only the nonzero components?
         cdef int   [:] ind = np.arange(1, num_rows+1, dtype=np.intc)
         cdef double[:] val = double_view(coefs)
-        if val.size != num_rows:
-            raise ValueError("Col size must be {}, got {}."
-                             .format(num_rows, val.size))
+        self._check_col_size(val.size)
         glp.set_mat_col(self._lp, col+1, num_rows, &ind[0]-1, &val[0]-1)
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
     def get_row(self, int row):
         """Get coefficient vector of one row."""
-        cdef int num_rows = self.num_rows
+        self._check_row_index(row)
         cdef int num_cols = self.num_cols
-        if row < 0 or row >= num_rows:
-            raise ValueError("Row {} is out of range (0, {})."
-                             .format(row, num_rows))
         cdef int   [:] ind = int_array(num_cols)
         cdef double[:] val = double_array(num_cols)
         cdef int nz = glp.get_mat_row(self._lp, row+1, &ind[0]-1, &val[0]-1)
@@ -278,11 +327,8 @@ cdef class Problem:
     @cython.wraparound(False)
     def get_col(self, int col):
         """Get coefficient vector of one col."""
+        self._check_col_index(col)
         cdef int num_rows = self.num_rows
-        cdef int num_cols = self.num_cols
-        if col < 0 or col >= num_cols:
-            raise ValueError("Col {} is out of range (0, {})."
-                             .format(col, num_cols))
         cdef int   [:] ind = int_array(num_rows)
         cdef double[:] val = double_array(num_rows)
         cdef int nz = glp.get_mat_col(self._lp, col+1, &ind[0]-1, &val[0]-1)
@@ -295,7 +341,7 @@ cdef class Problem:
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    def get_mat(self):
+    def get_matrix(self):
         """Get coefficient matrix."""
         cdef int num_rows = self.num_rows
         cdef int num_cols = self.num_cols
@@ -314,23 +360,26 @@ cdef class Problem:
     def set_row_bnds(self, rows, double lb, double ub):
         """Set bounds of the specified row(s)."""
         if isinstance(rows, int):
-            rows = [rows]
+            rows = (rows,)
         cdef int vartype = get_vartype(lb, ub)
         cdef int row
         for row in rows:
+            self._check_row_index(row)
             glp.set_row_bnds(self._lp, row+1, vartype, lb, ub)
 
     def set_col_bnds(self, cols, double lb, double ub):
         """Set bounds of the specified col."""
         if isinstance(cols, int):
-            cols = [cols]
+            cols = (cols,)
         cdef int vartype = get_vartype(lb, ub)
         cdef int col
         for col in cols:
+            self._check_col_index(col)
             glp.set_col_bnds(self._lp, col+1, vartype, lb, ub)
 
     def get_row_bnds(self, int row):
         """Get bounds (lb, ub) of the specified row."""
+        self._check_row_index(row)
         cdef double lb = glp.get_row_lb(self._lp, row+1)
         cdef double ub = glp.get_row_ub(self._lp, row+1)
         return (-INF if lb == -DBL_MAX else lb,
@@ -338,23 +387,41 @@ cdef class Problem:
 
     def get_col_bnds(self, int col):
         """Get bounds (lb, ub) of the specified col."""
+        self._check_col_index(col)
         cdef double lb = glp.get_col_lb(self._lp, col+1)
         cdef double ub = glp.get_col_ub(self._lp, col+1)
         return (-INF if lb == -DBL_MAX else lb,
                 +INF if ub == +DBL_MAX else ub)
 
+    cdef _check_row_size(self, int size, str name='row'):
+        if size != self.num_cols:
+            raise ValueError("Expecting {} size {}, got {}."
+                             .format(name, self.num_cols, size))
+
+    cdef _check_col_size(self, int size, str name='col'):
+        if size != self.num_rows:
+            raise ValueError("Expecting {} size {}, got {}."
+                             .format(name, self.num_rows, size))
+
+    cdef _check_row_index(self, int row):
+        if row < 0 or row >= self.num_rows:
+            raise IndexError("Invalid row = {}. Expecting 0 ≤ row < {}."
+                             .format(row, self.num_rows))
+
+    cdef _check_col_index(self, int col):
+        if col < 0 or col >= self.num_cols:
+            raise IndexError("Invalid col = {}. Expecting 0 ≤ col < {}."
+                             .format(col, self.num_cols))
+
     @cython.boundscheck(False)
     @cython.wraparound(False)
     def set_objective(self, coefs, int sense=glp.MIN):
         """Set objective coefficients and direction."""
-        cdef int num_cols = self.num_cols
         cdef double[:] buf = double_view(coefs)
         cdef int col
-        if buf.size != num_cols:
-            raise ValueError("Expecting objective size {}, got {}."
-                             .format(num_cols, buf.size))
+        self._check_row_size(buf.size, "objective")
         glp.set_obj_dir(self._lp, sense)
-        for col in range(num_cols):
+        for col in range(self.num_cols):
             glp.set_obj_coef(self._lp, col+1, buf[col])
 
     def simplex(self, int method=glp.PRIMAL):
@@ -400,38 +467,23 @@ cdef class Problem:
     def has_optimal_solution(self, objective, sense=glp.MIN):
         """Check if the system has an optimal solution."""
         try:
-            self.optimize(objective, sense)
+            self.set_objective(objective, sense)
+            self.simplex(sense)
             return True
         except (UnboundedError, InfeasibleError, NofeasibleError):
             return False
 
-    def implies(self, constraint, bound=0, sense=glp.MIN):
+    def implies(self, L):
         """
-        Check if the inequality represented by the constraint vector C and
-        bound b is redundant.
+        Check if the constraint matrix L∙x ≥ 0 is redundant, i.e. each point
+        in the polytope specified by the LP satisfies the constraints in L.
 
-        The direction of the inequality depends on the value of ``sense``:
-
-            - C∙x ≥ b   if sense=lp.MIN (default)
-            - C∙x ≤ b   if sense=lp.MAX
-
-        For convenience, ``constraint`` can be a matrix containing multiple
-        constraint queries. In this case ``bound`` and ``sense`` are allowed
-        to be vectors (but don't need to be).
+        ``L`` can either be a matrix or a single row vector.
         """
-        def _implies(c, b, s):
-            if not self.has_optimal_solution(c, s):
-                return False
-            obj_val = self.get_objective_value()
-            return obj_val <= b if s == glp.MIN else obj_val >= b
-        constraint = _as_np_array(constraint)
-        if len(constraint.shape) == 1:
-            constraint = [constraint]
-        if isinstance(bound, (float, int)):
-            bound = repeat(bound)
-        if isinstance(sense, int):
-            sense = repeat(sense)
-        return all(starmap(_implies, zip(constraint, bound, sense)))
+        def _implies(q):
+            return (self.has_optimal_solution(q) and
+                    self.get_objective_value() <= 0)
+        return all(map(_implies, _as_matrix(L)))
 
     @cython.boundscheck(False)
     @cython.wraparound(False)

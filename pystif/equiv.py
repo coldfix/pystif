@@ -42,11 +42,9 @@ def show_missing_constraints(lp, constraints, name_a, name_b):
 
 
 def check_implies(sys_a, sys_b, name_a, name_b, elem_ineqs=False, quiet=False):
-    lp = Problem.from_matrix(sys_a, lb_row=0)
+    lp = Problem(sys_a)
     if elem_ineqs:
-        eli = elemental_inequalities(num_vars(lp.num_cols))
-        eli = [ineq[1:] for ineq in eli]
-        lp.add_matrix(eli)
+        lp.add(elemental_inequalities(num_vars(lp.num_cols)))
     if quiet:
         return lp.implies(sys_b)
     return show_missing_constraints(lp, sys_b, name_a, name_b) == 0
