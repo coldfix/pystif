@@ -2,10 +2,27 @@ language: python
 
 python:
   - "3.4"
- 
+
+# Build inside docker containers instead of virtual machines. These are
+# faster, start quicker and support caching. Only downside: sudo is not
+# supported. To work around this, the debian package must be extracted
+# manually and a few environment variables need to be set up (see below).
+sudo: false
+
+env:
+  global:
+    # Enable caching of python wheels
+    - PIP_FIND_LINKS=file://$HOME/.pip-cache
+    - PIP_WHEEL_DIR=$HOME/.pip-cache
+
 install:
   - pip install cython
   - python setup.py develop
 
 script:
   - nosetests
+
+cache:
+  apt: true
+  directories:
+    - $PIP_WHEEL_DIR
