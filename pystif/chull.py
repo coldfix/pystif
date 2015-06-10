@@ -2,14 +2,19 @@
 Find hull off a convex cone that may not have full dimensionality.
 
 Usage:
-    chull -i INPUT -x XRAYS [-o OUTPUT] [-f FEEDBACK] [-e]
+    chull -i INPUT -x XRAYS [-o OUTPUT] [-f FEEDBACK]
 
 Options:
     -i INPUT, --input INPUT         Load initial (big) system from this file
     -x XRAYS, --xrays XRAYS         Load extremal rays from this file
     -o OUTPUT, --output OUTPUT      Save results to this file
     -f FILE, --feedback FILE        Save pending normal vectors to file
-    -e, --el-ineqs                  Don't show elemental inequalities
+
+Exit codes:
+
+    - 0 — full projection to the subspace has been computed
+    - 17 — still missing extremal rays for complete subspace description
+    - other exit codes correspond to program errors
 """
 
 import sys
@@ -84,57 +89,67 @@ def convex_hull(xrays):
     ))
 
 
-
-def filter_equations(big_system, equations, feedback, el_ineqs, info):
-
-    dim = big_system.shape[1]
-    subdim = equations.shape[1]
-
-    lp_origin = Problem(big_system)
-    lp_target = Problem(num_cols=subdim)
-    if el_ineqs:
-        lp_target.add(list(elemental_inequalities(num_vars(subdim))))
-
+def unique_rows(L):
+    """Return new matrix with the unique rows of L."""
     seen = VectorMemory()
+    L = list(map(scale_to_int, L))
+    return np.array([q for q in L if not seen(q)])
 
-    num_unseen = 0
-    num_feedback = 0
-    num_trivial = 0
-    for i, eq in enumerate(equations):
-        info("Progress: {:5}/{} | {:4} {:4}/{:4}"
-             .format(i, len(equations),
-                     num_trivial, num_feedback, num_unseen))
-        eq = scale_to_int(eq)
-        if seen(eq):
-            continue
-        num_unseen += 1
-        eq_embedded = np.hstack((eq, np.zeros(dim-subdim)))
-        if not lp_origin.has_optimal_solution(eq_embedded):
-            num_feedback += 1
-            feedback(format_vector(eq))
-            continue
-        if lp_target.has_optimal_solution(eq):
-            num_trivial += 1
-            continue
-        lp_target.add_row(eq, lb=0)
-        yield eq
+
+def classify(lp, ineqs, report_yes, report_no, status_info):
+    """
+    Classify inequalities according to whether they are implied by the LP.
+
+    All inequalities will be fed to either ``report_yes`` or ``report_no``
+    depending on whether they are implied.
+
+    Returns ``True`` if all inequalities are valid.
+    """
+    total = len(ineqs)
+    yes = 0
+    for i, q in enumerate(ineqs):
+        status_info(i, total, yes)
+        if lp.implies(q, embed=True):
+            yes += 1
+            report_yes(q)
+        else:
+            report_no(q)
+    status_info(total, total, yes)
+    return yes == total
+
+
+def print_vector(print_, q):
+    """Print formatted vector q."""
+    print_(format_vector(q))
+
+
+def print_status(print_, i, total, yes):
+    """Print status."""
+    print_("Progress: {:5}/{:5} | Valid: {:4}" .format(i, total, yes))
+    if i == total:
+        print_("\n")
 
 
 def main(args=None):
     opts = docopt(__doc__, args)
 
     system = np.loadtxt(opts['--input'], ndmin=2)
-    dataset = np.loadtxt(opts['--xrays'], ndmin=2)
-    equations = convex_hull(dataset)
+    xrays = np.loadtxt(opts['--xrays'], ndmin=2)
     feedback = print_to(opts['--feedback'], '#', default=sys.stdout)
     output = print_to(opts['--output'])
-    el_ineqs = opts['--el-ineqs']
     info = partial(print, '\r', end='', file=sys.stderr)
+    lp = Problem(system)
 
-    for eq in filter_equations(system, equations, feedback, el_ineqs, info):
-        output(format_vector(eq))
-    print("\n", file=sys.stderr)
+    faces = convex_hull(xrays)
+    faces = unique_rows(faces)
+
+    solution_channel = partial(print_vector, output)
+    feedback_channel = partial(print_vector, feedback)
+    show_status_info = partial(print_status, info)
+
+    return classify(lp, faces,
+                    solution_channel, feedback_channel, show_status_info)
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(0 if main() else 17)
