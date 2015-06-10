@@ -26,7 +26,7 @@ install:
   - dpkg -x libglpk-dev* $PREFIX
 
   # cache dependencies
-  - pip wheel -v cython scipy docopt
+  - pip wheel cython scipy docopt
 
   # install build dependency
   - pip install cython
