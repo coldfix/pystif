@@ -76,8 +76,11 @@ def convex_hull(xrays):
     return np.vstack((
         subord,
         -subord,
+        # The following is an empirical minus sign. I didn't find anything on
+        # the qhull documentation as to how the equations are oriented, but
+        # this seems to work. As soon as things start failing, you might want
+        # to take a second look.
         -equations,
-        equations,
     ))
 
 
