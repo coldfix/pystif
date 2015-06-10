@@ -94,15 +94,20 @@ def filter_equations(big_system, equations, feedback):
 
     seen = VectorMemory()
 
+    num_unseen = 0
+    num_feedback = 0
     num_trivial = 0
     for i, eq in enumerate(equations):
-        info("Progress: {:5}/{} | {:4}"
-             .format(i, len(equations), num_trivial))
+        info("Progress: {:5}/{} | {:4} {:4}/{:4}"
+             .format(i, len(equations),
+                     num_trivial, num_feedback, num_unseen))
         eq = scale_to_int(eq)
         if seen(eq):
             continue
+        num_unseen += 1
         eq_embedded = np.hstack((eq, np.zeros(dim-subdim)))
         if not lp_origin.has_optimal_solution(eq_embedded):
+            num_feedback += 1
             feedback(format_vector(eq))
             continue
         if lp_target.has_optimal_solution(eq):
