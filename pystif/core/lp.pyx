@@ -186,7 +186,8 @@ cdef class Problem:
 
     def add(self, L,
             double lb_row=0, double ub_row=INF,
-            double lb_col=-INF, double ub_col=INF):
+            double lb_col=-INF, double ub_col=INF,
+            *, embed=False):
         """
         Add the constraint matrix L∙x ≥ 0. Return the row index of the first
         added constraint.
@@ -199,13 +200,13 @@ cdef class Problem:
             self.add_cols(num_cols, lb_col, ub_col)
         try:
             for i, row in enumerate(L):
-                self.set_row(s+i, row)
+                self.set_row(s+i, row, embed=embed)
             return s
         except:
             self.del_rows(range(s, s+num_rows))
             raise
 
-    def add_row(self, coefs=None, double lb=0, double ub=INF):
+    def add_row(self, coefs=None, double lb=0, double ub=INF, *, embed=False):
         """
         Add one row with specified bounds. If coefs is given, its size must be
         equal to the current number of cols. Return the row index.
@@ -213,13 +214,13 @@ cdef class Problem:
         cdef int i = self.add_rows(1, lb, ub)
         try:
             if coefs is not None:
-                self.set_row(i, coefs)
+                self.set_row(i, coefs, embed=embed)
             return i
         except:
             self.del_row(i)
             raise
 
-    def add_col(self, coefs=None, double lb=-INF, double ub=INF):
+    def add_col(self, coefs=None, double lb=-INF, double ub=INF, *, embed=False):
         """
         Add one col with specified bounds. If coefs is given, its size must be
         equal to the current number of rows.
@@ -227,7 +228,7 @@ cdef class Problem:
         cdef int i = self.add_cols(1, lb, ub)
         try:
             if coefs is not None:
-                self.set_col(i, coefs)
+                self.set_col(i, coefs, embed=embed)
             return i
         except:
             self.del_col(i)
@@ -287,24 +288,24 @@ cdef class Problem:
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    def set_row(self, int row, coefs):
+    def set_row(self, int row, coefs, *, embed=False):
         """Set coefficients of one row."""
         self._check_row_index(row)
         cdef int num_cols = self.num_cols
         # TODO: more efficient to forward only the nonzero components?
         cdef int   [:] ind = np.arange(1, num_cols+1, dtype=np.intc)
         cdef double[:] val = double_view(coefs)
-        self._check_row_size(val.size)
+        self._check_row_size(val.size, embed)
         glp.set_mat_row(self._lp, row+1, num_cols, &ind[0]-1, &val[0]-1)
 
-    def set_col(self, int col, coefs):
+    def set_col(self, int col, coefs, *, embed=False):
         """Set coefficients of one col."""
         self._check_col_index(col)
         cdef int num_rows = self.num_rows
         # TODO: more efficient to forward only the nonzero components?
         cdef int   [:] ind = np.arange(1, num_rows+1, dtype=np.intc)
         cdef double[:] val = double_view(coefs)
-        self._check_col_size(val.size)
+        self._check_col_size(val.size, embed)
         glp.set_mat_col(self._lp, col+1, num_rows, &ind[0]-1, &val[0]-1)
 
     @cython.boundscheck(False)
@@ -393,15 +394,21 @@ cdef class Problem:
         return (-INF if lb == -DBL_MAX else lb,
                 +INF if ub == +DBL_MAX else ub)
 
-    cdef _check_row_size(self, int size, str name='row'):
-        if size != self.num_cols:
-            raise ValueError("Expecting {} size {}, got {}."
-                             .format(name, self.num_cols, size))
+    cdef _check_row_size(self, int size, embed, str name='row'):
+        if size == self.num_cols:
+            return
+        if embed and size >= 0 and size < self.num_cols:
+            return
+        raise ValueError("Expecting {} size {}, got {}."
+                         .format(name, self.num_cols, size))
 
-    cdef _check_col_size(self, int size, str name='col'):
-        if size != self.num_rows:
-            raise ValueError("Expecting {} size {}, got {}."
-                             .format(name, self.num_rows, size))
+    cdef _check_col_size(self, int size, embed, str name='col'):
+        if size == self.num_rows:
+            return
+        if embed and size >= 0 and size < self.num_rows:
+            return
+        raise ValueError("Expecting {} size {}, got {}."
+                         .format(name, self.num_rows, size))
 
     cdef _check_row_index(self, int row):
         if row < 0 or row >= self.num_rows:
@@ -415,11 +422,11 @@ cdef class Problem:
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    def set_objective(self, coefs, int sense=glp.MIN):
+    def set_objective(self, coefs, int sense=glp.MIN, *, embed=False):
         """Set objective coefficients and direction."""
         cdef double[:] buf = double_view(coefs)
         cdef int col
-        self._check_row_size(buf.size, "objective")
+        self._check_row_size(buf.size, embed, "objective")
         glp.set_obj_dir(self._lp, sense)
         for col in range(self.num_cols):
             glp.set_obj_coef(self._lp, col+1, buf[col])
@@ -464,16 +471,16 @@ cdef class Problem:
         """Get value of objective achieved in last optimization task."""
         return glp.get_obj_val(self._lp)
 
-    def has_optimal_solution(self, objective, sense=glp.MIN):
+    def has_optimal_solution(self, objective, sense=glp.MIN, *, embed=False):
         """Check if the system has an optimal solution."""
         try:
-            self.set_objective(objective, sense)
+            self.set_objective(objective, sense, embed=embed)
             self.simplex(sense)
             return True
         except (UnboundedError, InfeasibleError, NofeasibleError):
             return False
 
-    def implies(self, L):
+    def implies(self, L, *, embed=False):
         """
         Check if the constraint matrix L∙x ≥ 0 is redundant, i.e. each point
         in the polytope specified by the LP satisfies the constraints in L.
@@ -481,7 +488,7 @@ cdef class Problem:
         ``L`` can either be a matrix or a single row vector.
         """
         def _implies(q):
-            return (self.has_optimal_solution(q) and
+            return (self.has_optimal_solution(q, embed=embed) and
                     self.get_objective_value() <= 0)
         return all(map(_implies, _as_matrix(L)))
 
