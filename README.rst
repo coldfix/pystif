@@ -41,14 +41,15 @@ If you want to install you can just type instead::
 Usage
 ~~~~~
 
-The software package is split into many small independent components –
-following the well-known UNIX principle.
+The software package is split into many small independent components —
+following a well-known UNIX principle.
 
 The following subprograms are currently available as python modules:
 
-- ``pystif.xray`` – find extremal rays of projected cone
-- ``pystif.chull`` – compute convex hull given a set of extremal rays
-- ``pystif.equiv`` – check two systems of inequalities for equivalence
+- ``pystif.xray`` — find extremal rays of projected cone
+- ``pystif.chull`` — compute convex hull given a set of extremal rays
+- ``pystif.equiv`` — check two systems of inequalities for equivalence
+- ``pystif.el_ineqs`` — output elemental inequalities to a file
 
 Type ``python -m pystif.MODULE -h`` to get individual usage information. For
 remaining questions, contact me on github or read the source code.
