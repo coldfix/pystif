@@ -53,3 +53,11 @@ The following subprograms are currently available as python modules:
 
 Type ``python -m pystif.MODULE -h`` to get individual usage information. For
 remaining questions, contact me on github or read the source code.
+
+
+Other components
+~~~~~~~~~~~~~~~~
+
+There are a few more components which I have currently implemented in C++.
+I will try to add the most important functionality here — without
+sacraficing too much performance if at all possible.
