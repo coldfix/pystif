@@ -137,13 +137,14 @@ def main(args=None):
 
     system = np.loadtxt(opts['--input'], ndmin=2)
     xrays = np.loadtxt(opts['--xrays'], ndmin=2)
-    feedback = print_to(opts['--feedback'], '#', default=sys.stdout)
-    output = print_to(opts['--output'])
-    info = partial(print, '\r', end='', file=sys.stderr)
     lp = Problem(system)
 
     faces = convex_hull(xrays)
     faces = unique_rows(faces)
+
+    feedback = print_to(opts['--feedback'], '#', default=sys.stdout)
+    output = print_to(opts['--output'])
+    info = partial(print, '\r', end='', file=sys.stderr)
 
     callbacks = (partial(print_vector, output),
                  partial(print_vector, feedback),
