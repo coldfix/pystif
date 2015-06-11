@@ -293,20 +293,19 @@ cdef class Problem:
         self._check_row_index(row)
         cdef int num_cols = self.num_cols
         # TODO: more efficient to forward only the nonzero components?
-        cdef int   [:] ind = np.arange(1, num_cols+1, dtype=np.intc)
         cdef double[:] val = double_view(coefs)
+        cdef int   [:] ind = np.arange(1, val.size+1, dtype=np.intc)
         self._check_row_size(val.size, embed)
-        glp.set_mat_row(self._lp, row+1, num_cols, &ind[0]-1, &val[0]-1)
+        glp.set_mat_row(self._lp, row+1, val.size, &ind[0]-1, &val[0]-1)
 
     def set_col(self, int col, coefs, *, embed=False):
         """Set coefficients of one col."""
         self._check_col_index(col)
-        cdef int num_rows = self.num_rows
         # TODO: more efficient to forward only the nonzero components?
-        cdef int   [:] ind = np.arange(1, num_rows+1, dtype=np.intc)
         cdef double[:] val = double_view(coefs)
+        cdef int   [:] ind = np.arange(1, val.size+1, dtype=np.intc)
         self._check_col_size(val.size, embed)
-        glp.set_mat_col(self._lp, col+1, num_rows, &ind[0]-1, &val[0]-1)
+        glp.set_mat_col(self._lp, col+1, val.size, &ind[0]-1, &val[0]-1)
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
@@ -428,8 +427,10 @@ cdef class Problem:
         cdef int col
         self._check_row_size(buf.size, embed, "objective")
         glp.set_obj_dir(self._lp, sense)
-        for col in range(self.num_cols):
+        for col in range(buf.size):
             glp.set_obj_coef(self._lp, col+1, buf[col])
+        for col in range(buf.size, self.num_cols):
+            glp.set_obj_coef(self._lp, col+1, 0)
 
     def simplex(self, int method=glp.PRIMAL):
         """Perform simplex algorithm."""
