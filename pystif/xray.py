@@ -51,7 +51,10 @@ def random_direction_vector(dim):
 def find_xray(lp, direction):
     subdim = 1+len(direction)
     direction = np.hstack((0, direction, np.zeros(lp.num_cols-subdim)))
-    xray = lp.maximize(direction)
+    # For the random vectors it doesn't matter whether we use `minimize` or
+    # `maximize` — but it *does* matter for the oriented direction vectors
+    # posted by the `pystif.chull` module:
+    xray = lp.minimize(direction)
     xray.resize(subdim)
     # xray[0] is always -1, this prevents any shortening if we decide to that
     # later on, so just set it to 0.
