@@ -66,26 +66,26 @@ def convex_hull(xrays):
     points = np.dot(points, principal_basis)
 
     hull = scipy.spatial.ConvexHull(points)
-    equations = hull.equations
+    faces = hull.equations
 
-    equations = np.array([
-        eq[:-1] for eq in equations
+    faces = np.array([
+        eq[:-1] for eq in faces
         if abs(eq[-1]) < 1e-5])
 
     # add back the removed dimensions
-    equations = np.dot(equations, principal_basis.T)
+    faces = np.dot(faces, principal_basis.T)
 
-    subord = subordinate_basis.T
-    subord = add_left_zero(subord)
-    equations = add_left_zero(equations)
+    nullspace = subordinate_basis.T
+    nullspace = add_left_zero(nullspace)
+    faces = add_left_zero(faces)
     return np.vstack((
-        subord,
-        -subord,
+        nullspace,
+        -nullspace,
         # The following is an empirical minus sign. I didn't find anything on
         # the qhull documentation as to how the equations are oriented, but
         # this seems to work. As soon as things start failing, you might want
         # to take a second look.
-        -equations,
+        -faces,
     ))
 
 
@@ -125,7 +125,9 @@ def print_vector(print_, q):
 
 def print_status(print_, i, total, yes):
     """Print status."""
-    print_("Progress: {:5}/{:5} | Valid: {:4}" .format(i, total, yes))
+    l = len(str(total))
+    print_("Progress: {}/{},  valid: {}"
+           .format(str(i).rjust(l), total, str(yes).rjust(l)))
     if i == total:
         print_("\n")
 
@@ -143,12 +145,10 @@ def main(args=None):
     faces = convex_hull(xrays)
     faces = unique_rows(faces)
 
-    solution_channel = partial(print_vector, output)
-    feedback_channel = partial(print_vector, feedback)
-    show_status_info = partial(print_status, info)
-
-    return classify(lp, faces,
-                    solution_channel, feedback_channel, show_status_info)
+    callbacks = (partial(print_vector, output),
+                 partial(print_vector, feedback),
+                 partial(print_status, info))
+    return classify(lp, faces, *callbacks)
 
 
 if __name__ == '__main__':
