@@ -86,9 +86,7 @@ class VectorMemory:
         self.seen = set()
 
     def __call__(self, v):
-        if any(v != np.round(v)):
-            return False
-        v = tuple(int(c) for c in v)
+        v = tuple(scale_to_int(v))
         if v in self.seen:
             return True
         self.seen.add(v)
