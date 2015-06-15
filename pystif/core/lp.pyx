@@ -481,7 +481,7 @@ cdef class Problem:
         except (UnboundedError, InfeasibleError, NofeasibleError):
             return False
 
-    def implies(self, L, *, embed=False):
+    def implies(self, L, *, embed=False, threshold=1e-14):
         """
         Check if the constraint matrix L∙x ≥ 0 is redundant, i.e. each point
         in the polytope specified by the LP satisfies the constraints in L.
@@ -490,7 +490,7 @@ cdef class Problem:
         """
         def _implies(q):
             return (self.has_optimal_solution(q, embed=embed) and
-                    self.get_objective_value() <= 0)
+                    self.get_objective_value() <= threshold)
         return all(map(_implies, _as_matrix(L)))
 
     @cython.boundscheck(False)
