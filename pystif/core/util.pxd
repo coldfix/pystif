@@ -3,6 +3,14 @@ import numpy as np
 from cpython cimport array as c_array
 
 
+cdef extern from "math.h":
+    double INF "INFINITY"
+    double NAN "NAN"
+
+cdef extern from "float.h":
+    double DBL_MAX "DBL_MAX"
+
+
 cdef c_array.array int_array_template
 cdef c_array.array double_array_template
 
