@@ -27,16 +27,6 @@ from .core.it import elemental_inequalities, num_vars
 from .util import format_vector, scale_to_int, VectorMemory, print_to
 
 
-def orthogonal_complement(v):
-    """
-    Get the (orthonormal) basis vectors making up the orthogonal complement of
-    the plane defined by n∙x = 0.
-    """
-    a = np.hstack((np.array([v]).T , np.eye(v.shape[0])))
-    q, r = np.linalg.qr(a)
-    return q[:,1:]
-
-
 def principal_components(data_points, s_limit=1e-10):
     """
     Get the (orthonormal) basis vectors of the principal components of the

@@ -2,14 +2,14 @@
 XRay - Random search for inequalities in subspace.
 
 Usage:
-    xray -i INPUT  [-o OUTPUT] [-s SUBDIM] [-l LIMIT] [-n NUM | -d FILE]
+    xray init -i INPUT  [-o OUTPUT] [-s SUBDIM] [-l LIMIT]
+    xray find -i INPUT  [-o OUTPUT] [-s SUBDIM] [-l LIMIT] -d FILE
 
 Options:
     -i INPUT, --input INPUT         Read constraints matrix from file
     -o OUTPUT, --output OUTPUT      Write found constraints to this file
     -s SUBDIM, --subdim SUBDIM      Dimension of reduced space
     -l LIMIT, --limit LIMIT         Add constraints H(i)≤LIMIT for i<SUBDIM
-    -n NUM, --num-samples NUM       Number of trials [default: 100000]
     -d FILE, --directions FILE      Load directions from this file
 
 
@@ -39,7 +39,17 @@ import numpy as np
 import numpy.random
 from .core.lp import Problem
 from .util import (repeat, take, basis_vector, format_vector,
-                   scale_to_int, VectorMemory, print_to)
+                   scale_to_int, VectorMemory, print_to, make_int_exact)
+
+
+def orthogonal_complement(v):
+    """
+    Get the (orthonormal) basis vectors making up the orthogonal complement of
+    the plane defined by n∙x = 0.
+    """
+    a = np.hstack((np.array([v]).T , np.eye(v.shape[0])))
+    q, r = np.linalg.qr(a)
+    return q[:,1:]
 
 
 def random_direction_vector(dim):
@@ -64,6 +74,44 @@ def find_xray(lp, direction):
     return xray
 
 
+def inner_approximation(lp, dim):
+    """
+    Return a matrix of extreme points whose convex hull defines an inner
+    approximation to the projection of the polytope defined by the LP to the
+    subspace of its lowest ``dim`` components.
+
+    Extreme points are returned as matrix rows.
+
+    The returned points define a polytope with the dimension of the projected
+    polytope itself (which may be less than ``dim``).
+    """
+    # FIXME: Better use deterministic or random direction vectors?
+    v = random_direction_vector(dim)
+    points = np.array([
+        find_xray(lp, v)[1:],
+    ])
+    orth = np.eye(dim)
+    while orth.shape[1] > 0:
+        # Generate arbitrary vector in orthogonal space and min/max along its
+        # direction:
+        d = random_direction_vector(orth.shape[1])
+        v = np.dot(d, orth.T)
+        x = find_xray(lp, v)[1:]
+        p = make_int_exact(np.dot(x-points[0], orth))
+        if all(p == 0):
+            x = find_xray(lp, -v)[1:]
+            p = make_int_exact(np.dot(x-points[0], orth))
+        if all(p == 0):
+            # Optimizing along ``v`` yields a vector in our ray space. This
+            # means ``v∙x=0`` is part of the LP.
+            orth = np.dot(orth, orthogonal_complement(d))
+        else:
+            # Remove discovered ray from the orthogonal space:
+            orth = np.dot(orth, orthogonal_complement(p))
+            points = np.vstack((points, x))
+    return np.hstack((np.zeros((points.shape[0], 1)), points))
+
+
 def main(args=None):
     opts = docopt(__doc__, args)
 
@@ -81,15 +129,13 @@ def main(args=None):
         for i in range(1, subdim):
             lp.set_col_bnds(i, 0, limit)
 
-    if opts['--directions']:
+    if opts['init']:
+        rays = inner_approximation(lp, subdim-1)
+    elif opts['find']:
         directions = np.loadtxt(opts['--directions'], ndmin=2)[:,1:]
-    else:
-        num_samples = int(opts['--num-samples'])
-        directions = repeat(random_direction_vector, subdim-1)
-        directions = take(num_samples, directions)
+        rays = (find_xray(lp, v) for v in directions)
 
     seen = VectorMemory()
-    seen(np.zeros(subdim))
 
     output_file = opts['--output']
     if output_file and path.exists(output_file):
@@ -98,7 +144,6 @@ def main(args=None):
             seen(ray)
     output = print_to(output_file, append=True)
 
-    rays = (find_xray(lp, v) for v in directions)
     rays = (ray for ray in rays if not seen(ray))
 
     for ray in rays:
