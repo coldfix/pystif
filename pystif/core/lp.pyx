@@ -4,9 +4,8 @@ Cython Wrapper for GLPK. For more information, see :class:`Problem`.
 
 cimport cython
 cimport glpk as glp
-
-from cpython cimport array as c_array
-from array import array
+from .util cimport int_array, double_array, double_view
+from .util import _as_matrix
 
 import numpy as np
 
@@ -42,39 +41,6 @@ cpdef enum:
     DUAL = glp.DUAL
 
 
-cdef c_array.array int_array_template = array('i', [])
-cdef c_array.array double_array_template = array('d', [])
-
-cdef int[:] int_array(int size):
-    """Create a fixed size buffer."""
-    return c_array.clone(int_array_template, size, zero=False)
-
-cdef double[:] double_array(int size):
-    """Create a fixed size buffer."""
-    return c_array.clone(double_array_template, size, zero=False)
-
-cdef double[:] double_view(x):
-    """Get a memory view of sequence."""
-    try:
-        return x
-    except (ValueError, TypeError):
-        # ValueError: numpy dtype mismatch (e.g. int)
-        # TypeError: x doesn't support buffer interface (e.g. list)
-        return np.ascontiguousarray(x, np.float64)
-
-
-def _as_np_array(x):
-    """Create a numpy array from x suited for further processing."""
-    return np.ascontiguousarray(x, np.float64)
-
-
-def _as_matrix(x):
-    x = _as_np_array(x)
-    if len(x.shape) == 1:
-        return np.array([x])
-    return x
-
-
 cdef int get_vartype(double lb, double ub):
     if lb == ub:
         return glp.FX
@@ -101,21 +67,6 @@ class InfeasibleError(OptimizeError):
 
 class NofeasibleError(OptimizeError):
     """No feasible solution exists."""
-
-
-cdef str fmt_num(float num, float threshold=1e-10):
-    cdef float r = round(num)
-    if abs(num - r) < threshold:
-        return "{:3}".format(int(r))
-    return "{:22.15e}".format(num)
-
-
-# Call me crazy for optimizing this function using cython, but this actually
-# reduces the runtime of pystif.el_ineqs by about a factor 20.
-def format_vector(v):
-    """Convert vector to high-precision string, readable by np.loadtxt."""
-    cdef double[:] c = double_view(v)
-    return " ".join(fmt_num(x) for x in c)
 
 
 cdef class Problem:

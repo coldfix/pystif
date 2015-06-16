@@ -1,7 +1,7 @@
 import numpy as np
 import sys
 from functools import partial
-from .core.lp import format_vector
+from .core.util import format_vector
 
 
 def print_to(filename=None, *default_prefix,
