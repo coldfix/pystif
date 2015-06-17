@@ -5,12 +5,26 @@ Usage:
     chull -i INPUT [-o OUTPUT] [-x XRAYS] [-s SUBDIM] [-l LIMIT] [-r]
 
 Options:
-    -i INPUT, --input INPUT         Load LP from this file
-    -o OUTPUT, --output OUTPUT      Save valid facets to this file
-    -x XRAYS, --xrays XRAYS         Save extremal rays to this file
-    -s SUBDIM, --subdim SUBDIM      Dimension of reduced space
+    -i INPUT, --input INPUT         Load LP that defines the actual cone
+    -o OUTPUT, --output OUTPUT      Save facets of projected cone
+    -x XRAYS, --xrays XRAYS         Save projected extremal rays to this file
+    -s DIM, --subdim DIM            Subspace dimension
     -l LIMIT, --limit LIMIT         Add constraints H(i)≤LIMIT for i<SUBDIM
-    -r, --resume                    Resume with previously computed rays
+    -r, --resume                    Resume using previously computed rays
+                                    (must be fully dimensional!)
+Note:
+    * output files may be specified as '-' to use STDIN/STDOUT
+    * if --subdim is omitted it defaults to the square-root of input dimension
+    * the --limit constraint is needed for unbounded cones such as entropy
+      cones to make sure a bounded solution exists
+
+The outline of the algorithm is as follows:
+    1. generate a set of extremal rays that span the subspace in which the
+       projected cone lives
+    2. compute the convex hull over the current set of extremal rays
+    3. for each facet decide whether it is also a facet of the actual LP
+        a) yes: output facet normal vector
+        b) no: find the extremal ray that is outside the facet, go to 2.
 """
 
 import os
@@ -18,12 +32,83 @@ import sys
 from math import sqrt
 from functools import partial
 import numpy as np
+import numpy.random
 import scipy.spatial
 from docopt import docopt
 from .core.lp import Problem
 from .core.it import elemental_inequalities, num_vars
-from .util import format_vector, scale_to_int, VectorMemory, print_to
-from .xray import find_xray, inner_approximation
+from .util import (format_vector, scale_to_int, VectorMemory, print_to,
+                   make_int_exact)
+
+
+def orthogonal_complement(v):
+    """
+    Get the (orthonormal) basis vectors making up the orthogonal complement of
+    the plane defined by n∙x = 0.
+    """
+    a = np.hstack((np.array([v]).T , np.eye(v.shape[0])))
+    q, r = np.linalg.qr(a)
+    return q[:,1:]
+
+
+def random_direction_vector(dim):
+    v = np.random.normal(size=dim)
+    v /= np.linalg.norm(v)
+    return v
+
+
+def find_xray(lp, direction):
+    subdim = 1+len(direction)
+    direction = np.hstack((0, direction, np.zeros(lp.num_cols-subdim)))
+    # For the random vectors it doesn't matter whether we use `minimize` or
+    # `maximize` — but it *does* matter for the oriented direction vectors
+    # posted by the `pystif.chull` module:
+    xray = lp.minimize(direction)
+    xray.resize(subdim)
+    # xray[0] is always -1, this prevents any shortening if we decide to that
+    # later on, so just set it to 0.
+    xray[0] = 0
+    xray = scale_to_int(xray)
+    # TODO: output active constraints
+    return xray
+
+
+def inner_approximation(lp, dim):
+    """
+    Return a matrix of extreme points whose convex hull defines an inner
+    approximation to the projection of the polytope defined by the LP to the
+    subspace of its lowest ``dim`` components.
+
+    Extreme points are returned as matrix rows.
+
+    The returned points define a polytope with the dimension of the projected
+    polytope itself (which may be less than ``dim``).
+    """
+    # FIXME: Better use deterministic or random direction vectors?
+    v = random_direction_vector(dim)
+    points = np.array([
+        find_xray(lp, v)[1:],
+    ])
+    orth = np.eye(dim)
+    while orth.shape[1] > 0:
+        # Generate arbitrary vector in orthogonal space and min/max along its
+        # direction:
+        d = random_direction_vector(orth.shape[1])
+        v = np.dot(d, orth.T)
+        x = find_xray(lp, v)[1:]
+        p = make_int_exact(np.dot(x-points[0], orth))
+        if all(p == 0):
+            x = find_xray(lp, -v)[1:]
+            p = make_int_exact(np.dot(x-points[0], orth))
+        if all(p == 0):
+            # Optimizing along ``v`` yields a vector in our ray space. This
+            # means ``v∙x=0`` is part of the LP.
+            orth = np.dot(orth, orthogonal_complement(d))
+        else:
+            # Remove discovered ray from the orthogonal space:
+            orth = np.dot(orth, orthogonal_complement(p))
+            points = np.vstack((points, x))
+    return np.hstack((np.zeros((points.shape[0], 1)), points))
 
 
 def principal_components(data_points, s_limit=1e-10):
