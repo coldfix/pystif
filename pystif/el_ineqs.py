@@ -24,15 +24,16 @@ subset of variables. The zero-th column will always be zero.
 import sys
 from docopt import docopt
 from .core.it import elemental_inequalities
-from .util import format_vector, print_to
+from .util import System, default_column_labels
 
 
 def main(args=None):
     opts = docopt(__doc__, args)
-    print_ = print_to(opts['--output'], append=opts['--append'])
     num_vars = int(opts['NUM_VARS'])
+    output = System(opts['--output'], read=opts['--append'], write=True)
+    output.set_columns(default_column_labels(2**num_vars))
     for v in elemental_inequalities(num_vars):
-        print_(format_vector(v))
+        output.add(v)
 
 
 if __name__ == '__main__':

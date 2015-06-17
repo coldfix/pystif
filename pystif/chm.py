@@ -36,10 +36,8 @@ import numpy as np
 import numpy.random
 import scipy.spatial
 from docopt import docopt
-from .core.lp import Problem
 from .core.it import elemental_inequalities, num_vars
-from .util import (format_vector, scale_to_int, VectorMemory, print_to,
-                   make_int_exact)
+from .util import scale_to_int, make_int_exact, VectorMemory, System
 
 
 def orthogonal_complement(v):
@@ -204,11 +202,6 @@ def convex_hull_method(lp, lpb, rays,
     status_info(total, total, yes)
 
 
-def print_vector(print_, q):
-    """Print formatted vector q."""
-    print_(format_vector(q))
-
-
 def print_status(print_, i, total, yes):
     """Print status."""
     l = len(str(total))
@@ -225,8 +218,8 @@ def print_qhull(print_, num_points):
 def main(args=None):
     opts = docopt(__doc__, args)
 
-    system = np.loadtxt(opts['--input'], ndmin=2)
-    lp = Problem(system)
+    system = System(opts['--input'])
+    lp = system.lp()
     dim = lp.num_cols
 
     if opts['--subdim'] is not None:
@@ -234,27 +227,34 @@ def main(args=None):
     else:
         subdim = int(round(sqrt(dim)))
 
-    lpb = Problem(system)
+    lpb = system.lp()
     if opts['--limit'] is not None:
         limit = float(opts['--limit'])
         for i in range(1, subdim):
             lpb.set_col_bnds(i, 0, limit)
 
+    devnull = open(os.devnull, 'w')
     resume = opts['--resume']
-    rays_file = opts['--xrays']
-    if rays_file and resume and os.path.exists(rays_file):
-        xrays = np.loadtxt(rays_file, ndmin=2)
+    facet_io = System(opts['--output'], read=resume, write=True)
+    xrays_io = System(opts['--xrays'], read=resume, write=True,
+                      default=devnull)
+
+    if system.cols:
+        xrays_io.set_columns(system.cols[:subdim])
+        facet_io.set_columns(system.cols[:subdim])
+
+    if xrays_io.matrix:
+        xrays = xrays_io.matrix
     else:
         xrays = inner_approximation(lpb, subdim-1)
-
-    devnull = open(os.devnull, 'w')
-    xrays_sink = print_to(opts['--xrays'], append=resume, default=devnull)
-    facet_sink = print_to(opts['--output'], append=resume)
+        for ray in xrays:
+            xrays_io.add(ray)
+        print(file=xrays_io.file)
 
     info = partial(print, '\r', end='', file=sys.stderr)
 
-    callbacks = (partial(print_vector, xrays_sink),
-                 partial(print_vector, facet_sink),
+    callbacks = (xrays_io.add,
+                 facet_io.add,
                  partial(print_status, info),
                  partial(print_qhull, info))
 

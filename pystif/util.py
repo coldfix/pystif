@@ -1,7 +1,97 @@
-import numpy as np
-import sys
 from functools import partial
+from os import path
+import sys
+import numpy as np
 from .core.util import format_vector, make_int_exact, scale_to_int
+from .core.lp import Problem
+
+
+def detect_prefix(s, prefix, on_prefix):
+    """
+    Check whether ``s`` starts with ``prefix``. If so, call ``on_prefix`` with
+    the stripped string.
+    """
+    if s.startswith(prefix):
+        if on_prefix:
+            on_prefix(s[len(prefix):])
+        return True
+    return False
+
+
+def remove_comments(lines, on_comment=None):
+    """Iterate over non-comment lines. Forward comments to ``on_comment``."""
+    for line in lines:
+        if not detect_prefix(line.strip(), '#', on_comment):
+            yield line
+
+
+def read_system(filename, *, ndmin=2):
+    """Read linear system from file, return tuple (colnames, matrix)."""
+    comments = []
+    with open(filename) as file:
+        contents = remove_comments(file, comments.append)
+        matrix = np.loadtxt(contents, ndmin=ndmin)
+    cols = []
+    for line in comments:
+        detect_prefix(line.strip(), '::', lambda s: cols.extend(s.split()))
+    return cols, matrix
+
+
+class System:
+
+    """
+    IO utility for systems. Keeps track of column names.
+    """
+
+    def __init__(self, filename=None, *, read=True, write=False,
+                 default=sys.stdout):
+        self.seen = VectorMemory()
+        self.matrix = None
+        self.cols = None
+        if read:
+            if filename == '-' or not filename:
+                read = False
+            elif write and not path.exists(filename):
+                read = False
+        if read:
+            self.cols, self.matrix = read_system(filename)
+            if not self.cols:
+                self.cols = None
+            self.seen.add(*self.matrix)
+        if write:
+            if filename and filename != '-':
+                self.file = open(filename, 'a' if read else 'w')
+            else:
+                self.file = default
+        else:
+            self.file = None
+
+    def set_columns(self, columns):
+        if self.cols:
+            # TODO: consistency checks?
+            pass
+        else:
+            self.cols = columns
+            if self.file:
+                print('# ::', *columns, file=self.file)
+
+    # TODO: print only the tracked columns
+    # TODO: print columns if not appending
+
+    def add(self, v):
+        """Output the vector ``v``."""
+        if self.seen(v):
+            return
+        if self.matrix is None:
+            self.matrix = np.array([v])
+        else:
+            self.matrix = np.vstack((self.matrix, v))
+        if self.file:
+            print(format_vector(v), file=self.file)
+
+    def lp(self):
+        """Get the LP."""
+        return Problem(self.matrix)
 
 
 def print_to(filename=None, *default_prefix,
@@ -47,6 +137,21 @@ def is_int_vector(v):
     return all(np.round(v) == make_int_exact(v))
 
 
+def get_bits(num):
+    """Return tuple of indices corresponding to 1-bits."""
+    return tuple(i for i in range(num.bit_length())
+                 if num & (1 << i))
+
+
+def default_column_label(index):
+    return "H({})".format(",".join(map(str, get_bits(index))))
+
+
+def default_column_labels(dim):
+    # TODO: assert dim=2**n
+    return list(map(default_column_label, range(dim)))
+
+
 class VectorMemory:
 
     """
@@ -64,3 +169,7 @@ class VectorMemory:
             return True
         self.seen.add(v)
         return False
+
+    def add(self, *rows):
+        for v in rows:
+            self(v)
