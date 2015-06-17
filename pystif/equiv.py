@@ -2,7 +2,7 @@
 Check the equivalence of two system of equations.
 
 Usage:
-    equivalence.py [-e] [-q] [-1] A B
+    equiv [-e] [-q] [-1] A B
 
 Options:
     -e, --elem-ineqs    Add elemental inequalities before checking difference
@@ -63,8 +63,6 @@ def main(args=None):
         if not check_implies(sys_b, sys_a, 'B', 'A', **kwd):
             status |= 2
     return status
-
-main.__doc__ = __doc__
 
 
 if __name__ == '__main__':

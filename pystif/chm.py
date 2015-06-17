@@ -2,7 +2,7 @@
 Find projection of a convex cone to a lower dimensional subspace.
 
 Usage:
-    chull -i INPUT [-o OUTPUT] [-x XRAYS] [-s SUBDIM] [-l LIMIT] [-r]
+    chm -i INPUT [-o OUTPUT] [-x XRAYS] [-s SUBDIM] [-l LIMIT] [-r]
 
 Options:
     -i INPUT, --input INPUT         Load LP that defines the actual cone
@@ -12,6 +12,7 @@ Options:
     -l LIMIT, --limit LIMIT         Add constraints H(i)≤LIMIT for i<SUBDIM
     -r, --resume                    Resume using previously computed rays
                                     (must be fully dimensional!)
+
 Note:
     * output files may be specified as '-' to use STDIN/STDOUT
     * if --subdim is omitted it defaults to the square-root of input dimension
@@ -62,7 +63,7 @@ def find_xray(lp, direction):
     direction = np.hstack((0, direction, np.zeros(lp.num_cols-subdim)))
     # For the random vectors it doesn't matter whether we use `minimize` or
     # `maximize` — but it *does* matter for the oriented direction vectors
-    # posted by the `pystif.chull` module:
+    # obtained from other functions:
     xray = lp.minimize(direction)
     xray.resize(subdim)
     # xray[0] is always -1, this prevents any shortening if we decide to that

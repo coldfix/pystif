@@ -23,6 +23,13 @@ setup(
         'pystif',
         'pystif.core',
     ],
+    entry_points={
+        'console_scripts': [
+            'chm = pystif.chm:main',
+            'equiv = pystif.equiv:main',
+            'el_ineqs = pystif.el_ineqs:main',
+        ]
+    },
     ext_modules=cythonize([
         Extension(
             'pystif.core.lp', ['pystif/core/lp.pyx'],
