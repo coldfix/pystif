@@ -30,7 +30,7 @@ from .util import System, default_column_labels
 def main(args=None):
     opts = docopt(__doc__, args)
     num_vars = int(opts['NUM_VARS'])
-    output = System(opts['--output'], read=opts['--append'], write=True)
+    output = System.save(opts['--output'], append=opts['--append'])
     output.set_columns(default_column_labels(2**num_vars))
     for v in elemental_inequalities(num_vars):
         output.add(v)

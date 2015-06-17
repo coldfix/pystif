@@ -28,13 +28,13 @@ def remove_comments(lines, on_comment=None):
 def read_system(filename, *, ndmin=2):
     """Read linear system from file, return tuple (colnames, matrix)."""
     comments = []
-    with open(filename) as file:
-        contents = remove_comments(file, comments.append)
+    with open(filename) as f:
+        contents = remove_comments(f, comments.append)
         matrix = np.loadtxt(contents, ndmin=ndmin)
     cols = []
     for line in comments:
         detect_prefix(line.strip(), '::', lambda s: cols.extend(s.split()))
-    return cols, matrix
+    return matrix, cols or None
 
 
 class System:
@@ -43,55 +43,63 @@ class System:
     IO utility for systems. Keeps track of column names.
     """
 
-    def __init__(self, filename=None, *, read=True, write=False,
-                 default=sys.stdout):
-        self.seen = VectorMemory()
-        self.matrix = None
-        self.cols = None
-        if read:
-            if filename == '-' or not filename:
-                read = False
-            elif write and not path.exists(filename):
-                read = False
-        if read:
-            self.cols, self.matrix = read_system(filename)
-            if not self.cols:
-                self.cols = None
-            self.seen.add(*self.matrix)
-        if write:
-            if filename and filename != '-':
-                self.file = open(filename, 'a' if read else 'w')
-            else:
-                self.file = default
+    def __init__(self, matrix=None, cols=None):
+        self.matrix = matrix
+        self.cols = cols
+        self._seen = VectorMemory()
+        self._file = None
+        if matrix is not None:
+            self._seen.add(*matrix)
+
+    @classmethod
+    def load(cls, filename=None, *, default=sys.stdin, force=True):
+        if filename == '-' or not filename:
+            return cls()
+        if not force and not path.exists(filename):
+            return cls()
+        return cls(*read_system(filename))
+
+    @classmethod
+    def save(cls, filename=None, *, default=sys.stdout, append=False):
+        if append:
+            system = cls.load(filename, force=False)
         else:
-            self.file = None
+            system = cls()
+        if filename and filename != '-':
+            system._file = open(filename, 'a' if append else 'w')
+        else:
+            system._file = default
+        return system
 
     def set_columns(self, columns):
         if self.cols:
             # TODO: consistency checks?
+            # TODO: reorder columns on output
             pass
         else:
             self.cols = columns
-            if self.file:
-                print('# ::', *columns, file=self.file)
+            self._print('# ::', *columns)
 
     # TODO: print only the tracked columns
     # TODO: print columns if not appending
 
     def add(self, v):
         """Output the vector ``v``."""
-        if self.seen(v):
+        if self._seen(v):
             return
         if self.matrix is None:
             self.matrix = np.array([v])
         else:
             self.matrix = np.vstack((self.matrix, v))
-        if self.file:
-            print(format_vector(v), file=self.file)
+        self._print(format_vector(v))
 
     def lp(self):
         """Get the LP."""
         return Problem(self.matrix)
+
+    def _print(self, *args, **kwargs):
+        if self._file:
+            print(*args, file=self._file, **kwargs)
 
 
 def print_to(filename=None, *default_prefix,

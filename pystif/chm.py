@@ -218,7 +218,7 @@ def print_qhull(print_, num_points):
 def main(args=None):
     opts = docopt(__doc__, args)
 
-    system = System(opts['--input'])
+    system = System.load(opts['--input'])
     lp = system.lp()
     dim = lp.num_cols
 
@@ -235,9 +235,8 @@ def main(args=None):
 
     devnull = open(os.devnull, 'w')
     resume = opts['--resume']
-    facet_io = System(opts['--output'], read=resume, write=True)
-    xrays_io = System(opts['--xrays'], read=resume, write=True,
-                      default=devnull)
+    facet_io = System.save(opts['--output'], append=resume)
+    xrays_io = System.save(opts['--xrays'], append=resume, default=devnull)
 
     if system.cols:
         xrays_io.set_columns(system.cols[:subdim])
