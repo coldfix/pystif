@@ -66,6 +66,15 @@ class System:
         else:
             self.file = None
 
+    def set_columns(self, columns):
+        if self.cols:
+            # TODO: consistency checks?
+            pass
+        else:
+            self.cols = columns
+            if self.file:
+                print('# ::', *columns, file=self.file)
+
     # TODO: print only the tracked columns
     # TODO: print columns if not appending
 
@@ -126,6 +135,21 @@ def project_to_plane(v, n):
 
 def is_int_vector(v):
     return all(np.round(v) == make_int_exact(v))
+
+
+def get_bits(num):
+    """Return tuple of indices corresponding to 1-bits."""
+    return tuple(i for i in range(num.bit_length())
+                 if num & (1 << i))
+
+
+def default_column_label(index):
+    return "H({})".format(",".join(map(str, get_bits(index))))
+
+
+def default_column_labels(dim):
+    # TODO: assert dim=2**n
+    return list(map(default_column_label, range(dim)))
 
 
 class VectorMemory:
