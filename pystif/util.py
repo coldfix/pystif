@@ -48,6 +48,8 @@ class System:
         self.cols = cols
         self._seen = VectorMemory()
         self._file = None
+        self._slice = None
+        self._write_order = False
         if matrix is not None:
             self._seen.add(*matrix)
 
@@ -65,23 +67,53 @@ class System:
             system = cls.load(filename, force=False)
         else:
             system = cls()
+            system._write_order = True
         if filename and filename != '-':
             system._file = open(filename, 'a' if append else 'w')
         else:
             system._file = default
         return system
 
+    def set_io_order(self, columns):
+        """Set the column order for physical I/O."""
+        if self._file and self.matrix is not None:
+            # Requires to overwrite file…
+            raise RuntimeError("Can't change ordering after write!")
+        self._update_io_order(columns)
+
+    def _update_io_order(self, columns):
+        self._slice = [self._get_column_index(c) for c in columns]
+
+    def get_io_order(self):
+        """Get column names in I/O order."""
+        if self._slice:
+            return [self.cols[i] for i in self._slice]
+        return self.cols
+
+    def io_matrix(self):
+        """Get matrix in I/O order."""
+        if self._slice:
+            return self._matrix[:,self._slice]
+        return self._matrix
+
     def set_columns(self, columns):
-        if self.cols:
-            # TODO: consistency checks?
-            # TODO: reorder columns on output
-            pass
+        """Define the column names of newly added vectors."""
+        if self.cols and self.matrix is not None:
+            if set(columns) != set(self.cols):
+                raise ValueError("Can't change input columns.")
+            translate = [self.cols.index(c) for c in columns]
+            self.matrix = self.matrix[:,translate]
+            io_order = self.get_io_order()
+            self.cols = columns
+            self._update_io_order(io_order)
         else:
             self.cols = columns
-            self._print('# ::', *columns)
 
-    # TODO: print only the tracked columns
-    # TODO: print columns if not appending
+    def _get_column_index(self, col):
+        try:
+            return int(col)
+        except ValueError:
+            return self.cols.index(col)
 
     def add(self, v):
         """Output the vector ``v``."""
@@ -91,15 +123,21 @@ class System:
             self.matrix = np.array([v])
         else:
             self.matrix = np.vstack((self.matrix, v))
-        self._print(format_vector(v))
+        if self._slice:
+            v = v[self._slice]
+        self._print(v)
 
     def lp(self):
         """Get the LP."""
         return Problem(self.matrix)
 
-    def _print(self, *args, **kwargs):
-        if self._file:
-            print(*args, file=self._file, **kwargs)
+    def _print(self, v):
+        if not self._file:
+            return
+        if self._write_order:
+            print('# ::', *self.get_io_order(), file=self._file)
+            self._write_order = False
+        print(format_vector(v), file=self._file)
 
 
 def print_to(filename=None, *default_prefix,
