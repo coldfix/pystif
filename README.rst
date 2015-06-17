@@ -27,13 +27,7 @@ you can use ``pip`` to install it::
 
     pip install docopt
 
-pystif can be used locally from its checkout directory, but since it
-includes C extensions it needs to be built before it can be used::
-
-    python setup.py build_ext --inplace
-    python setup.py build
-
-If you want to install you can just type instead::
+To build and install pystif, type::
 
     python setup.py install
 
@@ -44,15 +38,19 @@ Usage
 The software package is split into many small independent components —
 following a well-known UNIX principle.
 
-The following subprograms are currently available as python modules:
+The following subprograms are currently available:
 
-- ``pystif.xray`` — find extremal rays of projected cone
-- ``pystif.chull`` — compute convex hull given a set of extremal rays
-- ``pystif.equiv`` — check two systems of inequalities for equivalence
-- ``pystif.el_ineqs`` — output elemental inequalities to a file
+- ``chm`` — compute convex hull given a set of extremal rays
+- ``equiv`` — check two systems of inequalities for equivalence
+- ``el_ineqs`` — output elemental inequalities to a file
 
-Type ``python -m pystif.MODULE -h`` to get individual usage information. For
-remaining questions, contact me on github or read the source code.
+These subprograms are available for execution by their name, e.g.:
+
+.. code-block::
+
+    chm ARGUMENTS…
+
+To get individual usage information use the ``-h`` argument.
 
 
 Other components
