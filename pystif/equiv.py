@@ -23,13 +23,12 @@ import sys
 import numpy as np
 from docopt import docopt
 from .core.it import elemental_inequalities, num_vars
-from .core.lp import Problem
-from .util import format_vector
+from .util import format_vector, System
 
 
 def show_missing_constraints(lp, constraints, name_a, name_b):
     """Show the difference of these constraints."""
-    missing = [constr for constr in constraints
+    missing = [constr for constr in constraints.matrix
                if not lp.implies(constr)]
     if not missing:
         print("{} implies {}!".format(name_a, name_b))
@@ -42,18 +41,18 @@ def show_missing_constraints(lp, constraints, name_a, name_b):
 
 
 def check_implies(sys_a, sys_b, name_a, name_b, elem_ineqs=False, quiet=False):
-    lp = Problem(sys_a)
+    lp = sys_a.lp()
     if elem_ineqs:
         lp.add(list(elemental_inequalities(num_vars(lp.num_cols))))
     if quiet:
-        return lp.implies(sys_b)
+        return lp.implies(sys_b.matrix)
     return show_missing_constraints(lp, sys_b, name_a, name_b) == 0
 
 
 def main(args=None):
     opts = docopt(__doc__)
-    sys_a = np.loadtxt(opts['A'], ndmin=2)
-    sys_b = np.loadtxt(opts['B'], ndmin=2)
+    sys_a = System(opts['A'])
+    sys_b = System(opts['B'])
     status = 0
     kwd = {'elem_ineqs': opts['--elem-ineqs'],
            'quiet': opts['--quiet']}
