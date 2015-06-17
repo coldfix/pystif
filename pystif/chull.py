@@ -1,23 +1,21 @@
 """
-Find hull off a convex cone that may not have full dimensionality.
+Find projection of a convex cone to a lower dimensional subspace.
 
 Usage:
-    chull -i INPUT -x XRAYS [-o OUTPUT] [-f FEEDBACK]
+    chull -i INPUT [-o OUTPUT] [-x XRAYS] [-s SUBDIM] [-l LIMIT] [-r]
 
 Options:
-    -i INPUT, --input INPUT         Load initial (big) system from this file
-    -x XRAYS, --xrays XRAYS         Load extremal rays from this file
-    -o OUTPUT, --output OUTPUT      Save results to this file
-    -f FILE, --feedback FILE        Save pending normal vectors to file
-
-Exit codes:
-
-    - 0 — full projection to the subspace has been computed
-    - 17 — still missing extremal rays for complete subspace description
-    - other exit codes correspond to program errors
+    -i INPUT, --input INPUT         Load LP from this file
+    -o OUTPUT, --output OUTPUT      Save valid facets to this file
+    -x XRAYS, --xrays XRAYS         Save extremal rays to this file
+    -s SUBDIM, --subdim SUBDIM      Dimension of reduced space
+    -l LIMIT, --limit LIMIT         Add constraints H(i)≤LIMIT for i<SUBDIM
+    -r, --resume                    Resume with previously computed rays
 """
 
+import os
 import sys
+from math import sqrt
 from functools import partial
 import numpy as np
 import scipy.spatial
@@ -25,7 +23,7 @@ from docopt import docopt
 from .core.lp import Problem
 from .core.it import elemental_inequalities, num_vars
 from .util import format_vector, scale_to_int, VectorMemory, print_to
-from .xray import find_xray
+from .xray import find_xray, inner_approximation
 
 
 def principal_components(data_points, s_limit=1e-10):
@@ -110,6 +108,7 @@ def convex_hull_method(lp, lpb, rays,
                 new_points.append(point)
 
         if new_points:
+            status_info(total, total, yes)
             points = np.vstack((points, new_points))
             qinfo(len(points))
             hull.add_points(new_points, restart=True)
@@ -141,31 +140,40 @@ def main(args=None):
     opts = docopt(__doc__, args)
 
     system = np.loadtxt(opts['--input'], ndmin=2)
-    xrays = np.loadtxt(opts['--xrays'], ndmin=2)
     lp = Problem(system)
+    dim = lp.num_cols
+
+    if opts['--subdim'] is not None:
+        subdim = int(opts['--subdim'])
+    else:
+        subdim = int(round(sqrt(dim)))
 
     lpb = Problem(system)
+    if opts['--limit'] is not None:
+        limit = float(opts['--limit'])
+        for i in range(1, subdim):
+            lpb.set_col_bnds(i, 0, limit)
 
-    subdim = xrays.shape[1]
-    limit = 1
-    for i in range(1, subdim):
-        lpb.set_col_bnds(i, 0, limit)
+    resume = opts['--resume']
+    rays_file = opts['--xrays']
+    if rays_file and resume and os.path.exists(rays_file):
+        xrays = np.loadtxt(rays_file, ndmin=2)
+    else:
+        xrays = inner_approximation(lpb, subdim-1)
 
-
-
-    feedback = print_to(opts['--feedback'], '#', default=sys.stdout)
-    output = print_to(opts['--output'])
+    devnull = open(os.devnull, 'w')
+    xrays_sink = print_to(opts['--xrays'], append=resume, default=devnull)
+    facet_sink = print_to(opts['--output'], append=resume)
 
     info = partial(print, '\r', end='', file=sys.stderr)
 
-    callbacks = (partial(print_vector, feedback),
-                 partial(print_vector, output),
+    callbacks = (partial(print_vector, xrays_sink),
+                 partial(print_vector, facet_sink),
                  partial(print_status, info),
                  partial(print_qhull, info))
 
     convex_hull_method(lp, lpb, xrays, *callbacks)
-    return True
 
 
 if __name__ == '__main__':
-    sys.exit(0 if main() else 17)
+    main()
