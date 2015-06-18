@@ -11,8 +11,11 @@ Options:
 """
 
 
+from math import log2
 from docopt import docopt
-from .util import System, print_to, default_column_labels
+from .core.it import num_vars
+from .util import (System, print_to,
+                   default_column_labels, column_varname_labels)
 
 
 def _fmt_float(f):
@@ -46,9 +49,9 @@ def main(args=None):
     if system.columns:
         columns = system.columns[1:]
     elif opts['--canonical']:
-        columns = default_column_labels(system.dim)[1:]
+        columns = column_varname_labels(num_vars(system.dim))[1:]
     else:
-        columns = ['_'+str(i) for i in range(system.dim)]
+        columns = default_column_labels(system.dim)
     print_ = print_to(opts['--output'])
     for row in system.matrix:
         print_(format_human_readable(row, columns))
