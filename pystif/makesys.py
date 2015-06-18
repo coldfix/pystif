@@ -2,7 +2,9 @@
 Output elemental inequalities for given number of variables.
 
 Usage:
-    makesys [-c COLS | -v VARS [-e]] [-o FILE [-a]] [INEQ...]
+    makesys -c COLS [-o FILE [-a]] INEQ...
+    makesys -v VARS [-o FILE [-a]] INEQ...
+    makesys -v VARS [-o FILE [-a]] [INEQ...] -e
 
 Options:
     -o OUTPUT, --output OUTPUT      Write inequalities to this file
