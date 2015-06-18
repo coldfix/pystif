@@ -2,7 +2,7 @@
 Output elemental inequalities for given number of variables.
 
 Usage:
-    el_ineqs NUM_VARS [-o OUTPUT] [-a]
+    makesys NUM_VARS [-o OUTPUT] [-a]
 
 Options:
     -o OUTPUT, --output OUTPUT      Write inequalities to this file

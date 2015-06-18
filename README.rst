@@ -34,7 +34,7 @@ The following subprograms are currently available:
 
 - ``chm`` — projects polytopes to subspaces via convex hull method
 - ``equiv`` — check two systems of inequalities for equivalence
-- ``el_ineqs`` — output elemental inequalities to a file
+- ``makesys`` — create/modify matrix file
 - ``pretty`` — human readable display of inequality file
 
 These subprograms are available for execution by their name, e.g.:
@@ -50,7 +50,7 @@ inequalities in a bipartite bell scenario:
 
 .. code-block::
 
-    el_ineqs 4 -o full.txt
+    makesys 4 -o full.txt
     chm -i full.txt -o small.txt -l1 -s <(echo AC BC AD BD A B C D)
     pretty -i small.txt
 

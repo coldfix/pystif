@@ -27,7 +27,7 @@ setup(
         'console_scripts': [
             'chm = pystif.chm:main',
             'equiv = pystif.equiv:main',
-            'el_ineqs = pystif.el_ineqs:main',
+            'makesys = pystif.makesys:main',
             'pretty = pystif.pretty:main',
         ]
     },
