@@ -29,7 +29,6 @@ The outline of the algorithm is as follows:
         b) no: find the extremal ray that is outside the facet, go to 2.
 """
 
-import os
 import sys
 from math import sqrt
 from functools import partial
@@ -240,10 +239,9 @@ def main(args=None):
         for i in range(1, subdim):
             lpb.set_col_bnds(i, 0, limit)
 
-    devnull = open(os.devnull, 'w')
     resume = opts['--resume']
     facet_io = System.save(opts['--output'], append=resume)
-    xrays_io = System.save(opts['--xrays'], append=resume, default=devnull)
+    xrays_io = System.save(opts['--xrays'], append=resume, default=None)
 
     if system.columns:
         xrays_io.columns = system.columns[:subdim]
