@@ -53,32 +53,29 @@ class System:
     IO utility for systems. Keeps track of column names.
     """
 
-    def __init__(self, matrix=None, columns=None, io_order=None):
+    def __init__(self, matrix=None, columns=None):
         self.matrix = matrix
-        self._columns = None
+        self._columns = columns
         self._slice = None
-        if columns:
-            self.columns = columns
-        if io_order:
-            self.io_order = io_order
-        self._seen = VectorMemory()
         self._file = None
+        self._io_started = False
+        self._seen = VectorMemory()
         if matrix is not None:
             self._seen.add(*matrix)
 
     @classmethod
     def load(cls, filename=None, *, default=sys.stdin, force=True):
-        if filename == '-' or not filename:
-            return cls()
-        if not force and not path.exists(filename):
-            return cls()
-        matrix, io_order = read_system(filename)
-        return cls(matrix, io_order=io_order)
+        if not force:
+            if not filename or filename == '-' or not path.exists(filename):
+                return cls()
+        return cls(*read_system(filename))
 
     @classmethod
     def save(cls, filename=None, *, default=sys.stdout, append=False):
         if append:
             system = cls.load(filename, force=False)
+            system.io_order = system.columns
+            system._io_started = bool(system.columns)
         else:
             system = cls()
         if filename and filename != '-':
@@ -89,20 +86,19 @@ class System:
 
     @property
     def io_order(self):
-        if self._slice:
-            return [self._columns[i] for i in self._slice]
-        return self._columns
+        return self._slice and [self._columns[i] for i in self._slice]
 
     @io_order.setter
     def io_order(self, columns):
         """Set the column order for physical I/O."""
-        assert self._slice is None, \
+        assert not self._io_started, \
             "Can't change I/O order in append mode or after writing a row!"
-        self._update_io_order(columns)
+        if columns is not None:
+            self._update_io_order(columns)
 
     def _update_io_order(self, columns):
-        if not self._columns:
-            self._columns = columns
+        assert self.columns is not None, \
+            "Must set column names before I/O — this is for your own good!"
         self._slice = [self._get_column_index(c) for c in columns]
 
     @property
@@ -120,12 +116,9 @@ class System:
         if self._matrix is not None:
             translate = [self._columns.index(c) for c in columns]
             self.matrix = self.matrix[:,translate]
-        if self._slice:
-            io_order = self.io_order
-            self._columns = columns
+        io_order, self._columns = self.io_order, columns
+        if io_order:
             self._update_io_order(io_order)
-        else:
-            self._columns = columns
 
     @property
     def dim(self):
@@ -163,8 +156,6 @@ class System:
             self.matrix = np.array([v])
         else:
             self.matrix = np.vstack((self.matrix, v))
-        if self._slice:
-            v = v[self._slice]
         self._print(v)
 
     def lp(self):
@@ -174,8 +165,13 @@ class System:
     def _print(self, v):
         if not self._file:
             return
-        if self.matrix.shape[0] == 1 and self.io_order:
-            print('#::', *self.io_order, file=self._file)
+        if not self._io_started:
+            io_order = self.io_order
+            if not io_order:
+                io_order = self.io_order = self.columns
+            print('#::', *io_order, file=self._file)
+            self._io_started = True
+        v = v[self._slice]
         print(format_vector(v), file=self._file)
 
 
