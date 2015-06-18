@@ -43,13 +43,16 @@ class System:
     IO utility for systems. Keeps track of column names.
     """
 
-    def __init__(self, matrix=None, cols=None):
+    def __init__(self, matrix=None, columns=None, io_order=None):
         self.matrix = matrix
-        self.cols = cols
+        self._columns = None
+        self._slice = None
+        if columns:
+            self.columns = columns
+        if io_order:
+            self.io_order = io_order
         self._seen = VectorMemory()
         self._file = None
-        self._slice = None
-        self._write_order = False
         if matrix is not None:
             self._seen.add(*matrix)
 
@@ -59,7 +62,8 @@ class System:
             return cls()
         if not force and not path.exists(filename):
             return cls()
-        return cls(*read_system(filename))
+        matrix, io_order = read_system(filename)
+        return cls(matrix, io_order=io_order)
 
     @classmethod
     def save(cls, filename=None, *, default=sys.stdout, append=False):
@@ -67,53 +71,57 @@ class System:
             system = cls.load(filename, force=False)
         else:
             system = cls()
-            system._write_order = True
         if filename and filename != '-':
             system._file = open(filename, 'a' if append else 'w')
         else:
             system._file = default
         return system
 
-    def set_io_order(self, columns):
+    @property
+    def io_order(self):
+        if self._slice:
+            return [self._columns[i] for i in self._slice]
+        return self._columns
+
+    @io_order.setter
+    def io_order(self, columns):
         """Set the column order for physical I/O."""
-        if self._file and self.matrix is not None:
-            # Requires to overwrite file…
-            raise RuntimeError("Can't change ordering after write!")
+        assert self._slice is None, \
+            "Can't change I/O order in append mode or after writing a row!"
         self._update_io_order(columns)
 
     def _update_io_order(self, columns):
+        if not self._columns:
+            self._columns = columns
         self._slice = [self._get_column_index(c) for c in columns]
 
-    def get_io_order(self):
-        """Get column names in I/O order."""
-        if self._slice:
-            return [self.cols[i] for i in self._slice]
-        return self.cols
+    @property
+    def columns(self):
+        return self._columns
 
-    def io_matrix(self):
-        """Get matrix in I/O order."""
-        if self._slice:
-            return self._matrix[:,self._slice]
-        return self._matrix
-
-    def set_columns(self, columns):
+    @columns.setter
+    def columns(self, columns):
         """Define the column names of newly added vectors."""
-        if self.cols and self.matrix is not None:
-            if set(columns) != set(self.cols):
-                raise ValueError("Can't change input columns.")
-            translate = [self.cols.index(c) for c in columns]
+        columns = list(columns)
+        if self._columns is None:
+            self._columns = columns
+            return
+        assert set(columns) == set(self._columns)
+        if self._matrix is not None:
+            translate = [self._columns.index(c) for c in columns]
             self.matrix = self.matrix[:,translate]
-            io_order = self.get_io_order()
-            self.cols = columns
+        if self._slice:
+            io_order = self.io_order
+            self._columns = columns
             self._update_io_order(io_order)
         else:
-            self.cols = columns
+            self._columns = columns
 
     def _get_column_index(self, col):
         try:
             return int(col)
         except ValueError:
-            return self.cols.index(col)
+            return self.columns.index(col)
 
     def add(self, v):
         """Output the vector ``v``."""
@@ -134,9 +142,8 @@ class System:
     def _print(self, v):
         if not self._file:
             return
-        if self._write_order:
-            print('# ::', *self.get_io_order(), file=self._file)
-            self._write_order = False
+        if self.matrix.shape[0] == 1 and self.io_order:
+            print('#::', *self.io_order, file=self._file)
         print(format_vector(v), file=self._file)
 
 
@@ -190,12 +197,13 @@ def get_bits(num):
 
 
 def default_column_label(index):
-    return "H({})".format(",".join(map(str, get_bits(index))))
+    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    return "".join(alphabet[i] for i in get_bits(index))
 
 
 def default_column_labels(dim):
     # TODO: assert dim=2**n
-    return list(map(default_column_label, range(dim)))
+    return ['_'] + list(map(default_column_label, range(1, dim)))
 
 
 class VectorMemory:

@@ -238,9 +238,9 @@ def main(args=None):
     facet_io = System.save(opts['--output'], append=resume)
     xrays_io = System.save(opts['--xrays'], append=resume, default=devnull)
 
-    if system.cols:
-        xrays_io.set_columns(system.cols[:subdim])
-        facet_io.set_columns(system.cols[:subdim])
+    if system.columns:
+        xrays_io.columns = system.columns[:subdim]
+        facet_io.columns = system.columns[:subdim]
 
     if xrays_io.matrix:
         xrays = xrays_io.matrix
@@ -248,7 +248,7 @@ def main(args=None):
         xrays = inner_approximation(lpb, subdim-1)
         for ray in xrays:
             xrays_io.add(ray)
-        print(file=xrays_io.file)
+        print(file=xrays_io._file)
 
     info = partial(print, '\r', end='', file=sys.stderr)
 
