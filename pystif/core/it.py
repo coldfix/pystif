@@ -38,7 +38,9 @@ def _nCr(n, r):
 
 def num_vars(dim):
     """Get the number of random variables from the entropy space dimension."""
-    return int(round(math.log2(dim)))
+    num_vars = int(round(math.log2(dim)))
+    assert 2**num_vars == dim
+    return num_vars
 
 
 def num_elemental_inequalities(num_vars):

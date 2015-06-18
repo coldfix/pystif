@@ -47,6 +47,17 @@ def _unique(items):
     return ret
 
 
+def _name_list(s):
+    try:
+        return int(s)
+    except ValueError:
+        pass
+    if path.exists(s):
+        with open(s) as f:
+            return f.read().split()
+    return s.split()
+
+
 class System:
 
     """
@@ -184,15 +195,9 @@ class System:
             - filename — file containing the subspace column names
             - string   — string containing the subspace column names
         """
-        try:
-            return self, int(subspace)
-        except ValueError:
-            pass
-        if path.exists(subspace):
-            with open(subspace) as f:
-                subspace_columns = f.read().split()
-        else:
-            subspace_columns = subspace.split()
+        subspace_columns = _name_list(subspace)
+        if isinstance(subspace_columns, int):
+            return self, subspace_columns
         system = self.slice(subspace_columns, fill=True)
         return system, system.subdim
 
@@ -246,14 +251,19 @@ def get_bits(num):
                  if num & (1 << i))
 
 
-def default_column_label(index):
-    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    return "".join(alphabet[i] for i in get_bits(index))
-
-
 def default_column_labels(dim):
-    # TODO: assert dim=2**n
-    return ['_'] + list(map(default_column_label, range(1, dim)))
+    return ['_'] + ['_'+str(i) for i in range(1, dim)]
+
+
+def _column_label(index, varnames="ABCDEFGHIJKLMNOPQRSTUVWXYZ"):
+    return "".join(varnames[i] for i in get_bits(index))
+
+
+def column_varname_labels(varnames):
+    if isinstance(varnames, int):
+        varnames = [chr(ord('A') + i) for i in range(varnames)]
+    dim = 2**len(varnames)
+    return ['_'] + [_column_label(i, varnames) for i in range(1, dim)]
 
 
 class VectorMemory:
