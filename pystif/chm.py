@@ -224,13 +224,7 @@ def main(args=None):
     if not system.columns:
         system.columns = default_column_labels(dim)
 
-    try:
-        subdim = int(opts['--subspace'])
-    except ValueError:
-        with open(opts['--subspace']) as f:
-            subspace_columns = f.read().split()
-        system = system.slice(subspace_columns, fill=True)
-        subdim = system.subdim
+    system, subdim = system.prepare_for_projection(opts['--subspace'])
 
     lp = system.lp()
     lpb = system.lp()

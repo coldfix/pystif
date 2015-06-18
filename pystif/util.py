@@ -174,6 +174,28 @@ class System:
         v = v[self._slice]
         print(format_vector(v), file=self._file)
 
+    def prepare_for_projection(self, subspace):
+        """
+        Return a tuple ``(system, subspace_dimension)`` with the subspace
+        occupying the columns with the lowest indices in the returned system.
+        The ``subspace`` parameter can be either of:
+
+            - integer  — subspace dimension, using the leftmost columns
+            - filename — file containing the subspace column names
+            - string   — string containing the subspace column names
+        """
+        try:
+            return self, int(subspace)
+        except ValueError:
+            pass
+        if path.exists(subspace):
+            with open(subspace) as f:
+                subspace_columns = f.read().split()
+        else:
+            subspace_columns = subspace.split()
+        system = self.slice(subspace_columns, fill=True)
+        return system, system.subdim
+
 
 def print_to(filename=None, *default_prefix,
              append=False, default=sys.stdout):
