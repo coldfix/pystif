@@ -10,6 +10,7 @@ Options:
     -x XRAYS, --xrays XRAYS         Save projected extremal rays to this file
     -s SUB, --subspace SUB          Subspace specification (dimension or file)
     -l LIMIT, --limit LIMIT         Add constraints H(i)≤LIMIT for i<SUBDIM
+                                    [default: 1]
     -r, --resume                    Resume using previously computed rays
                                     (must be fully dimensional!)
 
@@ -218,6 +219,8 @@ def print_qhull(print_, num_points):
 
 def main(args=None):
     opts = docopt(__doc__, args)
+
+    import pdb; pdb.set_trace()
 
     system = System.load(opts['--input'])
     dim = system.dim

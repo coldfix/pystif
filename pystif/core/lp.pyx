@@ -74,10 +74,10 @@ cdef class Problem:
 
     In general, input vectors q represent inequalities q∙x ≥ 0. There is a
     simple way to include an inhomogeneity in the vector q: Just set the
-    bounds of the zero-th column to be exactly -1. Then the inequality
+    bounds of the zero-th column to be exactly ``1``. Then the inequality
     represented by a vector q is:
 
-            q∙x ≥ q₀
+            q₀ + q∙x ≥ 0
 
     In fact, this behaviour is enabled by default and all of the pystif
     modules assume equations in this form. For your own LPs this mode can be
@@ -107,7 +107,7 @@ cdef class Problem:
         elif num_cols > 0:
             self.add_cols(num_cols, lb_col, ub_col)
         if self.num_cols > 0 and const_col:
-            self.set_col_bnds(0, -1, -1)
+            self.set_col_bnds(0, 1, 1)
 
     def __dealloc__(self):
         glp.delete_prob(self._lp)

@@ -36,7 +36,7 @@ def format_human_readable(constraint, columns):
     lhs = ["{} {}".format(_coef(c), columns[i])
            for i, c in enumerate(constraint[1:])
            if c != 0]
-    rhs = constraint[0]
+    rhs = -constraint[0]
     return "{} ≤ {}".format(" ".join(lhs), _fmt_float(rhs))
 
 

@@ -68,9 +68,9 @@ Conventions
 
 Most of the utilities input and output files that represent a linear system
 of equations. The files have a simple matrix structure (``numpy.loadtxt``)
-and each row corresponds to one inequality ``q∙x ≥ q₀``. The zero-th column
-is used as inhomogeneity by letting ``x₀ = -1`` constant. However, when
-performing IO on matrices of points (not equations) the zero-th column
+and each row corresponds to one inequality ``q∙(1,x) ≥ 0``. The zero-th
+column is used as inhomogeneity by letting ``x₀ = 1`` constant. However,
+when performing IO on matrices of points (not equations) the zero-th column
 should be ignored and may be set to ``0``.
 
 When working with entropy spaces the component ``i`` corresponds to the
