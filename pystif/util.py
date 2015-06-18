@@ -37,6 +37,16 @@ def read_system(filename, *, ndmin=2):
     return matrix, cols or None
 
 
+def _unique(items):
+    ret = []
+    seen = set()
+    for item in items:
+        if item not in seen:
+            seen.add(item)
+            ret.append(item)
+    return ret
+
+
 class System:
 
     """
@@ -116,6 +126,28 @@ class System:
             self._update_io_order(io_order)
         else:
             self._columns = columns
+
+    @property
+    def dim(self):
+        if self.matrix is not None:
+            return self.matrix.shape[1]
+        else:
+            return len(self.columns)
+
+    def slice(self, columns, fill=False):
+        """Return reordered system. ``fill=True`` appends missing columns."""
+        indices = [0] + [self._get_column_index(c) for c in columns]
+        indices = _unique(indices)
+        subdim = len(indices)
+        if fill:
+            indices += sorted(set(range(self.dim)) - set(indices))
+        if self.columns:
+            columns = [self.columns[i] for i in indices]
+        else:
+            columns = None
+        sys = System(self.matrix[:,indices], columns)
+        sys.subdim = subdim
+        return sys
 
     def _get_column_index(self, col):
         try:

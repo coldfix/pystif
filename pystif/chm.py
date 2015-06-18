@@ -2,20 +2,21 @@
 Find projection of a convex cone to a lower dimensional subspace.
 
 Usage:
-    chm -i INPUT [-o OUTPUT] [-x XRAYS] [-s SUBDIM] [-l LIMIT] [-r]
+    chm -i INPUT -s SUBSPACE [-o OUTPUT] [-x XRAYS] [-l LIMIT] [-r]
 
 Options:
     -i INPUT, --input INPUT         Load LP that defines the actual cone
     -o OUTPUT, --output OUTPUT      Save facets of projected cone
     -x XRAYS, --xrays XRAYS         Save projected extremal rays to this file
-    -s DIM, --subdim DIM            Subspace dimension
+    -s SUB, --subspace SUB          Subspace specification (dimension or file)
     -l LIMIT, --limit LIMIT         Add constraints H(i)≤LIMIT for i<SUBDIM
     -r, --resume                    Resume using previously computed rays
                                     (must be fully dimensional!)
 
 Note:
     * output files may be specified as '-' to use STDIN/STDOUT
-    * if --subdim is omitted it defaults to the square-root of input dimension
+    * --subspace can either be the name of a file containing the column names
+      of the subspace or the number of leftmost columns
     * the --limit constraint is needed for unbounded cones such as entropy
       cones to make sure a bounded solution exists
 
@@ -37,7 +38,8 @@ import numpy.random
 import scipy.spatial
 from docopt import docopt
 from .core.it import elemental_inequalities, num_vars
-from .util import scale_to_int, make_int_exact, VectorMemory, System
+from .util import (scale_to_int, make_int_exact, VectorMemory, System,
+                   default_column_labels)
 
 
 def orthogonal_complement(v):
@@ -219,14 +221,19 @@ def main(args=None):
     opts = docopt(__doc__, args)
 
     system = System.load(opts['--input'])
+    dim = system.dim
+    if not system.columns:
+        system.columns = default_column_labels(dim)
+
+    try:
+        subdim = int(opts['--subspace'])
+    except ValueError:
+        with open(opts['--subspace']) as f:
+            subspace_columns = f.read().split()
+        system = system.slice(subspace_columns, fill=True)
+        subdim = system.subdim
+
     lp = system.lp()
-    dim = lp.num_cols
-
-    if opts['--subdim'] is not None:
-        subdim = int(opts['--subdim'])
-    else:
-        subdim = int(round(sqrt(dim)))
-
     lpb = system.lp()
     if opts['--limit'] is not None:
         limit = float(opts['--limit'])
