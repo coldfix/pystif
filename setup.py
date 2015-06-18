@@ -28,6 +28,7 @@ setup(
             'chm = pystif.chm:main',
             'equiv = pystif.equiv:main',
             'el_ineqs = pystif.el_ineqs:main',
+            'pretty = pystif.pretty:main',
         ]
     },
     ext_modules=cythonize([
