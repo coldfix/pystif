@@ -50,7 +50,7 @@ inequalities in a bipartite bell scenario:
 
 .. code-block::
 
-    makesys 4 -o full.txt
+    makesys -v 4 -e -o full.txt
     chm -i full.txt -o small.txt -l1 -s <(echo AC BC AD BD A B C D)
     pretty -i small.txt
 
