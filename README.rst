@@ -12,20 +12,15 @@ with numpy.
 Installation
 ~~~~~~~~~~~~
 
-Before you get going you best install these dependencies
+First, install these dependencies:
 
 - python≥3.4
-- GLPK
+- GLPK (development files)
 - setuptools (should be installed by default on many systems)
 - cython
 - numpy
 - scipy
-- docopt
-
-If *docopt* is not available in your distribution's official repositories,
-you can use ``pip`` to install it::
-
-    pip install docopt
+- docopt (use ``pip install docopt`` if unavailable in your package manager)
 
 To build and install pystif, type::
 
@@ -35,22 +30,29 @@ To build and install pystif, type::
 Usage
 ~~~~~
 
-The software package is split into many small independent components —
-following a well-known UNIX principle.
-
 The following subprograms are currently available:
 
-- ``chm`` — compute convex hull given a set of extremal rays
+- ``chm`` — projects polytopes to subspaces via convex hull method
 - ``equiv`` — check two systems of inequalities for equivalence
 - ``el_ineqs`` — output elemental inequalities to a file
+- ``pretty`` — human readable display of inequality file
 
 These subprograms are available for execution by their name, e.g.:
 
 .. code-block::
 
-    chm ARGUMENTS…
+    chm --help
 
-To get individual usage information use the ``-h`` argument.
+retrieves individual usage information for the ``chm`` utility.
+
+The following typical example computes and prints the marginal entropic
+inequalities in a bipartite bell scenario:
+
+.. code-block::
+
+    el_ineqs 4 -o full.txt
+    chm -i full.txt -o small.txt -l1 -s <(echo AC BC AD BD A B C D)
+    pretty -i small.txt
 
 
 Other components
