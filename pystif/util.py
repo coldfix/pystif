@@ -191,8 +191,10 @@ def print_to(filename=None, *default_prefix,
         mode = 'a' if append else 'w'
         file = open(filename, mode, buffering=1)
         return partial(print, file=file)
-    else:
+    elif default:
         return partial(print, *default_prefix, file=default)
+    else:
+        return lambda *args, **kwargs: None
 
 
 def basis_vector(dim, index):

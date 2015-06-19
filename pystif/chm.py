@@ -220,8 +220,6 @@ def print_qhull(print_, num_points):
 def main(args=None):
     opts = docopt(__doc__, args)
 
-    import pdb; pdb.set_trace()
-
     system = System.load(opts['--input'])
     dim = system.dim
     if not system.columns:
@@ -243,7 +241,7 @@ def main(args=None):
                           columns=system.columns[:subdim])
 
     if ray_file._matrix:
-        xrays = ray_file._matrix
+        rays = ray_file._matrix
     else:
         rays = inner_approximation(lpb, subdim-1)
         for ray in rays:
@@ -257,7 +255,7 @@ def main(args=None):
                  partial(print_status, info),
                  partial(print_qhull, info))
 
-    convex_hull_method(lp, lpb, xrays, *callbacks)
+    convex_hull_method(lp, lpb, rays, *callbacks)
 
 
 if __name__ == '__main__':
