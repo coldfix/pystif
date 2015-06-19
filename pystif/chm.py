@@ -39,7 +39,7 @@ import scipy.spatial
 from docopt import docopt
 from .core.it import elemental_inequalities, num_vars
 from .util import (scale_to_int, make_int_exact, VectorMemory, System,
-                   default_column_labels)
+                   default_column_labels, SystemFile)
 
 
 def orthogonal_complement(v):
@@ -237,25 +237,23 @@ def main(args=None):
             lpb.set_col_bnds(i, 0, limit)
 
     resume = opts['--resume']
-    facet_io = System.save(opts['--output'], append=resume)
-    xrays_io = System.save(opts['--xrays'], append=resume, default=None)
+    facet_file = SystemFile(opts['--output'], append=resume,
+                            columns=system.columns[:subdim])
+    ray_file = SystemFile(opts['--xrays'], append=resume, default=None,
+                          columns=system.columns[:subdim])
 
-    if system.columns:
-        xrays_io.columns = system.columns[:subdim]
-        facet_io.columns = system.columns[:subdim]
-
-    if xrays_io.matrix:
-        xrays = xrays_io.matrix
+    if ray_file._matrix:
+        xrays = ray_file._matrix
     else:
-        xrays = inner_approximation(lpb, subdim-1)
-        for ray in xrays:
-            xrays_io.add(ray)
-        print(file=xrays_io._file)
+        rays = inner_approximation(lpb, subdim-1)
+        for ray in rays:
+            ray_file(ray)
+        ray_file._print()
 
     info = partial(print, '\r', end='', file=sys.stderr)
 
-    callbacks = (xrays_io.add,
-                 facet_io.add,
+    callbacks = (ray_file,
+                 facet_file,
                  partial(print_status, info),
                  partial(print_qhull, info))
 

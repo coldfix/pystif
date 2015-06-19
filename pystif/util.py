@@ -66,13 +66,7 @@ class System:
 
     def __init__(self, matrix=None, columns=None):
         self.matrix = matrix
-        self._columns = columns
-        self._slice = None
-        self._file = None
-        self._io_started = False
-        self._seen = VectorMemory()
-        if matrix is not None:
-            self._seen.add(*matrix)
+        self.columns = columns
 
     @classmethod
     def load(cls, filename=None, *, default=sys.stdin, force=True):
@@ -80,56 +74,6 @@ class System:
             if not filename or filename == '-' or not path.exists(filename):
                 return cls()
         return cls(*read_system(filename))
-
-    @classmethod
-    def save(cls, filename=None, *, default=sys.stdout, append=False):
-        if append:
-            system = cls.load(filename, force=False)
-            system.io_order = system.columns
-            system._io_started = bool(system.columns)
-        else:
-            system = cls()
-        if filename and filename != '-':
-            system._file = open(filename, 'a' if append else 'w')
-        else:
-            system._file = default
-        return system
-
-    @property
-    def io_order(self):
-        return self._slice and [self._columns[i] for i in self._slice]
-
-    @io_order.setter
-    def io_order(self, columns):
-        """Set the column order for physical I/O."""
-        assert not self._io_started, \
-            "Can't change I/O order in append mode or after writing a row!"
-        if columns is not None:
-            self._update_io_order(columns)
-
-    def _update_io_order(self, columns):
-        assert self.columns is not None, \
-            "Must set column names before I/O — this is for your own good!"
-        self._slice = [self._get_column_index(c) for c in columns]
-
-    @property
-    def columns(self):
-        return self._columns
-
-    @columns.setter
-    def columns(self, columns):
-        """Define the column names of newly added vectors."""
-        columns = list(columns)
-        if self._columns is None:
-            self._columns = columns
-            return
-        assert set(columns) == set(self._columns)
-        if self._matrix is not None:
-            translate = [self._columns.index(c) for c in columns]
-            self.matrix = self.matrix[:,translate]
-        io_order, self._columns = self.io_order, columns
-        if io_order:
-            self._update_io_order(io_order)
 
     @property
     def dim(self):
@@ -149,9 +93,7 @@ class System:
             columns = [self.columns[i] for i in indices]
         else:
             columns = None
-        sys = System(self.matrix[:,indices], columns)
-        sys.subdim = subdim
-        return sys
+        return System(self.matrix[:,indices], columns), subdim
 
     def _get_column_index(self, col):
         try:
@@ -159,31 +101,9 @@ class System:
         except ValueError:
             return self.columns.index(col)
 
-    def add(self, v):
-        """Output the vector ``v``."""
-        if self._seen(v):
-            return
-        if self.matrix is None:
-            self.matrix = np.array([v])
-        else:
-            self.matrix = np.vstack((self.matrix, v))
-        self._print(v)
-
     def lp(self):
         """Get the LP."""
         return Problem(self.matrix)
-
-    def _print(self, v):
-        if not self._file:
-            return
-        if not self._io_started:
-            io_order = self.io_order
-            if not io_order:
-                io_order = self.io_order = self.columns
-            print('#::', *io_order, file=self._file)
-            self._io_started = True
-        v = v[self._slice]
-        print(format_vector(v), file=self._file)
 
     def prepare_for_projection(self, subspace):
         """
@@ -198,8 +118,49 @@ class System:
         subspace_columns = _name_list(subspace)
         if isinstance(subspace_columns, int):
             return self, subspace_columns
-        system = self.slice(subspace_columns, fill=True)
-        return system, system.subdim
+        return self.slice(subspace_columns, fill=True)
+
+
+class SystemFile:
+
+    """Sink for matrix files."""
+
+    def __init__(self, filename=None, *,
+                 default=sys.stdout, append=False, columns=None):
+        self.columns = columns
+        self.file_columns = columns
+        self._seen = VectorMemory()
+        self._slice = None
+        self._started = False
+        self._matrix = None
+        if append:
+            self._read_for_append(filename)
+        self._print = print_to(filename, default=default, append=append)
+
+    def _read_for_append(self, filename):
+        system = System.load(filename, force=False)
+        if system.matrix:
+            self._matrix = system.matrix
+            self._seen.add(*system.matrix)
+            self._started = True
+        if system.columns:
+            self.file_columns = file_columns = system.columns
+            if self.columns:
+                self._slice = list(map(self.columns.index, file_columns))
+            else:
+                self.columns = file_columns
+
+    def __call__(self, v):
+        """Output the vector ``v``."""
+        if self._seen(v):
+            return
+        if not self._started:
+            if self.file_columns:
+                self._print('#::', *self.file_columns)
+            self._started = True
+        if self._slice:
+            v = v[self._slice]
+        self._print(format_vector(v))
 
 
 def print_to(filename=None, *default_prefix,

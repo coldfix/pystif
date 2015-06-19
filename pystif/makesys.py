@@ -2,9 +2,9 @@
 Output elemental inequalities for given number of variables.
 
 Usage:
-    makesys -c COLS [-o FILE [-a]] INEQ...
-    makesys -v VARS [-o FILE [-a]] INEQ...
-    makesys -v VARS [-o FILE [-a]] [INEQ...] -e
+    makesys -c COLS [-o FILE] INEQ...
+    makesys -v VARS [-o FILE] INEQ...
+    makesys -v VARS [-o FILE] [INEQ...] -e
 
 Options:
     -o OUTPUT, --output OUTPUT      Write inequalities to this file
@@ -32,7 +32,7 @@ from os import path
 from docopt import docopt
 import numpy as np
 from .core.it import elemental_inequalities, num_vars
-from .util import (System, _name_list,
+from .util import (System, SystemFile, _name_list,
                    default_column_labels, column_varname_labels)
 
 
@@ -124,36 +124,29 @@ def _parse_eq_file(eq_str, col_idx):
 def main(args=None):
     opts = docopt(__doc__, args)
 
-    equations = []
-    system = System.save(opts['--output'], append=opts['--append'])
-
     if opts['--cols']:
         colnames = _name_list(opts['--cols'])
         if isinstance(colnames, int):
             colnames = default_column_labels(colnames)
-        system.columns = colnames
-
+        col_idx = create_index(colnames)
     elif opts['--vars']:
         varnames = _name_list(opts['--vars'])
         colnames = column_varname_labels(varnames)
-        system.columns = colnames
-        if opts['--elem-ineqs']:
-            equations += list(elemental_inequalities(num_vars(system.dim)))
-
-    if system.columns:
-        col_idx = create_index(system.columns)
+        col_idx = create_index(colnames)
     else:
         colnames = []
         col_idx = AutoInsert(colnames)
 
+    equations = []
     for e in opts['INEQ']:
         equations += _parse_eq_file(e, col_idx)
+    dim = len(colnames)
+    if opts['--elem-ineqs']:
+        equations += list(elemental_inequalities(num_vars(dim)))
 
-    if not system.columns:
-        system.columns = colnames
-
+    output = SystemFile(opts['--output'], columns=colnames)
     for e in equations:
-        system.add(np.hstack((e, system.dim-len(e))))
+        output(np.hstack((e, np.zeros(dim-len(e)))))
 
 
 if __name__ == '__main__':
