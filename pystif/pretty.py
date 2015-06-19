@@ -36,9 +36,16 @@ def _coef(coef):
 
 
 def format_human_readable(constraint, columns):
-    lhs = ["{} {}".format(_coef(c), columns[i])
+    lhs = [(_coef(c), columns[i], c > 0)
            for i, c in enumerate(constraint[1:])
            if c != 0]
+    # len() is used as approximation for number of terms involved. For most
+    # cases this should be fine.
+    lhs = sorted(lhs, key=lambda term: (term[2], len(term[1])),
+                 reverse=True)
+    lhs = ["{} {}".format(coef, col) for coef, col, _ in lhs]
+    if not lhs:
+        lhs = ["0"]
     rhs = -constraint[0]
     return "{} ≥ {}".format(" ".join(lhs), _fmt_float(rhs))
 
