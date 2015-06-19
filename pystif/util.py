@@ -77,10 +77,14 @@ class System:
 
     @property
     def dim(self):
-        if self.matrix is not None:
-            return self.matrix.shape[1]
-        else:
-            return len(self.columns)
+        return self.matrix.shape[1]
+
+    @property
+    def shape(self):
+        return self.matrix.shape
+
+    def __bool__(self):
+        return self.matrix is not None
 
     def slice(self, columns, fill=False):
         """Return reordered system. ``fill=True`` appends missing columns."""
@@ -94,6 +98,19 @@ class System:
         else:
             columns = None
         return System(self.matrix[:,indices], columns), subdim
+
+    def merge(self, other):
+        if not self: return other
+        if not other: return self
+        assert self.columns and other.columns, \
+            "Need to set column names for merge operation!"
+        columns = self.columns[:]
+        columns += [c for c in other.columns if c not in columns]
+        col_idx = [columns.index(c) for c in other.columns]
+        matrix = np.zeros((self.shape[0]+other.shape[0], len(columns)))
+        matrix[:self.shape[0],:self.shape[1]] = self.matrix
+        matrix[self.shape[0]:,col_idx] = other.matrix
+        return self.__class__(matrix, columns)
 
     def _get_column_index(self, col):
         try:

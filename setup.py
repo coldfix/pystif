@@ -29,6 +29,7 @@ setup(
             'equiv = pystif.equiv:main',
             'makesys = pystif.makesys:main',
             'pretty = pystif.pretty:main',
+            'mergesys = pystif.mergesys:main',
         ]
     },
     ext_modules=cythonize([

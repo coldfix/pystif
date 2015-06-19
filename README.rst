@@ -36,6 +36,7 @@ The following subprograms are currently available:
 - ``equiv`` — check two systems of inequalities for equivalence
 - ``makesys`` — create/modify matrix file
 - ``pretty`` — human readable display of inequality file
+- ``mergesys`` — merge two systems (padding with zeros where needed)
 
 These subprograms are available for execution by their name, e.g.:
 
