@@ -49,7 +49,7 @@ def format_human_readable(constraint, columns):
     if not lhs:
         lhs = ["0"]
     rhs = -constraint[0]
-    return "{} ≥ {}".format(" ".join(lhs), _fmt_float(rhs))
+    return "{} ≥ {}".format(" ".join(lhs).lstrip('+ '), _fmt_float(rhs))
 
 
 def vars_from_colname(column_name):
