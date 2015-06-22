@@ -16,8 +16,8 @@ from collections import Counter, defaultdict
 from math import log2
 from docopt import docopt
 from .core.it import num_vars
-from .util import (System, print_to,
-                   default_column_labels, column_varname_labels)
+from .core.io import (System, print_to,
+                      default_column_labels, column_varname_labels)
 
 
 def _fmt_float(f):

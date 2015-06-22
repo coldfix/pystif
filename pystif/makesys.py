@@ -32,8 +32,8 @@ from os import path
 from docopt import docopt
 import numpy as np
 from .core.it import elemental_inequalities, num_vars
-from .util import (System, SystemFile, _name_list,
-                   default_column_labels, column_varname_labels)
+from .core.io import (System, SystemFile, _name_list,
+                      default_column_labels, column_varname_labels)
 
 
 def create_index(l):

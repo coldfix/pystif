@@ -4,8 +4,8 @@ Cython Wrapper for GLPK. For more information, see :class:`Problem`.
 
 cimport cython
 cimport glpk as glp
-from .util cimport int_array, double_array, double_view, INF, NAN, DBL_MAX
-from .util import _as_matrix
+from .buf cimport int_array, double_array, double_view, INF, NAN, DBL_MAX
+from .buf import _as_matrix
 
 import numpy as np
 

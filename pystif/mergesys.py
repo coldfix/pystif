@@ -11,7 +11,7 @@ Options:
 import sys
 import numpy as np
 from docopt import docopt
-from .util import System, SystemFile
+from .core.io import System, SystemFile
 
 
 # TODO: minify while merging?

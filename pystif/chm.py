@@ -38,8 +38,8 @@ import numpy.random
 import scipy.spatial
 from docopt import docopt
 from .core.it import elemental_inequalities, num_vars
-from .util import (scale_to_int, make_int_exact, VectorMemory, System,
-                   default_column_labels, SystemFile)
+from .core.io import (scale_to_int, make_int_exact, VectorMemory, System,
+                      default_column_labels, SystemFile)
 
 
 def orthogonal_complement(v):

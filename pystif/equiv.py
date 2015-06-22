@@ -23,7 +23,7 @@ import sys
 import numpy as np
 from docopt import docopt
 from .core.it import elemental_inequalities, num_vars
-from .util import format_vector, System
+from .core.io import format_vector, System
 
 
 def show_missing_constraints(lp, constraints, name_a, name_b):

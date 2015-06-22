@@ -2,8 +2,8 @@ from functools import partial
 from os import path
 import sys
 import numpy as np
-from .core.util import format_vector, make_int_exact, scale_to_int
-from .core.lp import Problem
+from .buf import format_vector, make_int_exact, scale_to_int
+from .lp import Problem
 
 
 def detect_prefix(s, prefix, on_prefix):
