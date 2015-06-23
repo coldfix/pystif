@@ -31,13 +31,11 @@ The outline of the algorithm is as follows:
 """
 
 import sys
-from math import sqrt
 from functools import partial
 import numpy as np
 import numpy.random
 import scipy.spatial
 from docopt import docopt
-from .core.it import elemental_inequalities, num_vars
 from .core.io import (scale_to_int, make_int_exact, VectorMemory, System,
                       default_column_labels, SystemFile)
 
