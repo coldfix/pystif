@@ -2,7 +2,7 @@
 import itertools
 from fractions import gcd
 import numpy as np
-from .lp import Problem
+from .lp import Problem, call
 
 
 class FME:
@@ -16,6 +16,10 @@ class FME:
     column heuristic or redundancy check) — but also to allow adding output
     functions.
     """
+
+    cb_start = None
+    cb_step = None
+    cb_stop = None
 
     def partition_by_column_sign(self, rows, int col):
         """
@@ -50,6 +54,7 @@ class FME:
     def eliminate_column_from_system(self, rows, int col):
         """Eliminate a column from a system of inequalities."""
         zero, pos, neg = self.partition_by_column_sign(rows, col)
+        call(self.cb_step, rows, col, zero, pos, neg)
         ret = [np.delete(row, col) for row in zero]
         if ret:
             lp = Problem(ret)
@@ -88,6 +93,7 @@ class FME:
     def eliminate_columns_from_system(self, rows, cols_to_eliminate):
         """Eliminate columns with the specified indices from the system."""
         cdef int col
+        call(self.cb_start, rows, cols_to_eliminate)
         while cols_to_eliminate:
             col = self.choose_next_column(rows, cols_to_eliminate)
             rows = self.eliminate_column_from_system(rows, col)
@@ -96,6 +102,7 @@ class FME:
                 for c in cols_to_eliminate
                 if c != col
             ]
+        call(self.cb_stop, rows)
         return rows
 
     def solve_to(self, rows, int solve_to):
