@@ -461,3 +461,34 @@ cdef class Problem:
         for row in range(self.num_rows):
             buf[row] = glp.get_row_dual(self._lp, row+1)
         return ret
+
+
+def call(fn, *args, **kw):
+    return fn and fn(*args, **kw)
+
+
+class Minimize:
+
+    """
+    Remove redundant inequalities from a system of linear inequalities. Be
+    warned, this is a very slow process.
+    """
+
+    # callbacks to provide UI status information
+    cb_start = None
+    cb_step = None
+    cb_stop = None
+
+    def minimize(self, rows):
+        call(self.cb_start, rows)
+        ret = []
+        lp = Problem(rows)
+        for idx in range(lp.num_rows-1, -1, -1):
+            row = rows[idx]
+            call(self.cb_step, idx, ret)
+            lp.del_row(idx)
+            if not lp.implies(row):
+                lp.add_row(row)
+                ret.append(row)
+        call(self.cb_stop, ret)
+        return ret

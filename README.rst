@@ -38,6 +38,7 @@ The following subprograms are currently available:
 - ``makesys`` — create/modify matrix file
 - ``pretty`` — human readable display of inequality file
 - ``mergesys`` — merge two systems (padding with zeros where needed)
+- ``minimize`` — remove redundant inequalities from system
 
 These subprograms are available for execution by their name, e.g.:
 
