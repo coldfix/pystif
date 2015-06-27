@@ -54,8 +54,8 @@ inequalities in a bipartite bell scenario:
 .. code-block::
 
     makesys -v 4 -e -o full.txt
-    chm -i full.txt -o small.txt -l1 -s <(echo AC BC AD BD A B C D)
-    pretty -i small.txt
+    chm full.txt -o small.txt -l1 -s <(echo AC BC AD BD A B C D)
+    pretty small.txt
 
 
 Other components

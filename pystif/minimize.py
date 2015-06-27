@@ -2,11 +2,9 @@
 Minimize a system of inequalities.
 
 Usage:
-    minimize -i INPUT [-o OUTPUT] [-e] [-q]
+    minimize INPUT [-o OUTPUT] [-e] [-q]
 
 Options:
-    -i INPUT, --input INPUT         Read initial system of inequalities from
-                                    this file
     -o OUTPUT, --output OUTPUT      Write final (minimized) system to this file
     -a, --append                    Open output file in append mode
     -e, --el-ineqs                  Extend system with elemental inequalities
@@ -43,7 +41,7 @@ class VerboseMinimize(MinimizeStatusInfo, Minimize):
 def main(args=None):
     opts = docopt(__doc__, args)
 
-    system = System.load(opts['--input'])
+    system = System.load(opts['INPUT'])
     dim = system.dim
     if not system.columns:
         system.columns = default_column_labels(dim)

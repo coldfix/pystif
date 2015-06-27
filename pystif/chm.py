@@ -2,10 +2,9 @@
 Find projection of a convex cone to a lower dimensional subspace.
 
 Usage:
-    chm -i INPUT -s SUBSPACE [-o OUTPUT] [-x XRAYS] [-l LIMIT] [-r]
+    chm INPUT -s SUBSPACE [-o OUTPUT] [-x XRAYS] [-l LIMIT] [-r]
 
 Options:
-    -i INPUT, --input INPUT         Load LP that defines the actual cone
     -o OUTPUT, --output OUTPUT      Save facets of projected cone
     -x XRAYS, --xrays XRAYS         Save projected extremal rays to this file
     -s SUB, --subspace SUB          Subspace specification (dimension or file)
@@ -218,7 +217,7 @@ def print_qhull(print_, num_points):
 def main(args=None):
     opts = docopt(__doc__, args)
 
-    system = System.load(opts['--input'])
+    system = System.load(opts['INPUT'])
     dim = system.dim
     if not system.columns:
         system.columns = default_column_labels(dim)

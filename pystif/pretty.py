@@ -2,10 +2,9 @@
 Print equations in human readable format.
 
 Usage:
-    pretty -i INPUT [-o OUTPUT] [-c] [-g]
+    pretty INPUT [-o OUTPUT] [-c] [-g]
 
 Options:
-    -i INPUT, --input INPUT         Input file
     -o OUTPUT, --output OUTPUT      Output file
     -c, --canonical                 Assume canonical column labels
     -g, --group                     Group similar constraints
@@ -85,7 +84,7 @@ def group_permuted_terms(constraints, colnames):
 
 def main(args=None):
     opts = docopt(__doc__, args)
-    system = System.load(opts['--input'])
+    system = System.load(opts['INPUT'])
     if system.columns:
         columns = system.columns[1:]
     elif opts['--canonical']:

@@ -25,16 +25,23 @@ def remove_comments(lines, on_comment=None):
             yield line
 
 
-def read_system(filename, *, ndmin=2):
-    """Read linear system from file, return tuple (colnames, matrix)."""
+def read_system_from_file(file, *, ndmin=2):
     comments = []
-    with open(filename) as f:
-        contents = remove_comments(f, comments.append)
-        matrix = np.loadtxt(contents, ndmin=ndmin)
+    contents = remove_comments(file, comments.append)
+    matrix = np.loadtxt(contents, ndmin=ndmin)
     cols = []
     for line in comments:
         detect_prefix(line.strip(), '::', lambda s: cols.extend(s.split()))
     return matrix, cols or None
+
+
+def read_system(filename, *, ndmin=2):
+    """Read linear system from file, return tuple (colnames, matrix)."""
+    if filename == '-':
+        return read_system_from_file(sys.stdin)
+    else:
+        with open(filename) as f:
+            return read_system_from_file(f)
 
 
 def _unique(items):
@@ -71,7 +78,7 @@ class System:
     @classmethod
     def load(cls, filename=None, *, default=sys.stdin, force=True):
         if not force:
-            if not filename or filename == '-' or not path.exists(filename):
+            if not filename or (filename != '-' and not path.exists(filename)):
                 return cls()
         return cls(*read_system(filename))
 

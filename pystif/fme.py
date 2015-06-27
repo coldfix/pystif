@@ -2,10 +2,9 @@
 Perform a simple Fourier-Motzkin-Elimination (FME) on the rows.
 
 Usage:
-    fme -i INPUT [-o OUTPUT] -s SUBSPACE [-q]
+    fme INPUT [-o OUTPUT] -s SUBSPACE [-q]
 
 Options:
-    -i INPUT, --input INPUT         Load LP that defines the actual cone
     -o OUTPUT, --output OUTPUT      Save facets of projected cone
     -s SUB, --subspace SUB          Subspace specification (dimension or file)
     -q, --quiet                     No status output
@@ -43,7 +42,7 @@ class VerboseFME(FMEStatusInfo, FME):
 def main(args=None):
     opts = docopt(__doc__, args)
 
-    system = System.load(opts['--input'])
+    system = System.load(opts['INPUT'])
     dim = system.dim
     if not system.columns:
         system.columns = default_column_labels(dim)
