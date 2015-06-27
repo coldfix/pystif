@@ -37,7 +37,7 @@ import numpy.random
 import scipy.spatial
 from docopt import docopt
 from .core.io import (scale_to_int, make_int_exact, VectorMemory, System,
-                      default_column_labels, SystemFile)
+                      default_column_labels, SystemFile, StatusInfo)
 
 
 def orthogonal_complement(v):
@@ -246,7 +246,7 @@ def main(args=None):
             ray_file(ray)
         ray_file._print()
 
-    info = partial(print, '\r', end='', file=sys.stderr)
+    info = StatusInfo()
 
     callbacks = (ray_file,
                  facet_file,
