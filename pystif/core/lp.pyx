@@ -103,11 +103,9 @@ cdef class Problem:
         self._lp = glp.create_prob()
         if L is not None:
             L = _as_matrix(L)
-            self.add(L, lb_row, ub_row, lb_col, ub_col)
+            self.add(L, lb_row, ub_row, lb_col, ub_col, const_col=const_col)
         elif num_cols > 0:
-            self.add_cols(num_cols, lb_col, ub_col)
-        if self.num_cols > 0 and const_col:
-            self.set_col_bnds(0, 1, 1)
+            self.add_cols(num_cols, lb_col, ub_col, const_col=const_col)
 
     def __dealloc__(self):
         glp.delete_prob(self._lp)
@@ -130,7 +128,7 @@ cdef class Problem:
     def add(self, L,
             double lb_row=0, double ub_row=INF,
             double lb_col=-INF, double ub_col=INF,
-            *, embed=False):
+            *, bint embed=False, bint const_col=True):
         """
         Add the constraint matrix L∙x ≥ 0. Return the row index of the first
         added constraint.
@@ -140,7 +138,7 @@ cdef class Problem:
         cdef int i
         cdef int s = self.add_rows(num_rows, lb_row, ub_row)
         if self.num_cols == 0:
-            self.add_cols(num_cols, lb_col, ub_col)
+            self.add_cols(num_cols, lb_col, ub_col, const_col=const_col)
         try:
             for i, row in enumerate(L):
                 self.set_row(s+i, row, embed=embed)
@@ -187,11 +185,17 @@ cdef class Problem:
             self.del_rows(range(s, s+num_rows))
             raise
 
-    def add_cols(self, int num_cols, double lb=-INF, double ub=INF):
+    def add_cols(self, int num_cols, double lb=-INF, double ub=INF, *,
+                 bint const_col=True):
         """Add multiple cols and set their bounds."""
+        if num_cols <= 0:
+            raise ValueError("Invalid number of columns: {}"
+                             .format(num_cols))
         cdef int s = glp.add_cols(self._lp, num_cols)-1
         try:
             self.set_col_bnds(range(s, s+num_cols), lb, ub)
+            if const_col and self.num_cols == num_cols:
+                self.set_col_bnds(0, 1, 1)
             return s
         except:
             self.del_cols(range(s, s+num_cols))

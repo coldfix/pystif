@@ -37,7 +37,7 @@ import numpy.random
 import scipy.spatial
 from docopt import docopt
 from .core.io import (scale_to_int, make_int_exact, VectorMemory, System,
-                      default_column_labels, SystemFile)
+                      default_column_labels, SystemFile, StatusInfo)
 
 
 def orthogonal_complement(v):
@@ -45,7 +45,7 @@ def orthogonal_complement(v):
     Get the (orthonormal) basis vectors making up the orthogonal complement of
     the plane defined by n∙x = 0.
     """
-    a = np.hstack((np.array([v]).T , np.eye(v.shape[0])))
+    a = np.hstack((np.atleast_2d(v).T , np.eye(v.shape[0])))
     q, r = np.linalg.qr(a)
     return q[:,1:]
 
@@ -246,7 +246,7 @@ def main(args=None):
             ray_file(ray)
         ray_file._print()
 
-    info = partial(print, '\r', end='', file=sys.stderr)
+    info = StatusInfo()
 
     callbacks = (ray_file,
                  facet_file,

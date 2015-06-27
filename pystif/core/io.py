@@ -267,3 +267,23 @@ class VectorMemory:
     def add(self, *rows):
         for v in rows:
             self(v)
+
+
+class StatusInfo:
+
+    def __init__(self, file=sys.stderr):
+        self.file = file
+
+    def write(self, blob):
+        self.file.write(blob)
+        self.file.flush()
+
+    def cursor_up(self, num_lines=1):
+        self.write("\033[" + str(num_lines) + "A")
+
+    def clear_line(self):
+        self.write("\r\033[K")
+
+    def __call__(self, *args):
+        self.clear_line()
+        self.write(" ".join(args))
