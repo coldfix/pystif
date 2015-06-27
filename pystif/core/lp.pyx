@@ -189,6 +189,9 @@ cdef class Problem:
 
     def add_cols(self, int num_cols, double lb=-INF, double ub=INF):
         """Add multiple cols and set their bounds."""
+        if num_cols <= 0:
+            raise ValueError("Invalid number of columns: {}"
+                             .format(num_cols))
         cdef int s = glp.add_cols(self._lp, num_cols)-1
         try:
             self.set_col_bnds(range(s, s+num_cols), lb, ub)
