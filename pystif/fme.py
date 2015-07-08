@@ -22,8 +22,9 @@ class FMEStatusInfo:
 
     def cb_start(self, rows, cols_to_eliminate):
         num_cols = len(rows[0])
-        self.info("Eliminate: {} -> {} columns.\n"
-                  .format(num_cols, num_cols - len(cols_to_eliminate)))
+        self.info("Eliminate: {} -> {} columns ({} rows)\n"
+                  .format(num_cols, num_cols - len(cols_to_eliminate),
+                          len(rows)))
 
     def cb_step(self, rows, col, z, p, n):
         z, p, n = len(z), len(p), len(n)
