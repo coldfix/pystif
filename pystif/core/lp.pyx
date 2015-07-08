@@ -204,7 +204,7 @@ cdef class Problem:
     @cython.boundscheck(False)
     @cython.wraparound(False)
     def del_rows(self, rows):
-        cdef int[:] buf = np.array(rows)
+        cdef int[:] buf = np.array(rows, dtype=np.intc)
         cdef int i
         for i in range(buf.size):
             self._check_row_index(i)
@@ -214,7 +214,7 @@ cdef class Problem:
     @cython.boundscheck(False)
     @cython.wraparound(False)
     def del_cols(self, cols):
-        cdef int[:] buf = np.array(cols)
+        cdef int[:] buf = np.array(cols, dtype=np.intc)
         cdef int i
         for i in range(buf.size):
             self._check_col_index(i)
