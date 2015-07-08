@@ -166,7 +166,7 @@ cdef class Problem:
         Add one col with specified bounds. If coefs is given, its size must be
         equal to the current number of rows.
         """
-        cdef int i = self.add_cols(1, lb, ub)
+        cdef int i = self.add_cols(1, lb, ub, const_col=False)
         try:
             if coefs is not None:
                 self.set_col(i, coefs, embed=embed)
