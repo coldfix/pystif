@@ -110,6 +110,12 @@ cdef class Problem:
     def __dealloc__(self):
         glp.delete_prob(self._lp)
 
+    def copy(self):
+        """Return an independent copy of this LP."""
+        lp = Problem()
+        glp.copy_prob(lp._lp, self._lp, glp.ON)
+        return lp
+
     property num_rows:
         """Current number of rows."""
         def __get__(self):

@@ -9,6 +9,10 @@ cdef extern from "glpk.h":
         MINOR_VERSION "GLP_MINOR_VERSION"
 
     enum:
+        ON  "GLP_ON"   # copy names
+        OFF "GLP_OFF"  # don't copy names
+
+    enum:
         MIN "GLP_MIN"  #  minimization
         MAX "GLP_MAX"  #  maximization
 
@@ -50,6 +54,7 @@ cdef extern from "glpk.h":
 
     Prob* create_prob "glp_create_prob" ()
     void delete_prob "glp_delete_prob" (Prob* prob)
+    void copy_prob "glp_copy_prob" (Prob* dest, Prob* prob, int names)
 
     # manage constraint matrix
 
