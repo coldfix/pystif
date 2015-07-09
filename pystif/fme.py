@@ -2,14 +2,19 @@
 Perform a simple Fourier-Motzkin-Elimination (FME) on the rows.
 
 Usage:
-    fme INPUT [-o OUTPUT] -s SUBSPACE [-q]
+    fme INPUT [-o OUTPUT] -s SUBSPACE [-q] [-d DROP]
 
 Options:
     -o OUTPUT, --output OUTPUT      Save facets of projected cone
     -s SUB, --subspace SUB          Subspace specification (dimension or file)
     -q, --quiet                     No status output
+    -d DROP, --drop DROP            Randomly drop DROP inequalities from the
+                                    initial system before beginning the FME
+                                    [default: 0]
 """
 
+import random
+import numpy as np
 from docopt import docopt
 from .core.fme import FME
 from .core.io import System, SystemFile, StatusInfo, default_column_labels
@@ -53,6 +58,12 @@ def main(args=None):
         fme = FME()
     else:
         fme = VerboseFME()
+
+    random.seed()
+    num_drop = int(opts['--drop'])
+    for i in range(num_drop):
+        d = random.randrange(system.shape[0])
+        system.matrix = np.delete(system.matrix, d, axis=0)
 
     rows = fme.solve_to(system.matrix, subdim)
 
