@@ -443,7 +443,7 @@ cdef class Problem:
         """
         def _implies(q):
             return (self.has_optimal_solution(q, embed=embed) and
-                    self.get_objective_value() <= threshold)
+                    self.get_objective_value() >= -threshold)
         return all(map(_implies, _as_matrix(L)))
 
     @cython.boundscheck(False)
