@@ -409,17 +409,17 @@ cdef class Problem:
             raise NofeasibleError
         raise UnknownError
 
-    def optimize(self, objective, sense=glp.MIN):
+    def optimize(self, objective, sense=glp.MIN, *, embed=False):
         """Optimize objective and return solution as numpy array."""
-        self.set_objective(objective, sense)
+        self.set_objective(objective, sense, embed=embed)
         self.simplex()
         return self.get_prim_solution()
 
-    def minimize(self, objective):
-        return self.optimize(objective, glp.MIN)
+    def minimize(self, objective, *, embed=False):
+        return self.optimize(objective, glp.MIN, embed=embed)
 
-    def maximize(self, objective):
-        return self.optimize(objective, glp.MAX)
+    def maximize(self, objective, *, embed=False):
+        return self.optimize(objective, glp.MAX, embed=embed)
 
     def get_objective_value(self):
         """Get value of objective achieved in last optimization task."""
