@@ -136,50 +136,25 @@ def facet_enumeration_method(lp, lpb, initial_facet):
             queue.append(adj)
 
 
-def refine_to_facet(lp, lpb, face, atol=1e-10):
-    subspace = intersect_polyhedron_with_face(lpb, face)[:,1:]
-    nullspace = matrix_nullspace(np.vstack((subspace, face[1:])))
-    subdim = len(face)
-
+def filter_non_singular_directions(lp, nullspace):
     for i, direction in enumerate(nullspace):
         if lp.implies(np.hstack((0, direction)), embed=True):
             direction = -direction
             if lp.implies(np.hstack((0, direction)), embed=True):
                 continue
+        yield i, direction
 
-        seen = VectorMemory()
-        vertex = find_xray(lpb, direction)[1:]
-        seen(vertex)
 
-        simplex = np.vstack((
-            subspace,
-            np.delete(nullspace, i, axis=0),
-        ))
-
-        plane = get_plane(np.vstack((simplex, vertex)))
-        plane = np.hstack((0, plane))
-
-        if lp.implies(plane, embed=True):
-            return refine_to_facet(lp, lpb, plane)
-        plane = -plane
-        if lp.implies(plane, embed=True):
-            return refine_to_facet(lp, lpb, plane)
-
-        while True:
-            if np.dot(plane[1:], direction) <= -atol:
-                plane = -plane
-
-            vertex = lpb.minimize(plane, embed=True)
-            vertex = scale_to_int(vertex[1:subdim])
-            if lpb.get_objective_value() >= -atol:
-                return plane
-            assert not seen(vertex)
-            plane = get_plane(np.vstack((simplex, vertex)))
-            plane = scale_to_int(plane)
-            palne = np.hstack((0, plane))
-
-    return face
-
+def refine_to_facet(lp, face):
+    subspace = intersect_polyhedron_with_face(lp, face)[:,1:]
+    nullspace = matrix_nullspace(np.vstack((subspace, face[1:])))
+    try:
+        i, direction = next(filter_non_singular_directions(lp, nullspace))
+    except StopIteration:
+        return face
+    simplex = tuple(subspace) + tuple(np.delete(nullspace, i, axis=0))
+    plane = get_adjacent_facet(lp, face, simplex, direction)
+    return refine_to_facet(lp, plane)
 
 
 def intersect_polyhedron_with_face(lp, face):
@@ -187,6 +162,13 @@ def intersect_polyhedron_with_face(lp, face):
     lp = lp.copy()
     lp.add(face, 0, 0, embed=True)
     return inner_approximation(lp, subdim-1)
+
+
+def is_facet(lp, plane):
+    subdim = len(plane)
+    body_dim = len(inner_approximation(lp, subdim-1))
+    face_dim = len(intersect_polyhedron_with_face(lp, plane))
+    return face_dim+1 == body_dim
 
 
 def main(args=None):
@@ -208,10 +190,12 @@ def main(args=None):
 
     face = np.ones(subdim)
     face[0] = 0
-    facet = refine_to_facet(lp, lpb, face)
+    facet = refine_to_facet(lpb, face)
+
+    assert lp.implies(facet, embed=True)
+    assert is_facet(lpb, facet)
 
     print("Found initial facet, starting enumeration...")
-    assert lp.implies(facet, embed=True)
 
     facets = facet_enumeration_method(lp, lpb, facet)
     for f in facets:
