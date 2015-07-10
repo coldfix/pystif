@@ -44,7 +44,8 @@ def orthogonal_complement(v):
     Get the (orthonormal) basis vectors making up the orthogonal complement of
     the plane defined by n∙x = 0.
     """
-    a = np.hstack((np.atleast_2d(v).T , np.eye(v.shape[0])))
+    v = np.atleast_2d(v)
+    a = np.hstack((v.T , np.eye(v.shape[1])))
     q, r = np.linalg.qr(a)
     return q[:,1:]
 
@@ -199,6 +200,7 @@ def convex_hull_method(lp, lpb, rays,
             break
 
     status_info(total, total, yes)
+    return hull, subspace
 
 
 def print_status(print_, i, total, yes):
