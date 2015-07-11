@@ -116,6 +116,7 @@ def facet_enumeration_method(lp, lpb, initial_facet, found_cb):
     while queue:
         facet = queue.pop()
         facet = scale_to_int(facet)
+        assert is_facet(lpb, facet)
 
         hull, subspace = get_facet_boundaries(lp, lpb, facet)
         # TODO: need to recover points from hull subspace
@@ -125,6 +126,7 @@ def facet_enumeration_method(lp, lpb, initial_facet, found_cb):
             boundary = tuple(points[i] for i in simplex)
             if not any(np.allclose(p, 0) for p in boundary):
                 continue
+            assert abs(equation[-1]) < 1e-10
 
             if matrix_rank(boundary) < subdim-3:
                 # TODO: I don't know why/if it's possible for an N dimensional
