@@ -106,19 +106,16 @@ def get_adjacent_facet(lp, facet, b_simplex, old_vertex, atol=1e-10):
 def facet_enumeration_method(lp, lpb, initial_facet):
 
     subdim = len(initial_facet)
-    small_lp = Problem(num_cols=subdim)
 
     # TODO: maintain a list[frozenset[vertices]] to never do a facet twice
     seen_b = set()
+    seen = VectorMemory()
 
     queue = [initial_facet]
     while queue:
         facet = queue.pop()
         facet = scale_to_int(facet)
-        if small_lp.implies(facet):
-            continue
 
-        small_lp.add(facet)
         yield facet
 
         hull, subspace = get_facet_boundaries(lp, lpb, facet)
@@ -145,7 +142,8 @@ def facet_enumeration_method(lp, lpb, initial_facet):
 
             adj = get_adjacent_facet(lpb, facet, boundary, old_vertex)
             # TODO: check adj against every seen facet
-            queue.append(adj)
+            if not seen(adj):
+                queue.append(adj)
 
 
 def filter_non_singular_directions(lp, nullspace):
