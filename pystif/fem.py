@@ -48,16 +48,6 @@ def get_plane(v):
     assert space.shape[0] == 1
     return space[0].flatten()
 
-    #----------------------------------------
-    # TODO: The current method doesn't detect errors (e.g. if the input
-    # vertices are not a body of the correct dimension). In this regard
-    # principal_components should behave better.
-    # v = np.atleast_2d(v)
-    # a = np.hstack((v.T , np.eye(v.shape[1])))
-    # q, r = np.linalg.qr(a)
-    # return q[:,-1:].flatten()
-    #----------------------------------------
-
 
 def get_facet_boundaries(lp, lpb, facet):
     """
@@ -83,13 +73,10 @@ def get_adjacent_facet(lp, facet, b_simplex, old_vertex, atol=1e-10):
     `facet_boundary`.
     """
     # TODO: in first step maximize along plane defined by facet_boundary and
-    # facet.
+    # facet?
     subdim = len(facet)
     plane = -facet
-
     seen = VectorMemory()
-
-    # TODO: this algorithm walks through cycles...
     while True:
         vertex = lp.minimize(plane, embed=True)
         vertex = scale_to_int(vertex[1:subdim])
@@ -106,8 +93,7 @@ def get_adjacent_facet(lp, facet, b_simplex, old_vertex, atol=1e-10):
 def facet_enumeration_method(lp, lpb, initial_facet, found_cb):
 
     subdim = len(initial_facet)
-
-    # TODO: maintain a list[frozenset[vertices]] to never do a facet twice
+    # TODO: maintain a list[frozenset[vertices]] to never do a facet twice?
     seen_b = set()
     seen = VectorMemory()
 
@@ -119,7 +105,6 @@ def facet_enumeration_method(lp, lpb, initial_facet, found_cb):
         assert is_facet(lpb, facet)
 
         hull, subspace = get_facet_boundaries(lp, lpb, facet)
-        # TODO: need to recover points from hull subspace
         points = [scale_to_int(np.dot(p, subspace.T)) for p in hull.points]
 
         for equation, simplex in zip(hull.equations, hull.simplices):
@@ -142,7 +127,6 @@ def facet_enumeration_method(lp, lpb, initial_facet, found_cb):
             old_vertex = max(points, key=lambda p: np.dot(eq, p))
 
             adj = get_adjacent_facet(lpb, facet, boundary, old_vertex)
-            # TODO: check adj against every seen facet
             if not seen(adj):
                 queue.append(adj)
                 found_cb(adj)
