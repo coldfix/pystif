@@ -127,9 +127,9 @@ def facet_enumeration_method(lp, lpb, initial_facet):
             if not any(np.allclose(p, 0) for p in boundary):
                 continue
 
-            eq = np.dot(equation[:-1], subspace.T)
+            eq = np.dot(-equation[:-1], subspace.T)
 
-            old_vertex = max(points, key=lambda p: abs(np.dot(eq, p)))
+            old_vertex = max(points, key=lambda p: np.dot(eq, p))
 
             adj = get_adjacent_facet(lpb, facet, boundary, old_vertex)
             # TODO: check adj against every seen facet
