@@ -25,6 +25,9 @@ from .chm import (convex_hull_method, inner_approximation, find_xray,
                   print_status, print_qhull)
 
 
+matrix_rank = np.linalg.matrix_rank
+
+
 def matrix_nullspace(A, eps=1e-10):
     """
     Return a basis for the solution space of ``A∙x=0`` as column vectors.
@@ -125,6 +128,15 @@ def facet_enumeration_method(lp, lpb, initial_facet):
         for equation, simplex in zip(hull.equations, hull.simplices):
             boundary = tuple(points[i] for i in simplex)
             if not any(np.allclose(p, 0) for p in boundary):
+                continue
+
+            if matrix_rank(boundary) < subdim-3:
+                # TODO: I don't know why/if it's possible for an N dimensional
+                # convex polytope to have faces with less than N-2 dimensional
+                # boundaries, but it apparently it happens…
+                # TODO: I don't know either if it will lead to an incomplete
+                # description to ignore these, but I will postpone this
+                # question for later and first get it work at all.
                 continue
 
             eq = np.dot(-equation[:-1], subspace.T)
