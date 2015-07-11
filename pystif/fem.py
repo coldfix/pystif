@@ -19,7 +19,7 @@ import scipy
 from docopt import docopt
 
 from .core.lp import Problem
-from .core.io import (StatusInfo, System, default_column_labels,
+from .core.io import (StatusInfo, System, default_column_labels, SystemFile,
                       VectorMemory, scale_to_int)
 from .chm import (convex_hull_method, inner_approximation, find_xray,
                   print_status, print_qhull)
@@ -103,7 +103,7 @@ def get_adjacent_facet(lp, facet, b_simplex, old_vertex, atol=1e-10):
         plane = np.hstack((0, plane))
 
 
-def facet_enumeration_method(lp, lpb, initial_facet):
+def facet_enumeration_method(lp, lpb, initial_facet, found_cb):
 
     subdim = len(initial_facet)
 
@@ -111,12 +111,11 @@ def facet_enumeration_method(lp, lpb, initial_facet):
     seen_b = set()
     seen = VectorMemory()
 
+    found_cb(initial_facet)
     queue = [initial_facet]
     while queue:
         facet = queue.pop()
         facet = scale_to_int(facet)
-
-        yield facet
 
         hull, subspace = get_facet_boundaries(lp, lpb, facet)
         # TODO: need to recover points from hull subspace
@@ -144,6 +143,7 @@ def facet_enumeration_method(lp, lpb, initial_facet):
             # TODO: check adj against every seen facet
             if not seen(adj):
                 queue.append(adj)
+                found_cb(adj)
 
 
 def filter_non_singular_directions(lp, nullspace):
@@ -207,9 +207,9 @@ def main(args=None):
 
     print("Found initial facet, starting enumeration...")
 
-    facets = facet_enumeration_method(lp, lpb, facet)
-    for f in facets:
-        print(f)
+    facet_file = SystemFile(opts['--output'], columns=system.columns[:subdim])
+
+    facet_enumeration_method(lp, lpb, facet, facet_file)
 
 
 if __name__ == '__main__':
