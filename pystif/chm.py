@@ -35,6 +35,7 @@ import numpy as np
 import numpy.random
 import scipy.spatial
 from docopt import docopt
+from .core.util import PointSet
 from .core.io import (scale_to_int, make_int_exact, VectorMemory, System,
                       default_column_labels, SystemFile, StatusInfo)
 
@@ -129,9 +130,26 @@ def add_left_zero(mat):
     return np.hstack((np.zeros((mat.shape[0], 1)), mat))
 
 
+class CHull:
+
+    def __init__(self):
+        self.points = PointSet()
+        self.equations = []
+        self.simplices = []
+
+    def add_facet(self, equation, points):
+        for point in points:
+            self.points.add(point)
+        simplex = [self.points.index(point) for point in points]
+        self.equations.append(equation)
+        self.simplices.append(simplex)
+
+
 def convex_hull_method(lp, lpb, rays,
                        report_ray, report_yes,
                        status_info, qinfo):
+
+    result = CHull()
 
     points = del_const_col(rays)
     points = np.vstack((np.zeros(points.shape[1]), points))
@@ -183,6 +201,8 @@ def convex_hull_method(lp, lpb, rays,
             if lp.implies(face, embed=True):
                 yes += 1
                 report_yes(face)
+                result.add_facet(hull.equations[i],
+                                 hull.points[list(hull.simplices[i])])
             else:
                 ray = find_xray(lpb, face[1:])
                 if seen_ray(ray):
@@ -200,7 +220,7 @@ def convex_hull_method(lp, lpb, rays,
             break
 
     status_info(total, total, yes)
-    return hull, subspace
+    return result, subspace
 
 
 def print_status(print_, i, total, yes):
