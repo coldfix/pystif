@@ -33,7 +33,6 @@ import sys
 from functools import partial
 
 import numpy as np
-import numpy.random
 import scipy.spatial
 from docopt import docopt
 

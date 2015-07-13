@@ -7,12 +7,6 @@ from .linalg import (matrix_rowspace, matrix_nullspace,
 from .util import PointSet, cached
 
 
-def random_direction_vector(dim):
-    v = np.random.normal(size=dim)
-    v /= np.linalg.norm(v)
-    return v
-
-
 class ConvexPolyhedron:
 
     """
@@ -50,10 +44,9 @@ class ConvexPolyhedron:
         points = np.empty((0, self.subdim))
         orth = np.eye(self.subdim - 1)
         while orth.shape[1] > 0:
-            # Generate arbitrary vector in orthogonal space and min/max along
-            # its direction:
-            # FIXME: Better use deterministic or random direction vectors?
-            d = random_direction_vector(orth.shape[1])
+            # Choose vector from orthogonal space and optimize along its
+            # direction:
+            d = orth[0]
             v = np.dot(d, orth.T)
             v = np.hstack((0, v))
             x = self.search(v)[1:]
