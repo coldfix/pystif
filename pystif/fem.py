@@ -107,23 +107,14 @@ def facet_enumeration_method(lp, lpb, initial_facet, found_cb):
         hull, subspace = get_facet_boundaries(lp, lpb, facet)
         points = [scale_to_int(np.dot(p, subspace.T)) for p in hull.points]
 
-        for equation, simplex in zip(hull.equations, hull.simplices):
-            boundary = tuple(points[i] for i in simplex)
-            if not any(np.allclose(p, 0) for p in boundary):
-                continue
+        for i, equation in enumerate(hull.equations):
             assert abs(equation[-1]) < 1e-10
+            equation = -equation[:-1]
 
-            if matrix_rank(boundary) < subdim-3:
-                # TODO: I don't know why/if it's possible for an N dimensional
-                # convex polytope to have faces with less than N-2 dimensional
-                # boundaries, but it apparently it happens…
-                # TODO: I don't know either if it will lead to an incomplete
-                # description to ignore these, but I will postpone this
-                # question for later and first get it work at all.
-                continue
+            boundary = tuple(np.dot(matrix_nullspace([equation]), subspace.T))
 
-            eq = np.dot(-equation[:-1], subspace.T)
 
+            eq = np.dot(equation, subspace.T)
             old_vertex = max(points, key=lambda p: np.dot(eq, p))
 
             adj = get_adjacent_facet(lpb, facet, boundary, old_vertex)
