@@ -32,7 +32,7 @@ setup(
             'mergesys = pystif.mergesys:main',
             'fme = pystif.fme:main',
             'minimize = pystif.minimize:main',
-            'fem = pystif.fem:main',
+            'afi = pystif.afi:main',
         ]
     },
     ext_modules=cythonize([

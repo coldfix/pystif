@@ -1,8 +1,8 @@
 """
-Project convex cone to subspace by an incremental facet enumeration method.
+Project convex cone to subspace by an adjacent facet iteration method.
 
 Usage:
-    fem INPUT -s SUBSPACE [-o OUTPUT] [-l LIMIT]
+    afi INPUT -s SUBSPACE [-o OUTPUT] [-l LIMIT]
 
 Options:
     -o OUTPUT, --output OUTPUT      Set output file for solution
@@ -90,7 +90,7 @@ def get_adjacent_facet(lp, facet, b_simplex, old_vertex, atol=1e-10):
         plane = np.hstack((0, plane))
 
 
-def facet_enumeration_method(lp, lpb, initial_facet, found_cb):
+def adjacent_facet_iteration(lp, lpb, initial_facet, found_cb):
 
     subdim = len(initial_facet)
     seen_b = set()
@@ -189,7 +189,7 @@ def main(args=None):
 
     facet_file = SystemFile(opts['--output'], columns=system.columns[:subdim])
 
-    facet_enumeration_method(lp, lpb, facet, facet_file)
+    adjacent_facet_iteration(lp, lpb, facet, facet_file)
 
 
 if __name__ == '__main__':
