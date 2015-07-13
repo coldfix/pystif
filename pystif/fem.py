@@ -93,7 +93,6 @@ def get_adjacent_facet(lp, facet, b_simplex, old_vertex, atol=1e-10):
 def facet_enumeration_method(lp, lpb, initial_facet, found_cb):
 
     subdim = len(initial_facet)
-    # TODO: maintain a list[frozenset[vertices]] to never do a facet twice?
     seen_b = set()
     seen = VectorMemory()
 
@@ -106,9 +105,18 @@ def facet_enumeration_method(lp, lpb, initial_facet, found_cb):
 
         equations, subspace = get_facet_boundaries(lp, lpb, facet)
 
+        # for status output:
+        num_eqs = len(equations)
+        len_eqs = len(str(num_eqs))
+
         for i, equation in enumerate(equations):
             boundary = tuple(np.dot(matrix_nullspace([equation]), subspace.T))
 
+            print("\rFEM queue: {:4}, progress: {}/{}".format(
+                len(queue),
+                str(i).rjust(len_eqs),
+                num_eqs,
+            ), end='')
 
             eq = np.dot(equation, subspace.T)
 
