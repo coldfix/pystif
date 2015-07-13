@@ -85,9 +85,6 @@ class ConvexPolyhedron:
         """
         assert len(q) == self.subdim
         assert q[0] == 0
-        # For the random vectors it doesn't matter whether we use `minimize`
-        # or `maximize` — but it *does* matter for the oriented direction
-        # vectors obtained from other functions:
         extreme_point = self.lp.minimize(q, embed=True)
         extreme_point = extreme_point[0:self.subdim]
         extreme_point[0] = 0
@@ -118,7 +115,6 @@ class ConvexPolyhedron:
         return self.intersection(face).dim()
 
     def is_facet(self, face):
-        # TODO: need to work with the subspaces bases…?
         return self.face_dim(plane) == self.dim()-1
 
     def is_face(self, face):
