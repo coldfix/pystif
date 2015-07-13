@@ -2,9 +2,11 @@
 Utility functions that need Cython based optimization.
 """
 
+from __future__ import absolute_import
+
+from array import array
 cimport cython
 import numpy as np
-from array import array
 
 
 cdef c_array.array int_array_template = array('i', [])

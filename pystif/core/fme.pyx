@@ -1,8 +1,11 @@
 
 import itertools
 from fractions import gcd
+
 import numpy as np
-from .lp import Problem, call
+
+from .lp import Problem
+from .util import call
 
 
 class FME:

@@ -1,5 +1,10 @@
-from .io import VectorMemory
+"""
+Utilities to generate the symmetries of equations.
+"""
+
 import numpy as np
+
+from .util import VectorMemory
 
 
 class VarPermutation:

@@ -14,8 +14,10 @@ Options:
 """
 
 import random
+
 import numpy as np
 from docopt import docopt
+
 from .core.fme import FME
 from .core.io import System, SystemFile, StatusInfo, default_column_labels
 

@@ -12,6 +12,7 @@ Options:
 """
 
 from docopt import docopt
+
 from .core.lp import Minimize
 from .core.io import System, SystemFile, StatusInfo, default_column_labels
 

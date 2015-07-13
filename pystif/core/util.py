@@ -3,7 +3,11 @@ Misc utilities.
 """
 
 import numpy as np
-from .buf import scale_to_int
+from .array import scale_to_int
+
+
+def call(fn, *args, **kw):
+    return fn and fn(*args, **kw)
 
 
 class OrderedSet:
@@ -61,6 +65,29 @@ class PointSet(OrderedSet):
 
     def add(self, point):
         return super(PointSet, self).add(tuple(point))
+
+
+class VectorMemory:
+
+    """
+    Remember vectors and return if they have been seen.
+
+    Currently works only for int vectors.
+    """
+
+    def __init__(self):
+        self.seen = set()
+
+    def __call__(self, v):
+        v = tuple(scale_to_int(v))
+        if v in self.seen:
+            return True
+        self.seen.add(v)
+        return False
+
+    def add(self, *rows):
+        for v in rows:
+            self(v)
 
 
 class ExtremePoints(PointSet):

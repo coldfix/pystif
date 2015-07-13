@@ -29,8 +29,10 @@ subset of variables. The zero-th column will always be zero.
 import re
 import sys
 from os import path
+
 from docopt import docopt
 import numpy as np
+
 from .core.it import elemental_inequalities, num_vars
 from .core.io import (System, SystemFile, _name_list,
                       default_column_labels, column_varname_labels)

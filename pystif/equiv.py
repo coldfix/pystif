@@ -20,8 +20,10 @@ The values 2 and 3 are only used if --one-way is not in effect.
 """
 
 import sys
+
 import numpy as np
 from docopt import docopt
+
 from .core.it import elemental_inequalities, num_vars
 from .core.io import format_vector, System
 

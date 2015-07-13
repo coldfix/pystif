@@ -18,8 +18,9 @@ that the zero-th column is used for the inhomogeneity of an inequality (which
 is of course zero for elemental inequalities).
 """
 
-import numpy as np
 import math
+
+import numpy as np
 
 
 def _insert_zero_bit(pool, bit_index):

@@ -3,11 +3,12 @@ Cython Wrapper for GLPK. For more information, see :class:`Problem`.
 """
 
 cimport cython
-cimport glpk as glp
-from .buf cimport int_array, double_array, double_view, INF, NAN, DBL_MAX
-from .buf import _as_matrix
-
 import numpy as np
+
+from . cimport glpk as glp
+from .array cimport int_array, double_array, double_view, INF, NAN, DBL_MAX
+from .array import _as_matrix
+from .util import call
 
 
 __all__ = [
@@ -467,10 +468,6 @@ cdef class Problem:
         for row in range(self.num_rows):
             buf[row] = glp.get_row_dual(self._lp, row+1)
         return ret
-
-
-def call(fn, *args, **kw):
-    return fn and fn(*args, **kw)
 
 
 class Minimize:

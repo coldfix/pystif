@@ -1,9 +1,12 @@
 from functools import partial
 from os import path
 import sys
+
 import numpy as np
-from .buf import format_vector, make_int_exact, scale_to_int
+
+from .array import format_vector
 from .lp import Problem
+from .util import VectorMemory
 
 
 def detect_prefix(s, prefix, on_prefix):
@@ -204,13 +207,6 @@ def print_to(filename=None, *default_prefix,
         return lambda *args, **kwargs: None
 
 
-def basis_vector(dim, index):
-    """Get D dimensional unit vector with only the i-th component being 1."""
-    v = np.zeros(dim)
-    v[index] = 1
-    return v
-
-
 def repeat(func, *args, **kwargs):
     """Call the function endlessly."""
     while True:
@@ -221,15 +217,6 @@ def take(count, iterable):
     """Take count elements from iterable."""
     for i, v in zip(range(count), iterable):
         yield v
-
-
-def project_to_plane(v, n):
-    """Project v into the subspace defined by x∙n = 0."""
-    return v - n * np.dot(v, n) / np.linalg.norm(n)
-
-
-def is_int_vector(v):
-    return all(np.round(v) == make_int_exact(v))
 
 
 def get_bits(num):
@@ -251,29 +238,6 @@ def column_varname_labels(varnames):
         varnames = [chr(ord('A') + i) for i in range(varnames)]
     dim = 2**len(varnames)
     return ['_'] + [_column_label(i, varnames) for i in range(1, dim)]
-
-
-class VectorMemory:
-
-    """
-    Remember vectors and return if they have been seen.
-
-    Currently works only for int vectors.
-    """
-
-    def __init__(self):
-        self.seen = set()
-
-    def __call__(self, v):
-        v = tuple(scale_to_int(v))
-        if v in self.seen:
-            return True
-        self.seen.add(v)
-        return False
-
-    def add(self, *rows):
-        for v in rows:
-            self(v)
 
 
 class StatusInfo:

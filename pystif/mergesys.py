@@ -9,8 +9,10 @@ Options:
 """
 
 import sys
+
 import numpy as np
 from docopt import docopt
+
 from .core.io import System, SystemFile
 
 

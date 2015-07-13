@@ -15,40 +15,17 @@ Options:
 """
 
 from functools import partial
+
 import numpy as np
-import scipy
 from docopt import docopt
 
+from .core.array import scale_to_int
+from .core.io import StatusInfo, System, default_column_labels, SystemFile
+from .core.linalg import matrix_nullspace, plane_normal
 from .core.symmetry import NoSymmetry, SymmetryGroup
-from .core.lp import Problem
-from .core.io import (StatusInfo, System, default_column_labels, SystemFile,
-                      VectorMemory, scale_to_int)
-from .chm import (convex_hull_method, inner_approximation, find_xray,
+from .core.util import VectorMemory
+from .chm import (convex_hull_method, inner_approximation,
                   print_status, print_qhull)
-
-
-matrix_rank = np.linalg.matrix_rank
-
-
-def matrix_nullspace(A, eps=1e-10):
-    """
-    Return a basis for the solution space of ``A∙x=0`` as column vectors.
-    """
-    u, s, vh = np.linalg.svd(A)
-    n = next((i for i, c in enumerate(s) if c < eps), len(s))
-    return vh[n:]
-
-
-def get_plane(v):
-    """
-    Get normal vector of the plane defined by the vertices (=rows of) v.
-    """
-    # TODO: it should be easy to obtain the result directly from the
-    # facet equation, boundary equation and additional vertex without
-    # resorting to matrix decomposition techniques.
-    space = matrix_nullspace(v)
-    assert space.shape[0] == 1
-    return space[0].flatten()
 
 
 def get_facet_boundaries(lp, lpb, facet):
@@ -85,7 +62,10 @@ def get_adjacent_facet(lp, facet, b_simplex, old_vertex, atol=1e-10):
         assert not seen(vertex)
         if lp.get_objective_value() >= -atol:
             return plane
-        plane = get_plane(b_simplex + (vertex,))
+        # TODO: it should be easy to obtain the result directly from the
+        # facet equation, boundary equation and additional vertex without
+        # resorting to matrix decomposition techniques.
+        plane = plane_normal(b_simplex + (vertex,))
         plane = scale_to_int(plane)
         if np.dot(plane, old_vertex) <= -atol:
             plane = -plane

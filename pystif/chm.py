@@ -31,23 +31,16 @@ The outline of the algorithm is as follows:
 
 import sys
 from functools import partial
+
 import numpy as np
 import numpy.random
 import scipy.spatial
 from docopt import docopt
-from .core.io import (scale_to_int, make_int_exact, VectorMemory, System,
-                      default_column_labels, SystemFile, StatusInfo)
 
-
-def orthogonal_complement(v):
-    """
-    Get the (orthonormal) basis vectors making up the orthogonal complement of
-    the plane defined by n∙x = 0.
-    """
-    v = np.atleast_2d(v)
-    a = np.hstack((v.T , np.eye(v.shape[1])))
-    q, r = np.linalg.qr(a)
-    return q[:,1:]
+from .core.array import scale_to_int, make_int_exact
+from .core.io import System, default_column_labels, SystemFile, StatusInfo
+from .core.linalg import plane_basis, PCA
+from .core.util import VectorMemory
 
 
 def random_direction_vector(dim):
@@ -102,23 +95,12 @@ def inner_approximation(lp, dim):
         if all(p == 0):
             # Optimizing along ``v`` yields a vector in our ray space. This
             # means ``v∙x=0`` is part of the LP.
-            orth = np.dot(orth, orthogonal_complement(d))
+            orth = np.dot(orth, plane_basis(d))
         else:
             # Remove discovered ray from the orthogonal space:
-            orth = np.dot(orth, orthogonal_complement(p))
+            orth = np.dot(orth, plane_basis(p))
             points = np.vstack((points, x))
     return np.hstack((np.zeros((points.shape[0], 1)), points))
-
-
-def principal_components(data_points, s_limit=1e-10):
-    """
-    Get the (orthonormal) basis vectors of the principal components of the
-    data set specified by the rows of M.
-    """
-    cov_mat = np.cov(data_points.T)
-    u, s, v = np.linalg.svd(cov_mat)
-    num_comp = next((i for i, c in enumerate(s) if c < s_limit), len(s))
-    return u[:,:num_comp], u[:,num_comp:]
 
 
 def del_const_col(mat):
@@ -139,7 +121,7 @@ def convex_hull_method(lp, lpb, rays,
     points = np.vstack((np.zeros(points.shape[1]), points))
 
     # Now make sure the dataset lives in a full dimensional subspace
-    subspace, nullspace = principal_components(points)
+    subspace, nullspace = PCA(points)
 
     nullspace = nullspace.T
     nullspace = add_left_zero(nullspace)

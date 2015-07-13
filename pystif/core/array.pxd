@@ -1,6 +1,5 @@
-import numpy as np
-
 from cpython cimport array as c_array
+import numpy as np
 
 
 cdef extern from "math.h":
