@@ -104,20 +104,15 @@ def facet_enumeration_method(lp, lpb, initial_facet, found_cb):
         facet = scale_to_int(facet)
         assert is_facet(lpb, facet)
 
-        hull, subspace = get_facet_boundaries(lp, lpb, facet)
-        points = [scale_to_int(np.dot(p, subspace.T)) for p in hull.points]
+        equations, subspace = get_facet_boundaries(lp, lpb, facet)
 
-        for i, equation in enumerate(hull.equations):
-            assert abs(equation[-1]) < 1e-10
-            equation = -equation[:-1]
-
+        for i, equation in enumerate(equations):
             boundary = tuple(np.dot(matrix_nullspace([equation]), subspace.T))
 
 
             eq = np.dot(equation, subspace.T)
-            old_vertex = max(points, key=lambda p: np.dot(eq, p))
 
-            adj = get_adjacent_facet(lpb, facet, boundary, old_vertex)
+            adj = get_adjacent_facet(lpb, facet, boundary, eq)
             if not seen(adj):
                 queue.append(adj)
                 found_cb(adj)
