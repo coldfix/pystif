@@ -37,95 +37,25 @@ import numpy.random
 import scipy.spatial
 from docopt import docopt
 
-from .core.array import scale_to_int, make_int_exact
+from .core.array import scale_to_int
 from .core.io import System, default_column_labels, SystemFile, StatusInfo
-from .core.linalg import plane_basis, PCA
+from .core.geom import ConvexPolyhedron
+from .core.linalg import matrix_imker, addz, delz
 from .core.util import VectorMemory
 
 
-def random_direction_vector(dim):
-    v = np.random.normal(size=dim)
-    v /= np.linalg.norm(v)
-    return v
-
-
-def find_xray(lp, direction):
-    subdim = 1+len(direction)
-    direction = np.hstack((0, direction, np.zeros(lp.num_cols-subdim)))
-    # For the random vectors it doesn't matter whether we use `minimize` or
-    # `maximize` — but it *does* matter for the oriented direction vectors
-    # obtained from other functions:
-    xray = lp.minimize(direction)
-    xray.resize(subdim)
-    # xray[0] is always -1, this prevents any shortening if we decide to that
-    # later on, so just set it to 0.
-    xray[0] = 0
-    xray = scale_to_int(xray)
-    # TODO: output active constraints
-    return xray
-
-
-def inner_approximation(lp, dim):
-    """
-    Return a matrix of extreme points whose convex hull defines an inner
-    approximation to the projection of the polytope defined by the LP to the
-    subspace of its lowest ``dim`` components.
-
-    Extreme points are returned as matrix rows.
-
-    The returned points define a polytope with the dimension of the projected
-    polytope itself (which may be less than ``dim``).
-    """
-    # FIXME: Better use deterministic or random direction vectors?
-    v = random_direction_vector(dim)
-    points = np.array([
-        find_xray(lp, v)[1:],
-    ])
-    orth = np.eye(dim)
-    while orth.shape[1] > 0:
-        # Generate arbitrary vector in orthogonal space and min/max along its
-        # direction:
-        d = random_direction_vector(orth.shape[1])
-        v = np.dot(d, orth.T)
-        x = find_xray(lp, v)[1:]
-        p = make_int_exact(np.dot(x-points[0], orth))
-        if all(p == 0):
-            x = find_xray(lp, -v)[1:]
-            p = make_int_exact(np.dot(x-points[0], orth))
-        if all(p == 0):
-            # Optimizing along ``v`` yields a vector in our ray space. This
-            # means ``v∙x=0`` is part of the LP.
-            orth = np.dot(orth, plane_basis(d))
-        else:
-            # Remove discovered ray from the orthogonal space:
-            orth = np.dot(orth, plane_basis(p))
-            points = np.vstack((points, x))
-    return np.hstack((np.zeros((points.shape[0], 1)), points))
-
-
-def del_const_col(mat):
-    return mat[:,1:]
-
-
-def add_left_zero(mat):
-    return np.hstack((np.zeros((mat.shape[0], 1)), mat))
-
-
-def convex_hull_method(lp, lpb, rays,
+def convex_hull_method(polyhedron, rays,
                        report_ray, report_yes,
                        status_info, qinfo):
 
     result = []
 
-    points = del_const_col(rays)
-    points = np.vstack((np.zeros(points.shape[1]), points))
+    points = delz(rays)
 
     # Now make sure the dataset lives in a full dimensional subspace
-    subspace, nullspace = PCA(points)
+    subspace, nullspace = matrix_imker(points)
 
-    nullspace = nullspace.T
-    nullspace = add_left_zero(nullspace)
-    for face in nullspace:
+    for face in addz(nullspace):
         report_yes(face)
         report_yes(-face)
 
@@ -133,7 +63,8 @@ def convex_hull_method(lp, lpb, rays,
         subspace = np.eye(points.shape[1])
 
     # initial hull
-    points = np.dot(points, subspace)
+    points = np.dot(points, subspace.T)
+    points = np.vstack((np.zeros(points.shape[1]), points))
     qinfo(len(points))
     hull = scipy.spatial.ConvexHull(points, incremental=True)
 
@@ -157,23 +88,23 @@ def convex_hull_method(lp, lpb, rays,
             # but apparently points x inside the convex hull are described by
             # ``face ∙ (x,1) ≤ 0``
             face = -face[:-1]
-            face = np.dot(face, subspace.T)
+            face = np.dot(face, subspace)
             face = np.hstack((0, face))
             face = scale_to_int(face)
 
             if seen(face):
                 continue
 
-            if lp.implies(face, embed=True):
+            if polyhedron.is_face(face):
                 yes += 1
                 report_yes(face)
                 result.append(-hull.equations[i][:-1])
             else:
-                ray = find_xray(lpb, face[1:])
+                ray = polyhedron.search(face)
                 if seen_ray(ray):
                     continue
                 report_ray(ray)
-                point = np.dot(ray[1:], subspace)
+                point = np.dot(ray[1:], subspace.T)
                 new_points.append(point)
 
         if new_points:
@@ -185,7 +116,7 @@ def convex_hull_method(lp, lpb, rays,
             break
 
     status_info(total, total, yes)
-    return result, subspace
+    return addz(result), subspace, nullspace
 
 
 def print_status(print_, i, total, yes):
@@ -210,13 +141,8 @@ def main(args=None):
         system.columns = default_column_labels(dim)
 
     system, subdim = system.prepare_for_projection(opts['--subspace'])
-
-    lp = system.lp()
-    lpb = system.lp()
-    if opts['--limit'] is not None:
-        limit = float(opts['--limit'])
-        for i in range(1, subdim):
-            lpb.set_col_bnds(i, 0, limit)
+    polyhedron = ConvexPolyhedron.from_cone(system, subdim,
+                                            float(opts['--limit']))
 
     resume = opts['--resume']
     facet_file = SystemFile(opts['--output'], append=resume,
@@ -227,7 +153,7 @@ def main(args=None):
     if ray_file._matrix:
         rays = ray_file._matrix
     else:
-        rays = inner_approximation(lpb, subdim-1)
+        rays = polyhedron.basis()
         for ray in rays:
             ray_file(ray)
         ray_file._print()
@@ -239,7 +165,7 @@ def main(args=None):
                  partial(print_status, info),
                  partial(print_qhull, info))
 
-    convex_hull_method(lp, lpb, rays, *callbacks)
+    convex_hull_method(polyhedron, rays, *callbacks)
 
 
 if __name__ == '__main__':
