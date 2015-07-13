@@ -107,8 +107,19 @@ class TestLP(unittest.TestCase):
              [0, 0,  1],   # y ≥ 0 (area above x axis)
              [0, 1, -1]]   # x ≥ y (area under x=y axis)
         lp = Problem(L)
-        self.assertTrue(lp.implies([-1, 1, -1]))
-        self.assertFalse(lp.implies([1, 1, -1]))
+        self.assertTrue(lp.implies([1, 1, -1]))
+        self.assertFalse(lp.implies([-1, 1, -1]))
+
+    def test_copy(self):
+        a = Problem([0, 1, 1])  # x+y ≥ 0
+        b = a.copy()
+        a.add([0, -1,  0])      # x ≤ 0
+        b.add([0,  0, -1])      # y ≤ 0
+        self.assertTrue(a.implies([0, 0, 1]))   # y ≥ 0
+        self.assertFalse(b.implies([0, 0, 1]))  # y ≥ 0
+        self.assertFalse(a.implies([0, 1, 0]))  # x ≥ 0
+        self.assertTrue(b.implies([0, 1, 0]))   # x ≥ 0
+
 
 if __name__ == '__main__':
     unittest.main()

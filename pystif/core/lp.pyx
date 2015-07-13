@@ -110,6 +110,12 @@ cdef class Problem:
     def __dealloc__(self):
         glp.delete_prob(self._lp)
 
+    def copy(self):
+        """Return an independent copy of this LP."""
+        lp = Problem()
+        glp.copy_prob(lp._lp, self._lp, glp.ON)
+        return lp
+
     property num_rows:
         """Current number of rows."""
         def __get__(self):
@@ -403,17 +409,17 @@ cdef class Problem:
             raise NofeasibleError
         raise UnknownError
 
-    def optimize(self, objective, sense=glp.MIN):
+    def optimize(self, objective, sense=glp.MIN, *, embed=False):
         """Optimize objective and return solution as numpy array."""
-        self.set_objective(objective, sense)
+        self.set_objective(objective, sense, embed=embed)
         self.simplex()
         return self.get_prim_solution()
 
-    def minimize(self, objective):
-        return self.optimize(objective, glp.MIN)
+    def minimize(self, objective, *, embed=False):
+        return self.optimize(objective, glp.MIN, embed=embed)
 
-    def maximize(self, objective):
-        return self.optimize(objective, glp.MAX)
+    def maximize(self, objective, *, embed=False):
+        return self.optimize(objective, glp.MAX, embed=embed)
 
     def get_objective_value(self):
         """Get value of objective achieved in last optimization task."""
@@ -437,7 +443,7 @@ cdef class Problem:
         """
         def _implies(q):
             return (self.has_optimal_solution(q, embed=embed) and
-                    self.get_objective_value() <= threshold)
+                    self.get_objective_value() >= -threshold)
         return all(map(_implies, _as_matrix(L)))
 
     @cython.boundscheck(False)

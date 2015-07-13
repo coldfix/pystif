@@ -2,12 +2,13 @@
 Print equations in human readable format.
 
 Usage:
-    pretty INPUT [-o OUTPUT] [-c] [-g]
+    pretty INPUT [-o OUTPUT] [-c] [-g | -y SYM]
 
 Options:
     -o OUTPUT, --output OUTPUT      Output file
     -c, --canonical                 Assume canonical column labels
     -g, --group                     Group similar constraints
+    -y SYM, --symmetry SYM          Specify symmetry group generators
 """
 
 
@@ -15,8 +16,9 @@ from collections import Counter, defaultdict
 from math import log2
 from docopt import docopt
 from .core.it import num_vars
-from .core.io import (System, print_to,
+from .core.io import (System, print_to, VectorMemory,
                       default_column_labels, column_varname_labels)
+from .core.symmetry import SymmetryGroup
 
 
 def _fmt_float(f):
@@ -100,6 +102,16 @@ def main(args=None):
         for g in group_permuted_terms(system.matrix, columns):
             first = not first and print_()
             dump(g)
+    elif opts['--symmetry']:
+        sg = SymmetryGroup.load(opts['--symmetry'], system.columns)
+        seen = VectorMemory()
+        for row in system.matrix:
+            if seen(row):
+                continue
+            for sym in sg(row):
+                dump([sym])
+                seen(sym)
+            print_()
     else:
         dump(system.matrix)
 

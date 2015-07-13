@@ -32,8 +32,9 @@ Usage
 
 The following subprograms are currently available:
 
-- ``chm`` — project polyhedron to subspace via convex hull method
+- ``chm`` — project polyhedron to subspace via Convex Hull Method
 - ``fme`` — project polyhedron to subspace via Fourier-Motzkin-Elimination
+- ``afi`` — project polyhedron to subspace via Adjacent Facet Iteration
 - ``equiv`` — check two systems of inequalities for equivalence
 - ``makesys`` — create/modify matrix file
 - ``pretty`` — human readable display of inequality file
