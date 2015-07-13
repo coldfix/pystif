@@ -41,7 +41,8 @@ def get_cut_boundaries(body, subspace):
     return convex_hull_method(cut, cut.basis(), *callbacks)
 
 
-def adjacent_facet_iteration(polyhedron, initial_facet, found_cb, symmetries):
+def adjacent_facet_iteration(polyhedron, initial_facet, found_cb, symmetries,
+                             status_info):
 
     subdim = len(initial_facet)
     seen_b = set()
@@ -58,18 +59,10 @@ def adjacent_facet_iteration(polyhedron, initial_facet, found_cb, symmetries):
 
         equations, subspace, nullspace = get_cut_boundaries(polyhedron, facet)
 
-        # for status output:
-        num_eqs = len(equations)
-        len_eqs = len(str(num_eqs))
-
         for i, equation in enumerate(delz(equations)):
-            boundary = addz(np.dot(matrix_nullspace([equation]), subspace))
+            status_info(queue, equations, i)
 
-            print("\rFEM queue: {:4}, progress: {}/{}".format(
-                len(queue),
-                str(i).rjust(len_eqs),
-                num_eqs,
-            ), end='')
+            boundary = addz(np.dot(matrix_nullspace([equation]), subspace))
 
             eq = np.dot(equation, subspace)
             eq = np.hstack((0, eq))
@@ -83,6 +76,20 @@ def adjacent_facet_iteration(polyhedron, initial_facet, found_cb, symmetries):
                 for sym in symmetries(adj):
                     if not seen(sym):
                         found_cb(sym)
+
+        status_info(queue, equations, len(equations))
+
+
+def afi_status(info, queue, equations, i):
+    num_eqs = len(equations)
+    len_eqs = len(str(num_eqs))
+    info("FEM queue: {:4}, progress: {}/{}".format(
+        len(queue),
+        str(i).rjust(len_eqs),
+        num_eqs,
+    ))
+    if i == num_eqs:
+        info()
 
 
 def main(args=None):
@@ -110,7 +117,10 @@ def main(args=None):
     else:
         symmetries = NoSymmetry
 
-    adjacent_facet_iteration(polyhedron, facet, facet_file, symmetries)
+    info = StatusInfo()
+
+    adjacent_facet_iteration(polyhedron, facet, facet_file, symmetries,
+                             partial(afi_status, info))
 
 
 if __name__ == '__main__':

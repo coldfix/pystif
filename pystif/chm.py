@@ -124,7 +124,7 @@ def print_status(print_, i, total, yes):
     print_("Progress: {}/{} ({} facets)"
            .format(str(i).rjust(l), total, yes))
     if i == total:
-        print_("\n")
+        print_()
 
 
 def print_qhull(print_, num_points):

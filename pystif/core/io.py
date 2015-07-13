@@ -256,5 +256,8 @@ class StatusInfo:
         self.write("\r\033[K")
 
     def __call__(self, *args):
-        self.clear_line()
-        self.write(" ".join(args))
+        if args:
+            self.clear_line()
+            self.write(" ".join(args))
+        else:
+            self.write("\n")
