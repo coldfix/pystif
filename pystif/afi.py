@@ -2,7 +2,7 @@
 Project convex cone to subspace by an adjacent facet iteration method.
 
 Usage:
-    afi INPUT -s SUBSPACE [-o OUTPUT] [-l LIMIT]
+    afi INPUT -s SUBSPACE [-o OUTPUT] [-l LIMIT] [-y SYMMETRIES]
 
 Options:
     -o OUTPUT, --output OUTPUT      Set output file for solution
@@ -11,6 +11,7 @@ Options:
                                     [default: 1]
     -f FACES, --faces FACES         File with known faces of the projected
                                     polyhedron
+    -y SYM, --symmetry SYM          Symmetry group generators
 """
 
 from functools import partial
@@ -18,6 +19,7 @@ import numpy as np
 import scipy
 from docopt import docopt
 
+from .core.symmetry import NoSymmetry, SymmetryGroup
 from .core.lp import Problem
 from .core.io import (StatusInfo, System, default_column_labels, SystemFile,
                       VectorMemory, scale_to_int)
@@ -90,14 +92,17 @@ def get_adjacent_facet(lp, facet, b_simplex, old_vertex, atol=1e-10):
         plane = np.hstack((0, plane))
 
 
-def adjacent_facet_iteration(lp, lpb, initial_facet, found_cb):
+def adjacent_facet_iteration(lp, lpb, initial_facet, found_cb, symmetries):
 
     subdim = len(initial_facet)
     seen_b = set()
     seen = VectorMemory()
 
-    found_cb(initial_facet)
     queue = [initial_facet]
+    for sym in symmetries(initial_facet):
+        if not seen(initial_facet):
+            found_cb(initial_facet)
+
     while queue:
         facet = queue.pop()
         facet = scale_to_int(facet)
@@ -121,9 +126,14 @@ def adjacent_facet_iteration(lp, lpb, initial_facet, found_cb):
             eq = np.dot(equation, subspace.T)
 
             adj = get_adjacent_facet(lpb, facet, boundary, eq)
+
             if not seen(adj):
                 queue.append(adj)
                 found_cb(adj)
+
+                for sym in symmetries(adj):
+                    if not seen(sym):
+                        found_cb(sym)
 
 
 def filter_non_singular_directions(lp, nullspace):
@@ -189,7 +199,14 @@ def main(args=None):
 
     facet_file = SystemFile(opts['--output'], columns=system.columns[:subdim])
 
-    adjacent_facet_iteration(lp, lpb, facet, facet_file)
+    if opts['--symmetry']:
+        col_names = system.columns[:subdim]
+        symmetries = SymmetryGroup.load(opts['--symmetry'], col_names)
+
+    else:
+        symmetries = NoSymmetry
+
+    adjacent_facet_iteration(lp, lpb, facet, facet_file, symmetries)
 
 
 if __name__ == '__main__':
