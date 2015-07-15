@@ -57,14 +57,14 @@ def adjacent_facet_iteration(polyhedron, initial_facet, found_cb, symmetries,
         facet = queue.pop()
         facet = scale_to_int(facet)
 
-        equations, subspace, nullspace = get_cut_boundaries(polyhedron, facet)
+        equations, subspace = get_cut_boundaries(polyhedron, facet)
 
         for i, equation in enumerate(delz(equations)):
             status_info(queue, equations, i)
 
-            boundary = addz(np.dot(matrix_nullspace([equation]), subspace))
+            boundary = addz(subspace.back(matrix_nullspace([equation])))
 
-            eq = np.dot(equation, subspace)
+            eq = subspace.back(equation)
             eq = np.hstack((0, eq))
             eq = scale_to_int(eq)
 

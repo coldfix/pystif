@@ -38,7 +38,7 @@ from docopt import docopt
 
 from .core.array import scale_to_int
 from .core.io import System, default_column_labels, SystemFile, StatusInfo
-from .core.geom import ConvexPolyhedron
+from .core.geom import ConvexPolyhedron, LinearSubspace
 from .core.linalg import matrix_imker, addz, delz
 from .core.util import VectorMemory
 
@@ -52,18 +52,18 @@ def convex_hull_method(polyhedron, rays,
     points = delz(rays)
 
     # Now make sure the dataset lives in a full dimensional subspace
-    subspace, nullspace = matrix_imker(points)
+    subspace = LinearSubspace.from_rowspace(points)
 
-    for face in addz(nullspace):
+    for face in addz(subspace.normals):
         report_yes(face)
         report_yes(-face)
 
-    if nullspace.shape[0] == 0:
-        subspace = np.eye(points.shape[1])
+    if subspace.dim == points.shape[1]:
+        subspace = LinearSubspace.all_space(points.shape[1])
 
     # initial hull
-    points = np.dot(points, subspace.T)
-    points = np.vstack((np.zeros(points.shape[1]), points))
+    points = subspace.into(points)
+    points = np.vstack((np.zeros(subspace.dim), points))
     qinfo(len(points))
     hull = scipy.spatial.ConvexHull(points, incremental=True)
 
@@ -87,7 +87,7 @@ def convex_hull_method(polyhedron, rays,
             # but apparently points x inside the convex hull are described by
             # ``face ∙ (x,1) ≤ 0``
             face = -face[:-1]
-            face = np.dot(face, subspace)
+            face = subspace.back(face)
             face = np.hstack((0, face))
             face = scale_to_int(face)
 
@@ -103,8 +103,7 @@ def convex_hull_method(polyhedron, rays,
                 if seen_ray(ray):
                     continue
                 report_ray(ray)
-                point = np.dot(ray[1:], subspace.T)
-                new_points.append(point)
+                new_points.append(subspace.into(ray[1:]))
 
         if new_points:
             status_info(total, total, yes)
@@ -115,7 +114,7 @@ def convex_hull_method(polyhedron, rays,
             break
 
     status_info(total, total, yes)
-    return addz(result), subspace, nullspace
+    return addz(result), subspace
 
 
 def print_status(print_, i, total, yes):
