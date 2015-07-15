@@ -16,33 +16,33 @@ class ConvexPolyhedron:
     Assumes that the origin is an extreme point of the polyhedron.
     """
 
-    def __init__(self, lp, subdim):
+    def __init__(self, lp, dim):
         self.lp = lp
-        self.subdim = subdim
+        self.dim = dim
         self.points = PointSet()
 
     @classmethod
-    def from_cone(cls, system, subdim, limit):
+    def from_cone(cls, system, dim, limit):
         """Create search problem from the system ``L∙x≥0, x≤limit``."""
         lp = system.lp()
-        for i in range(1, subdim):
+        for i in range(1, dim):
             lp.set_col_bnds(i, 0, limit)
-        return cls(lp, subdim)
+        return cls(lp, dim)
 
     @cached
     def basis(self):
         """
         Return a matrix of extreme points whose convex hull defines an inner
         approximation to the projection of the polytope defined by the LP to
-        the subspace of its lowest ``self.subdim`` components.
+        the subspace of its lowest ``self.dim`` components.
 
         Extreme points are returned as matrix rows.
 
         The returned points define a polytope with the dimension of the
-        projected polytope itself (which may be less than ``self.subdim``).
+        projected polytope itself (which may be less than ``self.dim``).
         """
-        points = np.empty((0, self.subdim))
-        orth = LinearSubspace.all_space(self.subdim-1)
+        points = np.empty((0, self.dim))
+        orth = LinearSubspace.all_space(self.dim-1)
         while orth.dim > 0:
             # Choose vector from orthogonal space and optimize along its
             # direction:
@@ -75,17 +75,17 @@ class ConvexPolyhedron:
         """
         Search an extreme point ``x`` of the LP which minimizes ``q∙x``.
 
-        The ``q`` parameter must be specified as a vector with ``subdim``
+        The ``q`` parameter must be specified as a vector with ``dim``
         components. Its geometric interpretation is the normal vector of a
         hyperplane in the projection space. This hyperplane is shifted along
         its normal until all points inside the polyhedron fulfill ``q∙x≥0``.
 
-        Returns an extreme point with ``subdim`` components (the leftmost
+        Returns an extreme point with ``dim`` components (the leftmost
         component is always 0).
         """
-        assert len(q) == self.subdim
+        assert len(q) == self.dim
         extreme_point = self.lp.minimize(q, embed=True)
-        extreme_point = extreme_point[0:self.subdim]
+        extreme_point = extreme_point[0:self.dim]
         extreme_point[0] = 0
         extreme_point = scale_to_int(extreme_point)
         self.points.add(extreme_point)
@@ -99,22 +99,22 @@ class ConvexPolyhedron:
         :param space: specified by its normal vector(s).
         """
         space = np.atleast_2d(space)
-        assert space.shape[1] == self.subdim
+        assert space.shape[1] == self.dim
         lp = self.lp.copy()
         lp.add(space, 0, 0, embed=True)
-        return self.__class__(lp, self.subdim)
+        return self.__class__(lp, self.dim)
 
-    def dim(self):
+    def rank(self):
         """Geometric dimension of the projected polyhedron."""
         return len(self.basis())
 
-    def face_dim(self, face):
+    def face_rank(self, face):
         """Return dimension of the face."""
         face = self.subspace().projection(face)
-        return self.intersection(face).dim()
+        return self.intersection(face).rank()
 
     def is_facet(self, face):
-        return self.is_face(face) and self.face_dim(face) == self.dim()-1
+        return self.is_face(face) and self.face_rank(face) == self.rank()-1
 
     def is_face(self, face):
         return self.lp.implies(face, embed=True)
@@ -129,7 +129,7 @@ class ConvexPolyhedron:
             vertex = self.search(plane)[1:]
             if self.lp.get_objective_value() >= -atol:
                 # assert self.is_face(plane)
-                # assert self.face_dim(plane) >= self.face_dim(face)
+                # assert self.face_rank(plane) >= self.face_rank(face)
                 return plane
             # TODO: it should be easy to obtain the result directly from the
             # facet equation, boundary equation and additional vertex without
