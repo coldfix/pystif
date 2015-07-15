@@ -66,6 +66,7 @@ def adjacent_facet_iteration(polyhedron, initial_facet, found_cb, symmetries,
 
             eq = np.dot(equation, subspace)
             eq = np.hstack((0, eq))
+            eq = scale_to_int(eq)
 
             adj = polyhedron.get_adjacent_facet(facet, boundary, eq)
 

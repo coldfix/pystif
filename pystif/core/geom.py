@@ -71,6 +71,10 @@ class ConvexPolyhedron:
     def onb(self):
         return matrix_rowspace(self.basis())
 
+    @cached
+    def subspace_projector(self):
+        return np.dot(self.onb().T, self.onb())
+
     def search(self, q):
         """
         Search an extreme point ``x`` of the LP which minimizes ``q∙x``.
@@ -84,7 +88,6 @@ class ConvexPolyhedron:
         component is always 0).
         """
         assert len(q) == self.subdim
-        assert q[0] == 0
         extreme_point = self.lp.minimize(q, embed=True)
         extreme_point = extreme_point[0:self.subdim]
         extreme_point[0] = 0
@@ -111,11 +114,11 @@ class ConvexPolyhedron:
 
     def face_dim(self, face):
         """Return dimension of the face."""
-        face = np.dot(face, self.onb().T)
+        face = np.dot(face, self.subspace_projector().T)
         return self.intersection(face).dim()
 
     def is_facet(self, face):
-        return self.face_dim(plane) == self.dim()-1
+        return self.is_face(face) and self.face_dim(face) == self.dim()-1
 
     def is_face(self, face):
         return self.lp.implies(face, embed=True)
@@ -129,6 +132,8 @@ class ConvexPolyhedron:
         while True:
             vertex = self.search(plane)[1:]
             if self.lp.get_objective_value() >= -atol:
+                # assert self.is_face(plane)
+                # assert self.face_dim(plane) >= self.face_dim(face)
                 return plane
             # TODO: it should be easy to obtain the result directly from the
             # facet equation, boundary equation and additional vertex without
@@ -141,6 +146,7 @@ class ConvexPolyhedron:
 
     def filter_non_singular_directions(self, nullspace):
         for i, direction in enumerate(nullspace):
+            direction = scale_to_int(direction)
             if self.is_face(direction):
                 direction = -direction
                 if self.is_face(direction):
@@ -148,6 +154,12 @@ class ConvexPolyhedron:
             yield i, direction
 
     def refine_to_facet(self, face):
+        assert self.is_face(face)
+        face = np.dot(face, self.subspace_projector().T)
+        face = scale_to_int(face)
+        return self._refine_to_facet(face)
+
+    def _refine_to_facet(self, face):
         subspace = self.intersection(face).basis()
         nullspace = addz(matrix_nullspace(delz(np.vstack((subspace, face)))))
         try:
@@ -156,4 +168,4 @@ class ConvexPolyhedron:
             return face
         subface = np.vstack((subspace, np.delete(nullspace, i, axis=0)))
         plane = self.get_adjacent_facet(face, subface, -direction)
-        return self.refine_to_facet(plane)
+        return self._refine_to_facet(plane)
