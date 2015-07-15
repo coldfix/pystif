@@ -3,7 +3,7 @@ import numpy as np
 
 from .array import scale_to_int, make_int_exact
 from .linalg import (matrix_rowspace, matrix_nullspace,
-                     plane_basis, plane_normal, addz, delz)
+                     basis_vector, plane_normal, addz, delz)
 from .util import PointSet, cached
 
 
@@ -43,24 +43,24 @@ class ConvexPolyhedron:
         """
         points = np.empty((0, self.subdim))
         orth = np.eye(self.subdim - 1)
-        while orth.shape[1] > 0:
+        while orth.shape[0] > 0:
             # Choose vector from orthogonal space and optimize along its
             # direction:
-            d = orth[0]
-            v = np.dot(d, orth.T)
+            d = basis_vector(orth.shape[0], 0)
+            v = np.dot(d, orth)
             v = np.hstack((0, v))
             x = self.search(v)[1:]
-            p = make_int_exact(np.dot(x, orth))
+            p = make_int_exact(np.dot(x, orth.T))
             if all(p == 0):
                 x = self.search(-v)[1:]
-                p = make_int_exact(np.dot(x, orth))
+                p = make_int_exact(np.dot(x, orth.T))
             if all(p == 0):
                 # Optimizing along ``v`` yields a vector in our ray space.
                 # This means ``v∙x=0`` is part of the LP.
-                orth = np.dot(orth, plane_basis(d))
+                orth = np.dot(matrix_nullspace([d]), orth)
             else:
                 # Remove discovered ray from the orthogonal space:
-                orth = np.dot(orth, plane_basis(p))
+                orth = np.dot(matrix_nullspace([p]), orth)
                 points = np.vstack((
                     points,
                     np.hstack((0, x)),

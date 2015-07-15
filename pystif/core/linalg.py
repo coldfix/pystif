@@ -46,6 +46,13 @@ def matrix_imker(A, eps=1e-10):
     return vh[:n], vh[n:]
 
 
+def basis_vector(dim, index):
+    """Get D dimensional unit vector with only the i-th component being 1."""
+    v = np.zeros(dim)
+    v[index] = 1
+    return v
+
+
 def plane_basis(v):
     """
     Get the (orthonormal) basis vectors making up the orthogonal complement of
