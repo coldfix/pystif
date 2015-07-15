@@ -155,5 +155,5 @@ class ConvexPolyhedron:
         except StopIteration:
             return face
         subface = np.vstack((subspace, np.delete(nullspace, i, axis=0)))
-        plane = self.get_adjacent_facet(face, subface, direction)
+        plane = self.get_adjacent_facet(face, subface, -direction)
         return self.refine_to_facet(plane)
