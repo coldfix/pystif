@@ -42,6 +42,7 @@ script:
   - nosetests
   - bash ./example/cca3.sh
   - bash ./example/bell2x2.sh
+  - bash ./example/cca4.sh
 
 cache:
   - directories:
