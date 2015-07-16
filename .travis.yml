@@ -21,9 +21,9 @@ env:
 
 before_install:
   # download GLPK
-  - apt-get download libglpk-dev libglpk36
+  - apt-get download libglpk-dev glpk
   - dpkg -x libglpk-dev* $PREFIX
-  - dpkg -x libglpk36* $PREFIX
+  - dpkg -x glpk* $PREFIX
 
 install:
   - env
