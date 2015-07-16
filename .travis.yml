@@ -40,6 +40,8 @@ install:
 
 script:
   - nosetests
+  - bash ./example/cca3.sh
+  - bash ./example/bell2x2.sh
 
 cache:
   - directories:
