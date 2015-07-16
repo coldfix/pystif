@@ -144,6 +144,10 @@ def main(args=None):
 
     recursions = int(opts['--recursions'])
 
+    for face in addz(polyhedron.subspace().normals):
+        facet_file(face)
+        facet_file(-face)
+
     afi(polyhedron, symmetries, facet_file, StatusInfo(), recursions)
 
 
