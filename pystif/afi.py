@@ -2,7 +2,7 @@
 Project convex cone to subspace by an adjacent facet iteration method.
 
 Usage:
-    afi INPUT -s SUBSPACE [-o OUTPUT] [-l LIMIT] [-y SYMMETRIES] [-r NUM]
+    afi INPUT -s SUBSPACE [-o OUTPUT] [-l LIMIT] [-y SYMMETRIES] [-r NUM] [-q]...
 
 Options:
     -o OUTPUT, --output OUTPUT      Set output file for solution
@@ -13,10 +13,12 @@ Options:
                                     polyhedron
     -y SYM, --symmetry SYM          Symmetry group generators
     -r NUM, --recursions NUM        Number of AFI recursions [default: 0]
+    -q, --quiet                     Show less output
 """
 
 from functools import partial
 
+import os
 import numpy as np
 from docopt import docopt
 
@@ -29,45 +31,37 @@ from .core.util import VectorMemory
 from .chm import convex_hull_method, print_status, print_qhull
 
 
-def get_boundaries_chm(body):
-    """
-    Perform CHM on the facet to obtain a list of all its "hyper-facets".
-    """
-    info = StatusInfo()
-    callbacks = (lambda ray: None,
-                 lambda facet: None,
-                 partial(print_status, info),
-                 partial(print_qhull, info))
-    return convex_hull_method(body, body.basis(), *callbacks)
 
+def afi(polyhedron, symmetries, found_cb, info, recursions, quiet):
 
-def afi(polyhedron, symmetries, found_cb, info, recursions):
-
-    print("Search level {} facet.".format(recursions))
-
+    info("Search level {} facet.\n".format(recursions))
     # TODO: generate face via dual LP
-
     face = np.hstack((0, np.ones(polyhedron.dim-1)))
     facet = polyhedron.refine_to_facet(face)
-
-    print("Found level {} facet, starting enumeration.".format(recursions))
+    info("Found level {} facet, starting enumeration.\n"
+         .format(recursions))
 
     def _get_boundaries(body):
+        if quiet:
+            sub_info = StatusInfo(open(os.devnull, 'w'))
+        else:
+            sub_info = StatusInfo()
         if recursions == 0:
-            return get_boundaries_chm(body)
-
-        equations = []
-
+            callbacks = (lambda ray: None,
+                         lambda facet: None,
+                         partial(print_status, sub_info),
+                         partial(print_qhull, sub_info))
+            return convex_hull_method(body, body.basis(), *callbacks)
         # TODO: compute new subspace symmetries?
-        afi(body, NoSymmetry, equations.append, info, recursions-1)
-
+        equations = []
+        afi(body, NoSymmetry, equations.append, sub_info, recursions-1, quiet)
         equations = addz(body.subspace().into(delz(equations)))
-
         return equations, body.subspace()
 
-    adjacent_facet_iteration(polyhedron, facet, found_cb, symmetries,
-                             partial(afi_status, info, recursions=recursions),
-                             _get_boundaries)
+    adjacent_facet_iteration(
+        polyhedron, facet, found_cb, symmetries,
+        partial(afi_status, info, recursions=recursions),
+        _get_boundaries)
 
 
 def adjacent_facet_iteration(polyhedron, initial_facet, found_cb, symmetries,
@@ -144,7 +138,17 @@ def main(args=None):
 
     recursions = int(opts['--recursions'])
 
-    afi(polyhedron, symmetries, facet_file, StatusInfo(), recursions)
+    for face in addz(polyhedron.subspace().normals):
+        facet_file(face)
+        facet_file(-face)
+
+    quiet = opts['--quiet']
+    if quiet > 1:
+        info = StatusInfo(open(os.devnull, 'w'))
+    else:
+        info = StatusInfo()
+
+    afi(polyhedron, symmetries, facet_file, info, recursions, quiet)
 
 
 if __name__ == '__main__':
