@@ -2,7 +2,7 @@
 Project convex cone to subspace by an adjacent facet iteration method.
 
 Usage:
-    afi INPUT -s SUBSPACE [-o OUTPUT] [-l LIMIT] [-y SYMMETRIES]
+    afi INPUT -s SUBSPACE [-o OUTPUT] [-l LIMIT] [-y SYMMETRIES] [-r NUM]
 
 Options:
     -o OUTPUT, --output OUTPUT      Set output file for solution
@@ -12,6 +12,7 @@ Options:
     -f FACES, --faces FACES         File with known faces of the projected
                                     polyhedron
     -y SYM, --symmetry SYM          Symmetry group generators
+    -r NUM, --recursions NUM        Number of AFI recursions [default: 0]
 """
 
 from functools import partial
@@ -28,21 +29,49 @@ from .core.util import VectorMemory
 from .chm import convex_hull_method, print_status, print_qhull
 
 
-def get_cut_boundaries(body, subspace):
+def get_boundaries_chm(body):
     """
     Perform CHM on the facet to obtain a list of all its "hyper-facets".
     """
-    cut = body.intersection(subspace)
     info = StatusInfo()
     callbacks = (lambda ray: None,
                  lambda facet: None,
                  partial(print_status, info),
                  partial(print_qhull, info))
-    return convex_hull_method(cut, cut.basis(), *callbacks)
+    return convex_hull_method(body, body.basis(), *callbacks)
+
+
+def afi(polyhedron, symmetries, found_cb, info, recursions):
+
+    print("Search level {} facet.".format(recursions))
+
+    # TODO: generate face via dual LP
+
+    face = np.hstack((0, np.ones(polyhedron.dim-1)))
+    facet = polyhedron.refine_to_facet(face)
+
+    print("Found level {} facet, starting enumeration.".format(recursions))
+
+    def _get_boundaries(body):
+        if recursions == 0:
+            return get_boundaries_chm(body)
+
+        equations = []
+
+        # TODO: compute new subspace symmetries?
+        afi(body, NoSymmetry, equations.append, info, recursions-1)
+
+        equations = addz(body.subspace().into(delz(equations)))
+
+        return equations, body.subspace()
+
+    adjacent_facet_iteration(polyhedron, facet, found_cb, symmetries,
+                             partial(afi_status, info, recursions=recursions),
+                             _get_boundaries)
 
 
 def adjacent_facet_iteration(polyhedron, initial_facet, found_cb, symmetries,
-                             status_info):
+                             status_info, get_boundaries):
 
     subdim = len(initial_facet)
     seen_b = set()
@@ -57,7 +86,7 @@ def adjacent_facet_iteration(polyhedron, initial_facet, found_cb, symmetries,
         facet = queue.pop()
         facet = scale_to_int(facet)
 
-        equations, subspace = get_cut_boundaries(polyhedron, facet)
+        equations, subspace = get_boundaries(polyhedron.intersection(facet))
 
         for i, equation in enumerate(delz(equations)):
             status_info(queue, equations, i)
@@ -81,10 +110,11 @@ def adjacent_facet_iteration(polyhedron, initial_facet, found_cb, symmetries,
         status_info(queue, equations, len(equations))
 
 
-def afi_status(info, queue, equations, i):
+def afi_status(info, queue, equations, i, recursions):
     num_eqs = len(equations)
     len_eqs = len(str(num_eqs))
-    info("FEM queue: {:4}, progress: {}/{}".format(
+    info("AFI level {} queue: {:4}, progress: {}/{}".format(
+        recursions,
         len(queue),
         str(i).rjust(len_eqs),
         num_eqs,
@@ -104,12 +134,6 @@ def main(args=None):
     system, subdim = system.prepare_for_projection(opts['--subspace'])
     polyhedron = ConvexPolyhedron.from_cone(system, subdim,
                                             float(opts['--limit']))
-
-    face = np.hstack((0, np.ones(subdim-1)))
-    facet = polyhedron.refine_to_facet(face)
-
-    print("Found initial facet, starting enumeration...")
-
     facet_file = SystemFile(opts['--output'], columns=system.columns[:subdim])
 
     if opts['--symmetry']:
@@ -118,10 +142,9 @@ def main(args=None):
     else:
         symmetries = NoSymmetry
 
-    info = StatusInfo()
+    recursions = int(opts['--recursions'])
 
-    adjacent_facet_iteration(polyhedron, facet, facet_file, symmetries,
-                             partial(afi_status, info))
+    afi(polyhedron, symmetries, facet_file, StatusInfo(), recursions)
 
 
 if __name__ == '__main__':

@@ -120,14 +120,14 @@ def convex_hull_method(polyhedron, rays,
 def print_status(print_, i, total, yes):
     """Print status."""
     l = len(str(total))
-    print_("Progress: {}/{} ({} facets)"
+    print_("CHM Progress: {}/{} ({} facets)"
            .format(str(i).rjust(l), total, yes))
     if i == total:
         print_()
 
 
 def print_qhull(print_, num_points):
-    print_("qhull on {} rays\n".format(num_points))
+    print_("  > qhull on {} rays\n".format(num_points))
 
 
 def main(args=None):
