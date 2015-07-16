@@ -13,10 +13,10 @@ data=$here/data
 makesys -e -v "A a B b" -o init.txt
 
 # use different elimination methods:
-chm init.txt -s "AB Ab aB ab A a B b" -o fin-chm.txt
-fme init.txt -s "AB Ab aB ab A a B b" -o fin-fme.txt
-afi init.txt -s "AB Ab aB ab A a B b" -o fin-afi.txt
-afi init.txt -s "AB Ab aB ab A a B b" -o fin-sym.txt \
+time chm init.txt -s "AB Ab aB ab A a B b" -o fin-chm.txt
+time fme init.txt -s "AB Ab aB ab A a B b" -o fin-fme.txt
+time afi init.txt -s "AB Ab aB ab A a B b" -o fin-afi.txt
+time afi init.txt -s "AB Ab aB ab A a B b" -o fin-sym.txt \
     -y "Aa <> aA; AaBb <> BbAa"
 
 # consistency check

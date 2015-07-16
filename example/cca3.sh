@@ -18,13 +18,13 @@ makesys -e -v 6 -o raw.txt \
     "CDF + ABDEF - DF - ABCDEF = 0"
 
 # minimize the initial system:
-minimize raw.txt -o min.txt
+time minimize raw.txt -o min.txt
 
 # use different elimination methods:
-chm min.txt -s 8 -o fin-chm.txt
-fme min.txt -s 8 -o fin-fme.txt
-afi min.txt -s 8 -o fin-afi.txt
-afi min.txt -s 8 -o fin-sym.txt -y "ABCDEF <> BCAEFD"
+time chm min.txt -s 8 -o fin-chm.txt
+time fme min.txt -s 8 -o fin-fme.txt
+time afi min.txt -s 8 -o fin-afi.txt
+time afi min.txt -s 8 -o fin-sym.txt -y "ABCDEF <> BCAEFD"
 
 # consistency check
 equiv min.txt raw.txt
