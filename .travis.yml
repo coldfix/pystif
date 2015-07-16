@@ -13,8 +13,9 @@ env:
   global:
     # download binary GLPK
     - PREFIX=$HOME/install
-    - LIBRARY_PATH=$PREFIX/usr/lib
-    - CPATH=$PREFIX/usr/include
+    - LIBRARY_PATH=$PREFIX/usr/lib      # for gcc (build time)
+    - CPATH=$PREFIX/usr/include         # for gcc (build time)
+    - LD_LIBRARY_PATH=$LIBRARY_PATH     # for dynamic linker (run time)
 
     - MINICONDA_URL=https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
     - PATH=$HOME/miniconda/bin:$PATH
