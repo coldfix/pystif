@@ -2,7 +2,7 @@
 Find projection of a convex cone to a lower dimensional subspace.
 
 Usage:
-    chm INPUT -s SUBSPACE [-o OUTPUT] [-x XRAYS] [-l LIMIT] [-r]
+    chm INPUT -s SUBSPACE [-o OUTPUT] [-x XRAYS] [-l LIMIT] [-r] [-q]
 
 Options:
     -o OUTPUT, --output OUTPUT      Save facets of projected cone
@@ -12,6 +12,7 @@ Options:
                                     [default: 1]
     -r, --resume                    Resume using previously computed rays
                                     (must be fully dimensional!)
+    -q, --quiet                     Less status output
 
 Note:
     * output files may be specified as '-' to use STDIN/STDOUT
@@ -29,6 +30,7 @@ The outline of the algorithm is as follows:
         b) no: find the extremal ray that is outside the facet, go to 2.
 """
 
+import os
 import sys
 from functools import partial
 
@@ -156,7 +158,10 @@ def main(args=None):
             ray_file(ray)
         ray_file._print()
 
-    info = StatusInfo()
+    if opts['--quiet']:
+        info = StatusInfo(open(os.devnull, 'w'))
+    else:
+        info = StatusInfo()
 
     callbacks = (ray_file,
                  facet_file,
