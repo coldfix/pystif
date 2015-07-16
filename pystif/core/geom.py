@@ -69,7 +69,7 @@ class ConvexPolyhedron:
 
     @cached
     def subspace(self):
-        return LinearSubspace.from_rowspace(self.basis())
+        return LinearSubspace.from_rowspace(delz(self.basis()))
 
     def search(self, q):
         """
@@ -124,6 +124,7 @@ class ConvexPolyhedron:
         Get the adjacent facet defined by `facet` and `subface`.
         """
         plane = -face
+        subface = np.vstack((subface, addz(self.subspace().normals)))
         subface = delz(subface)
         while True:
             vertex = self.search(plane)[1:]
@@ -151,20 +152,22 @@ class ConvexPolyhedron:
 
     def refine_to_facet(self, face):
         assert self.is_face(face)
-        face = self.subspace().projection(face)
+        face = self.subspace().projection(face[1:])
+        face = np.hstack((0, face))
         face = scale_to_int(face)
-        return self._refine_to_facet(face)
-
-    def _refine_to_facet(self, face):
-        subspace = self.intersection(face).basis()
-        nullspace = addz(matrix_nullspace(delz(np.vstack((subspace, face)))))
-        try:
-            i, direction = next(self.filter_non_singular_directions(nullspace))
-        except StopIteration:
-            return face
-        subface = np.vstack((subspace, np.delete(nullspace, i, axis=0)))
-        plane = self.get_adjacent_facet(face, subface, -direction)
-        return self._refine_to_facet(plane)
+        while True:
+            subspace = self.intersection(face).basis()
+            nullspace = addz(matrix_nullspace(delz(np.vstack((
+                addz(self.subspace().normals),
+                subspace,
+                face,
+            )))))
+            try:
+                i, direction = next(self.filter_non_singular_directions(nullspace))
+            except StopIteration:
+                return face
+            subface = np.vstack((subspace, np.delete(nullspace, i, axis=0)))
+            face = self.get_adjacent_facet(face, subface, -direction)
 
 
 class LinearSubspace:
