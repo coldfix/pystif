@@ -114,5 +114,5 @@ class FME:
         the system.
         """
         num_cols = len(rows[0])
-        cols_to_eliminate = list(range(solve_to+1, num_cols))
+        cols_to_eliminate = list(range(solve_to, num_cols))
         return self.eliminate_columns_from_system(rows, cols_to_eliminate)
