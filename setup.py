@@ -23,6 +23,18 @@ setup(
         'pystif',
         'pystif.core',
     ],
+    entry_points={
+        'console_scripts': [
+            'chm = pystif.chm:main',
+            'equiv = pystif.equiv:main',
+            'makesys = pystif.makesys:main',
+            'pretty = pystif.pretty:main',
+            'mergesys = pystif.mergesys:main',
+            'fme = pystif.fme:main',
+            'minimize = pystif.minimize:main',
+            'afi = pystif.afi:main',
+        ]
+    },
     ext_modules=cythonize([
         Extension(
             'pystif.core.lp', ['pystif/core/lp.pyx'],

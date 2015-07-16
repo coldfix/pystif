@@ -26,7 +26,7 @@ class TestLP(unittest.TestCase):
         assert_array_equal(lp.get_row(0), row)
         with self.assertRaises(ValueError):
             lp.add_row([1])
-        with self.assertRaises(ValueError):
+        with self.assertRaises(IndexError):
             lp.get_row(1)
 
     def test_add_col(self):
@@ -37,14 +37,14 @@ class TestLP(unittest.TestCase):
         assert_array_equal(lp.get_col(0), col)
         with self.assertRaises(ValueError):
             lp.add_col([1])
-        with self.assertRaises(ValueError):
+        with self.assertRaises(IndexError):
             lp.get_col(1)
 
-    def test_get_mat(self):
+    def test_get_matrix(self):
         rows = [[1,2,3,4,5],
                 [6,7,8,9,0]]
-        lp = Problem.from_matrix(rows)
-        assert_array_equal(lp.get_mat(), rows)
+        lp = Problem(rows)
+        assert_array_equal(lp.get_matrix(), rows)
 
     def test_set_row_bnds(self):
         lp = Problem()
@@ -103,12 +103,23 @@ class TestLP(unittest.TestCase):
             lp.maximize([1, 2])        # max[ s = x + 2y ]
 
     def test_implies(self):
-        L = [[1,  0],   # x ≥ 0 (area left to y axis)
-             [0,  1],   # y ≥ 0 (area above x axis)
-             [1, -1]]   # x ≥ y (area under x=y axis)
-        lp = Problem.from_matrix(L, lb_row=0)
-        self.assertTrue(lp.implies([1, -1], 1))
-        self.assertFalse(lp.implies([1, -1], -1))
+        L = [[0, 1,  0],   # x ≥ 0 (area left to y axis)
+             [0, 0,  1],   # y ≥ 0 (area above x axis)
+             [0, 1, -1]]   # x ≥ y (area under x=y axis)
+        lp = Problem(L)
+        self.assertTrue(lp.implies([1, 1, -1]))
+        self.assertFalse(lp.implies([-1, 1, -1]))
+
+    def test_copy(self):
+        a = Problem([0, 1, 1])  # x+y ≥ 0
+        b = a.copy()
+        a.add([0, -1,  0])      # x ≤ 0
+        b.add([0,  0, -1])      # y ≤ 0
+        self.assertTrue(a.implies([0, 0, 1]))   # y ≥ 0
+        self.assertFalse(b.implies([0, 0, 1]))  # y ≥ 0
+        self.assertFalse(a.implies([0, 1, 0]))  # x ≥ 0
+        self.assertTrue(b.implies([0, 1, 0]))   # x ≥ 0
+
 
 if __name__ == '__main__':
     unittest.main()

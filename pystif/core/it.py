@@ -13,11 +13,14 @@ i-th bit is non-zero in s, e.g.:
 
 The zero-th vector component corresponds to the entropy of the empty set which
 is defined to be zero. It is not removed from the vector to avoid off-by-one
-mistakes.
+mistakes. In fact, this matches up nicely with the convention used in pystif
+that the zero-th column is used for the inhomogeneity of an inequality (which
+is of course zero for elemental inequalities).
 """
 
-import numpy as np
 import math
+
+import numpy as np
 
 
 def _insert_zero_bit(pool, bit_index):
@@ -32,6 +35,13 @@ def _nCr(n, r):
     """Binomial coefficient (n choose r)."""
     fac = math.factorial
     return fac(n) // fac(r) // fac(n-r)
+
+
+def num_vars(dim):
+    """Get the number of random variables from the entropy space dimension."""
+    num_vars = int(round(math.log2(dim)))
+    assert 2**num_vars == dim
+    return num_vars
 
 
 def num_elemental_inequalities(num_vars):
