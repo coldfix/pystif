@@ -21,6 +21,8 @@ env:
     - PATH=$HOME/miniconda/bin:$PATH
 
 before_install:
+  # Install GLPK from source since when using the debian package, I ran into
+  # error messages telling me to rebuild using '-fPIC'
   - ./.install.glpk $PREFIX
 
 install:

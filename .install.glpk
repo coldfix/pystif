@@ -1,5 +1,11 @@
 #! /bin/bash
 
+# Download, build and install GLPK from source. This script should only be
+# used for testing from inside Travis CI. To build your own GLPK, follow the
+# instructions at:
+#
+#   https://en.wikibooks.org/wiki/GLPK/Compiling_GLPK
+
 folder=$1
 prefix=$1/usr
 base=glpk-4.55
