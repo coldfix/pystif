@@ -32,9 +32,14 @@ Usage
 
 The following subprograms are currently available:
 
-- ``chm`` — project polyhedron to subspace via Convex Hull Method
-- ``fme`` — project polyhedron to subspace via Fourier-Motzkin-Elimination
-- ``afi`` — project polyhedron to subspace via Adjacent Facet Iteration
+Programs for computing the projection of a convex polyhedron to a subspace:
+
+- ``chm`` — Convex Hull Method
+- ``fme`` — Fourier-Motzkin-Elimination
+- ``afi`` — Adjacent Facet Iteration
+
+Peripheral utilities:
+
 - ``equiv`` — check two systems of inequalities for equivalence
 - ``makesys`` — create/modify matrix file
 - ``pretty`` — human readable display of inequality file
@@ -55,8 +60,10 @@ inequalities in a bipartite bell scenario:
 .. code-block::
 
     makesys -v 4 -e -o full.txt
-    chm full.txt -o small.txt -l1 -s <(echo AC BC AD BD A B C D)
-    pretty small.txt
+    chm full.txt -o small.txt -l1 -s "AC BC AD BD A B C D"
+    pretty small.txt -y "AB <> BA; ABCD <> CDAB"
+
+For more examples, see the ``example/`` subdirectory.
 
 
 Other components
