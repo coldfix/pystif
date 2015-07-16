@@ -1,0 +1,46 @@
+language: python
+
+python:
+  - "3.4"
+
+# Build inside docker containers instead of virtual machines. These are
+# faster, start quicker and support caching. Only downside: sudo is not
+# supported. To work around this, the debian package must be extracted
+# manually and a few environment variables need to be set up (see below).
+sudo: false
+
+env:
+  global:
+    # download binary GLPK
+    - PREFIX=$HOME/install
+    - LIBRARY_PATH=$PREFIX/usr/lib      # for gcc (build time)
+    - CPATH=$PREFIX/usr/include         # for gcc (build time)
+    - LD_LIBRARY_PATH=$LIBRARY_PATH     # for dynamic linker (run time)
+
+    - MINICONDA_URL=https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
+    - PATH=$HOME/miniconda/bin:$PATH
+
+before_install:
+  # Install GLPK from source since when using the debian package, I ran into
+  # error messages telling me to rebuild using '-fPIC'
+  - ./.install.glpk $PREFIX
+
+install:
+  - env
+
+  # setup miniconda in order to install expensive dependencies…
+  - wget $MINICONDA_URL -O miniconda.sh
+  - bash miniconda.sh -b -p $HOME/miniconda
+  - export PATH=$HOME/miniconda/bin:$PATH
+  - conda create -n testenv --yes cython scipy python=$TRAVIS_PYTHON_VERSION
+  - source activate testenv
+
+  # prepare package for use
+  - python setup.py develop
+
+script:
+  - nosetests
+
+cache:
+  - directories:
+    - $PREFIX
