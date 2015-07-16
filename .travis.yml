@@ -20,10 +20,7 @@ env:
     - PATH=$HOME/miniconda/bin:$PATH
 
 before_install:
-  # download GLPK
-  - apt-get download libglpk-dev glpk
-  - dpkg -x libglpk-dev* $PREFIX
-  - dpkg -x glpk* $PREFIX
+  - ./.install.glpk $PREFIX/usr
 
 install:
   - env

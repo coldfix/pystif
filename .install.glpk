@@ -1,0 +1,11 @@
+#! /bin/bash
+
+base=glpk-4.55
+name=$base.tar.gz
+
+wget ftp://ftp.gnu.org/gnu/glpk/$name
+tar -xzvf $name
+cd $base
+./configure
+make
+make prefix=$1 install
