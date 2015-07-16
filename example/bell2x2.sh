@@ -15,8 +15,8 @@ makesys -e -v "A a B b" -o init.txt
 # use different elimination methods:
 time chm init.txt -s "AB Ab aB ab A a B b" -o fin-chm.txt
 time fme init.txt -s "AB Ab aB ab A a B b" -o fin-fme.txt
-time afi init.txt -s "AB Ab aB ab A a B b" -o fin-afi.txt
-time afi init.txt -s "AB Ab aB ab A a B b" -o fin-sym.txt \
+time afi init.txt -s "AB Ab aB ab A a B b" -o fin-afi.txt -q
+time afi init.txt -s "AB Ab aB ab A a B b" -o fin-sym.txt -q \
     -y "Aa <> aA; AaBb <> BbAa"
 
 # consistency check

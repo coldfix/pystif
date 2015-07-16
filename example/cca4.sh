@@ -24,9 +24,9 @@ makesys -e -v "a b c d A B C D" -o raw.txt \
 cp $data/init-4-1.txt min.txt
 
 # use different elimination methods:
-time chm min.txt -s 16 -o fin-chm.txt
-time fme min.txt -s 16 -o fin-fme.txt
-time afi min.txt -s 16 -o fin-afi.txt \
+time chm min.txt -s 16 -o fin-chm.txt -q
+time fme min.txt -s 16 -o fin-fme.txt -q
+time afi min.txt -s 16 -o fin-afi.txt -q \
     -y "abcdABCD <> bcdaBCDA; abcdABCD <> dcbaDCBA"
 
 # consistency check
