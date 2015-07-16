@@ -21,7 +21,7 @@ makesys -e -v "a b c d A B C D" -o raw.txt \
 # DISABLED FOR TEST PERFORMANCE:
 # minimize the initial system:
 # time minimize raw.txt -o min.txt
-cp data/init-4-1.txt min.txt
+cp $data/init-4-1.txt min.txt
 
 # use different elimination methods:
 time chm min.txt -s 16 -o fin-chm.txt
