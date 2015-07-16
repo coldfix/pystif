@@ -21,7 +21,7 @@ env:
     - PATH=$HOME/miniconda/bin:$PATH
 
 before_install:
-  - ./.install.glpk $PREFIX/usr
+  - ./.install.glpk $PREFIX
 
 install:
   - env
@@ -38,3 +38,7 @@ install:
 
 script:
   - nosetests
+
+cache:
+  - directories:
+    - $PREFIX
