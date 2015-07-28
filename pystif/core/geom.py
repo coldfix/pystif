@@ -140,13 +140,13 @@ class ConvexPolyhedron:
             )
 
     def filter_non_singular_directions(self, nullspace):
-        for i, direction in enumerate(nullspace):
+        for direction in nullspace:
             direction = scale_to_int(direction)
             if self.is_face(direction):
                 direction = -direction
                 if self.is_face(direction):
                     continue
-            yield i, direction
+            yield direction
 
     def refine_to_facet(self, face):
         assert self.is_face(face)
@@ -161,7 +161,7 @@ class ConvexPolyhedron:
                 face,
             )))))
             try:
-                i, direction = next(self.filter_non_singular_directions(nullspace))
+                direction = next(self.filter_non_singular_directions(nullspace))
             except StopIteration:
                 return face
             face = self.get_adjacent_facet(face, -direction)
