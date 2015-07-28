@@ -55,7 +55,6 @@ def afi(polyhedron, symmetries, found_cb, info, recursions, quiet):
         # TODO: compute new subspace symmetries?
         equations = []
         afi(body, NoSymmetry, equations.append, sub_info, recursions-1, quiet)
-        equations = addz(body.subspace().into(delz(equations)))
         return equations, body.subspace()
 
     adjacent_facet_iteration(
@@ -82,16 +81,10 @@ def adjacent_facet_iteration(polyhedron, initial_facet, found_cb, symmetries,
 
         equations, subspace = get_boundaries(polyhedron.intersection(facet))
 
-        for i, equation in enumerate(delz(equations)):
+        for i, equation in enumerate(equations):
             status_info(queue, equations, i)
 
-            boundary = addz(subspace.back(matrix_nullspace([equation])))
-
-            eq = subspace.back(equation)
-            eq = np.hstack((0, eq))
-            eq = scale_to_int(eq)
-
-            adj = polyhedron.get_adjacent_facet(facet, boundary, eq)
+            adj = polyhedron.get_adjacent_facet(facet, equation)
 
             if not seen(adj):
                 queue.append(adj)

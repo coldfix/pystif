@@ -119,36 +119,34 @@ class ConvexPolyhedron:
     def is_face(self, face):
         return self.lp.implies(face, embed=True)
 
-    def get_adjacent_facet(self, face, subface, inner, atol=1e-10):
+    def get_adjacent_facet(self, face, inner, atol=1e-10):
         """
         Get the adjacent facet defined by `facet` and `subface`.
         """
         plane = -face
-        subface = np.vstack((subface, addz(self.subspace().normals)))
-        subface = delz(subface)
         while True:
-            vertex = self.search(plane)[1:]
+            vertex = self.search(plane)
             if self.lp.get_objective_value() >= -atol:
                 # assert self.is_face(plane)
                 # assert self.face_rank(plane) >= self.face_rank(face)
-                return plane
-            # TODO: it should be easy to obtain the result directly from the
-            # facet equation, boundary equation and additional vertex without
-            # resorting to matrix decomposition techniques.
-            plane = plane_normal(np.vstack((subface, vertex)))
-            plane = scale_to_int(plane)
-            plane = np.hstack((0, plane))
-            if np.dot(plane, inner) <= -atol:
-                plane = -plane
+                return scale_to_int(plane)
+            plane /= np.linalg.norm(plane)
+            inner /= np.linalg.norm(inner)
+            fx = np.dot(plane, vertex)
+            sx = np.dot(inner, vertex)
+            plane, inner = (
+                inner - sx/fx * plane,
+                fx * plane + sx * inner,
+            )
 
     def filter_non_singular_directions(self, nullspace):
-        for i, direction in enumerate(nullspace):
+        for direction in nullspace:
             direction = scale_to_int(direction)
             if self.is_face(direction):
                 direction = -direction
                 if self.is_face(direction):
                     continue
-            yield i, direction
+            yield direction
 
     def refine_to_facet(self, face):
         assert self.is_face(face)
@@ -163,11 +161,10 @@ class ConvexPolyhedron:
                 face,
             )))))
             try:
-                i, direction = next(self.filter_non_singular_directions(nullspace))
+                direction = next(self.filter_non_singular_directions(nullspace))
             except StopIteration:
                 return face
-            subface = np.vstack((subspace, np.delete(nullspace, i, axis=0)))
-            face = self.get_adjacent_facet(face, subface, -direction)
+            face = self.get_adjacent_facet(face, -direction)
 
 
 class LinearSubspace:

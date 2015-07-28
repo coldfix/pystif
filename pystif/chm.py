@@ -99,7 +99,7 @@ def convex_hull_method(polyhedron, rays,
             if polyhedron.is_face(face):
                 yes += 1
                 report_yes(face)
-                result.append(-hull.equations[i][:-1])
+                result.append(face)
             else:
                 ray = polyhedron.search(face)
                 if seen_ray(ray):
@@ -116,7 +116,7 @@ def convex_hull_method(polyhedron, rays,
             break
 
     status_info(total, total, yes)
-    return addz(result), subspace
+    return result, subspace
 
 
 def print_status(print_, i, total, yes):
