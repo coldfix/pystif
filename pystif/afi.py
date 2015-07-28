@@ -85,13 +85,11 @@ def adjacent_facet_iteration(polyhedron, initial_facet, found_cb, symmetries,
         for i, equation in enumerate(delz(equations)):
             status_info(queue, equations, i)
 
-            boundary = addz(subspace.back(matrix_nullspace([equation])))
-
             eq = subspace.back(equation)
             eq = np.hstack((0, eq))
             eq = scale_to_int(eq)
 
-            adj = polyhedron.get_adjacent_facet(facet, boundary, eq)
+            adj = polyhedron.get_adjacent_facet(facet, eq)
 
             if not seen(adj):
                 queue.append(adj)
