@@ -33,6 +33,7 @@ setup(
             'fme = pystif.fme:main',
             'minimize = pystif.minimize:main',
             'afi = pystif.afi:main',
+            'rfd = pystif.rfd:main',
         ]
     },
     ext_modules=cythonize([

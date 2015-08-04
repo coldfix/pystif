@@ -99,6 +99,9 @@ class VectorMemory:
         self.seen.add(v)
         return False
 
+    def __len__(self):
+        return len(self.seen)
+
     def add(self, *rows):
         for v in rows:
             self(v)

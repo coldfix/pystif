@@ -39,6 +39,7 @@ Programs for computing the projection of a convex polyhedron to a subspace:
 - ``chm`` — Convex Hull Method
 - ``fme`` — Fourier-Motzkin-Elimination
 - ``afi`` — Adjacent Facet Iteration
+- ``rfd`` — Randomized facet discovery
 
 Peripheral utilities:
 
