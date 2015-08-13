@@ -146,12 +146,14 @@ class ConvexPolyhedron:
             )
 
     def filter_non_singular_directions(self, nullspace):
-        for direction in nullspace:
-            direction = scale_to_int(direction)
+        while nullspace.shape[0] > 0:
+            direction = random_direction_vector(nullspace.shape[0])
+            direction = np.dot(nullspace.T, direction)
             if self.is_face(direction):
                 direction = -direction
                 if self.is_face(direction):
-                    continue
+                    # TODO: remove direction from nullspace
+                    return
             yield direction
 
     def refine_to_facet(self, face):
