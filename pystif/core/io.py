@@ -60,6 +60,8 @@ def _unique(items):
 def _name_list(s):
     try:
         return int(s)
+    except TypeError:
+        return s
     except ValueError:
         pass
     if path.exists(s):
