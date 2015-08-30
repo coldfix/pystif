@@ -25,7 +25,7 @@ from docopt import docopt
 from .core.array import scale_to_int
 from .core.io import StatusInfo, System, default_column_labels, SystemFile
 from .core.geom import ConvexPolyhedron
-from .core.linalg import matrix_nullspace, plane_normal, addz, delz
+from .core.linalg import addz
 from .core.symmetry import NoSymmetry, SymmetryGroup
 from .core.util import VectorMemory
 from .chm import convex_hull_method, print_status, print_qhull

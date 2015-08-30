@@ -7,6 +7,12 @@ from .linalg import (matrix_imker, matrix_nullspace,
 from .util import PointSet, cached
 
 
+def random_direction_vector(dim):
+    v = np.random.normal(size=dim)
+    v /= np.linalg.norm(v)
+    return v
+
+
 class ConvexPolyhedron:
 
     """
@@ -46,7 +52,7 @@ class ConvexPolyhedron:
         while orth.dim > 0:
             # Choose vector from orthogonal space and optimize along its
             # direction:
-            d = orth.basis_vector(0)
+            d = random_direction_vector(orth.dim)
             v = orth.back(d)
             v = np.hstack((0, v))
             x = self.search(v)[1:]
@@ -140,12 +146,14 @@ class ConvexPolyhedron:
             )
 
     def filter_non_singular_directions(self, nullspace):
-        for direction in nullspace:
-            direction = scale_to_int(direction)
+        while nullspace.shape[0] > 0:
+            direction = random_direction_vector(nullspace.shape[0])
+            direction = np.dot(nullspace.T, direction)
             if self.is_face(direction):
                 direction = -direction
                 if self.is_face(direction):
-                    continue
+                    # TODO: remove direction from nullspace
+                    return
             yield direction
 
     def refine_to_facet(self, face):
