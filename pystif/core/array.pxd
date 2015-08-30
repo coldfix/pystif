@@ -1,4 +1,3 @@
-from cpython cimport array as c_array
 import numpy as np
 
 
@@ -10,18 +9,8 @@ cdef extern from "float.h":
     double DBL_MAX "DBL_MAX"
 
 
-cdef c_array.array int_array_template
-cdef c_array.array double_array_template
-
-
-cdef inline int[:] int_array(int size):
-    """Create a fixed size buffer."""
-    return c_array.clone(int_array_template, size, zero=False)
-
-
-cdef inline double[:] double_array(int size):
-    """Create a fixed size buffer."""
-    return c_array.clone(double_array_template, size, zero=False)
+cdef int[:] int_array(int size)
+cdef double[:] double_array(int size)
 
 
 cdef inline double[:] double_view(x):

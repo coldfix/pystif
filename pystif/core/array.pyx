@@ -5,6 +5,7 @@ Utility functions that need Cython based optimization.
 from __future__ import absolute_import
 
 from array import array
+from cpython cimport array as c_array
 cimport cython
 import numpy as np
 
@@ -30,6 +31,16 @@ cdef str fmt_num(float num, float threshold=1e-10):
     if abs(num - r) < threshold:
         return "{:3}".format(int(r))
     return "{:22.15e}".format(num)
+
+
+cdef int[:] int_array(int size):
+    """Create a fixed size buffer."""
+    return c_array.clone(int_array_template, size, zero=False)
+
+
+cdef double[:] double_array(int size):
+    """Create a fixed size buffer."""
+    return c_array.clone(double_array_template, size, zero=False)
 
 
 # Call me crazy for optimizing this function using cython, but this actually
