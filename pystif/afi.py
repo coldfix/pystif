@@ -66,8 +66,6 @@ def afi(polyhedron, symmetries, found_cb, info, recursions, quiet):
 def adjacent_facet_iteration(polyhedron, initial_facet, found_cb, symmetries,
                              status_info, get_boundaries):
 
-    subdim = len(initial_facet)
-    seen_b = set()
     seen = VectorMemory()
 
     queue = [initial_facet]
