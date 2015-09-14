@@ -82,7 +82,7 @@ def adjacent_facet_iteration(polyhedron, initial_facet, found_cb, symmetries,
         for i, equation in enumerate(equations):
             status_info(queue, equations, i)
 
-            adj = polyhedron.get_adjacent_facet(facet, equation)
+            adj, _ = polyhedron.get_adjacent_facet(facet, equation)
 
             if not seen(adj):
                 queue.append(adj)

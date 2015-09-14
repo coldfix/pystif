@@ -135,7 +135,7 @@ class ConvexPolyhedron:
             if self.lp.get_objective_value() >= -atol:
                 # assert self.is_face(plane)
                 # assert self.face_rank(plane) >= self.face_rank(face)
-                return scale_to_int(plane)
+                return scale_to_int(plane), scale_to_int(inner)
             plane /= np.linalg.norm(plane)
             inner /= np.linalg.norm(inner)
             fx = np.dot(plane, vertex)
@@ -172,7 +172,7 @@ class ConvexPolyhedron:
                 direction = next(self.filter_non_singular_directions(nullspace))
             except StopIteration:
                 return face
-            face = self.get_adjacent_facet(face, -direction)
+            face, _ = self.get_adjacent_facet(face, -direction)
 
 
 class LinearSubspace:
