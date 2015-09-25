@@ -9,8 +9,6 @@ Options:
     -s SUB, --subspace SUB          Subspace specification (dimension or file)
     -l LIMIT, --limit LIMIT         Add constraints H(i)≤LIMIT for i<SUBDIM
                                     [default: 1]
-    -f FACES, --faces FACES         File with known faces of the projected
-                                    polyhedron
     -y SYM, --symmetry SYM          Symmetry group generators
     -r NUM, --recursions NUM        Number of AFI recursions [default: 0]
     -q, --quiet                     Show less output
@@ -24,88 +22,212 @@ from docopt import docopt
 
 from .core.array import scale_to_int
 from .core.io import StatusInfo, System, default_column_labels, SystemFile
-from .core.geom import ConvexPolyhedron
-from .core.linalg import addz
+from .core.geom import ConvexPolyhedron, LinearSubspace
+from .core.linalg import addz, delz
 from .core.symmetry import NoSymmetry, SymmetryGroup
 from .core.util import VectorMemory
 from .chm import convex_hull_method, print_status, print_qhull
 
 
+class Face:
 
-def afi(polyhedron, symmetries, found_cb, info, recursions, quiet):
+    """
+    Stores the currently known local geometric structure of a face. This state
+    is computed and altered during the AFI procedure.
 
-    info("Search level {} facet.\n".format(recursions))
-    # TODO: generate face via dual LP
-    face = np.hstack((0, np.ones(polyhedron.dim-1)))
-    facet = polyhedron.refine_to_facet(face)
-    info("Found level {} facet, starting enumeration.\n"
-         .format(recursions))
+    :ivar ConvexPolyhedron polyhedron:  Provider for LP primitives
+    :ivar LinearSubspace subspace:      Defining subspace
+    :ivar list subfaces:                Known subfaces
+    :ivar dict adjacent:                facet, subface -> adjacent facet
+    :ivar dict normals:                 subface -> normal vector (relative to first supface)
+    :ivar bool solved:                  completely solved
+    """
 
-    def _get_boundaries(body):
-        if quiet:
+    def __init__(self, polyhedron):
+        self.polyhedron = polyhedron
+        self.subspace = polyhedron.subspace()
+        self.subfaces = []
+        self.adjacent = {}
+        self.normals = {}
+        self.solved = False
+        self.rank = self.subspace.onb.shape[0]
+
+    def add_subface(self, subface, normal):
+        """
+        Add a subface (initially without known adjacency).
+
+        :param Face subface:    the subface (may be incomplete at this time)
+        :param normal:          normal vector of the subface for this face
+        """
+        self.subfaces.append(subface)
+        self.normals[subface] = normal
+
+
+class AFIQueue:
+
+    def __init__(self, afi):
+        self.afi = afi
+        self.queue = []
+        self.seen = VectorMemory()
+
+    def __len__(self):
+        return len(self.queue)
+
+    def pop(self):
+        return self.queue.pop()
+
+    def add(self, facet, normal):
+        if self.seen(normal):
+            return
+        yield (facet, normal)
+        self.queue.append(facet)
+        for symm in self.afi.symmetries(normal):
+            self.seen(symm)
+
+
+class AFI:
+
+    """
+    Performs AFI (Adjacent Facet Iteration) and stores the result.
+    """
+
+    def __init__(self, polyhedron, symmetries, recursions, quiet_rank, info):
+        self.polyhedron = polyhedron
+        self.symmetries = symmetries
+        self.recursions = recursions
+        self.quiet_rank = quiet_rank
+        self.full_rank = polyhedron.rank()
+        self._info = info
+        self.whole = Face(polyhedron)
+
+    def solve(self):
+        """Iterate over facet normal vectors of the overall polyhedron."""
+        for facet, normal in self._solve_face(self.whole):
+            yield from self.symmetries(normal)
+
+    def _solve_face(self, body):
+        """
+        Iterate over essentially different subfaces (:class:`Face`) of `body`.
+
+        :param Face body: abstract face graph
+        :param ConvexPolyhedron polyhedron: face realization subspace
+        """
+        if body.solved:
+            yield from self._sol(body)
+        elif body.rank == 1:
+            yield from self._ray(body)
+        elif body.rank == self.full_rank - self.recursions:
+            yield from self._chm(body)
+        else:
+            yield from self._afi(body)
+        body.solved = True
+
+    def _sol(self, body):
+        """."""
+        yield from body.normals.items()
+
+    def _ray(self, body):
+        """Iterate over the vertices of a 1D face."""
+        # NOTE: currently only handling rays originating at zero, so we
+        # just need a single additional subface (~vertex):
+        normal = addz(body.subspace.onb)[0]
+        facet = self.get_subface_instance(body, normal)
+        body.add_subface(facet, normal)
+        return [(facet, normal)]
+
+    def _chm(self, body):
+        """Iterate over all subfaces of an arbitrary face using CHM."""
+        if body.rank <= self.quiet_rank:
             sub_info = StatusInfo(open(os.devnull, 'w'))
         else:
-            sub_info = StatusInfo()
-        if recursions == 0:
-            callbacks = (lambda ray: None,
-                         lambda facet: None,
-                         partial(print_status, sub_info),
-                         partial(print_qhull, sub_info))
-            return convex_hull_method(body, body.basis(), *callbacks)
-        # TODO: compute new subspace symmetries?
-        equations = []
-        afi(body, NoSymmetry, equations.append, sub_info, recursions-1, quiet)
-        return equations, body.subspace()
+            sub_info = self._info
+        callbacks = (lambda ray: None,
+                     lambda facet: None,
+                     partial(print_status, sub_info),
+                     partial(print_qhull, sub_info))
+        poly = body.polyhedron
+        ineqs, _ = convex_hull_method(poly, poly.basis(), *callbacks)
+        for ineq in ineqs:
+            yield self.get_subface_instance(body, ineq), ineq
 
-    adjacent_facet_iteration(
-        polyhedron, facet, found_cb, symmetries,
-        partial(afi_status, info, recursions=recursions),
-        _get_boundaries)
+    def _afi(self, body):
+        """Iterate over all subfaces of an arbitrary face using AFI."""
+        queue = AFIQueue(self)
+        yield from queue.add(*self.init_face(body))
+        while queue:
+            facet = queue.pop()
+            subfaces = list(self._solve_face(facet))
+            for i, (subface, _) in enumerate(subfaces):
+                self.status_info(queue, subfaces, i, body.rank)
+                yield from queue.add(*self.get_adjacent_face(body, facet, subface))
+            self.status_info(queue, subfaces, len(subfaces), body.rank)
 
+    def init_face(self, face):
+        """Ensure knowledge of a subface."""
+        if face.subfaces:
+            subface = face.subfaces[0]
+            return subface, face.normals[subface]
+        rank = face.rank-1
+        self.info(rank, "Search rank {} facet", rank)
+        # TODO: obtain chain of subfaces of dimensions 1 to N in single sweep
+        guess = np.hstack((0, np.ones(self.polyhedron.dim-1)))
+        normal = face.polyhedron.refine_to_facet(guess)
+        facet = self.get_subface_instance(face, normal)
+        self.info(rank, "Search rank {} facet [done]\n", rank)
+        return facet, normal
 
-def adjacent_facet_iteration(polyhedron, initial_facet, found_cb, symmetries,
-                             status_info, get_boundaries):
+    def get_adjacent_face(self, sup, face, sub):
+        try:
+            f = sup.adjacent[face, sub]
+            return f, sup.normals[f]
+        except KeyError:
+            pass
 
-    seen = VectorMemory()
+        g0 = sup.normals[face]
+        s0 = face.normals[sub]
+        g, s = sup.polyhedron.get_adjacent_facet(g0, s0)
+        adjf = self.get_subface_instance(sup, g)
 
-    queue = [initial_facet]
-    for sym in symmetries(initial_facet):
-        if not seen(initial_facet):
-            found_cb(initial_facet)
+        adjf.add_subface(sub, s)
 
-    while queue:
-        facet = queue.pop()
-        facet = scale_to_int(facet)
+        sup.adjacent[adjf, sub] = face
+        sup.adjacent[face, sub] = adjf
+        return adjf, g
 
-        equations, subspace = get_boundaries(polyhedron.intersection(facet))
+    def _intersect(self, face, normal):
+        polyhedron = face.polyhedron.intersection(normal)
+        polyhedron._subspace = face.subspace.add_normals(delz(normal)[0])
+        polyhedron._rank = face.rank - 1
+        return polyhedron
 
-        for i, equation in enumerate(equations):
-            status_info(queue, equations, i)
+    def get_subface_instance(self, face, normal):
+        """
+        Get/instanciate subface object with the given normal vector.
 
-            adj, _ = polyhedron.get_adjacent_facet(facet, equation)
+        The returned object is guaranteed to be a registered subface of the
+        given face.
 
-            if not seen(adj):
-                queue.append(adj)
-                found_cb(adj)
+        :param Face face: parental face
+        :param np.ndarray normal: subface normal vector in canonical basis
+        """
+        for f, n in face.normals.items():
+            if np.allclose(n, normal):
+                return f
+        polyhed = self._intersect(face, normal)
+        subface = Face(polyhed)
+        face.add_subface(subface, normal)
+        return subface
 
-                for sym in symmetries(adj):
-                    if not seen(sym):
-                        found_cb(sym)
+    def info(self, rank, text, *args, **kwargs):
+        if rank >= self.quiet_rank:
+            self._info(text.format(*args, **kwargs))
 
-        status_info(queue, equations, len(equations))
-
-
-def afi_status(info, queue, equations, i, recursions):
-    num_eqs = len(equations)
-    len_eqs = len(str(num_eqs))
-    info("AFI level {} queue: {:4}, progress: {}/{}".format(
-        recursions,
-        len(queue),
-        str(i).rjust(len_eqs),
-        num_eqs,
-    ))
-    if i == num_eqs:
-        info()
+    def status_info(self, queue, equations, i, rank):
+        num_eqs = len(equations)
+        len_eqs = len(str(num_eqs))
+        self.info(rank, "AFI rank {} queue: {:4}, progress: {}/{}{}", rank,
+                  len(queue), str(i).rjust(len_eqs), num_eqs,
+                  "\n" if i == num_eqs else "")
 
 
 def main(args=None):
@@ -127,7 +249,7 @@ def main(args=None):
     else:
         symmetries = NoSymmetry
 
-    recursions = int(opts['--recursions'])
+    recursions = int(opts['--recursions']) or -1
 
     for face in addz(polyhedron.subspace().normals):
         facet_file(face)
@@ -139,7 +261,14 @@ def main(args=None):
     else:
         info = StatusInfo()
 
-    afi(polyhedron, symmetries, facet_file, info, recursions, quiet)
+    quiet_rank = subdim-2 if quiet else 0
+
+    afi = AFI(polyhedron, symmetries, recursions, quiet_rank, info)
+
+    for facet in afi.solve():
+        facet_file(facet)
+
+    info()
 
 
 if __name__ == '__main__':

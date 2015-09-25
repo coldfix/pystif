@@ -110,6 +110,7 @@ class ConvexPolyhedron:
         lp.add(space, 0, 0, embed=True)
         return self.__class__(lp, self.dim)
 
+    @cached
     def rank(self):
         """Geometric dimension of the projected polyhedron."""
         return len(self.basis())
@@ -235,3 +236,9 @@ class LinearSubspace:
             self.back(space.normals),
         ))
         return self.__class__(self.back(space.onb), normals)
+
+    def add_normals(self, normals):
+        return self.__class__.from_nullspace(np.vstack((
+            self.normals,
+            normals,
+        )))
