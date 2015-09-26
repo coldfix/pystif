@@ -12,7 +12,6 @@ __all__ = [
     'matrix_imker',
     'plane_basis',
     'plane_normal',
-    'PCA',
     'basis_vector',
     'project_to_plane',
 ]
@@ -71,14 +70,6 @@ def plane_normal(v):
     space = matrix_nullspace(v)
     assert space.shape[0] == 1
     return space[0].flatten()
-
-
-def PCA(data_points, eps=1e-10):
-    """
-    Get the (orthonormal) basis vectors of the principal components of the
-    data set specified by the rows of M.
-    """
-    return matrix_imker(np.cov(data_points.T), eps)
 
 
 def project_to_plane(v, n):
