@@ -42,15 +42,36 @@ def evaluate_generators(generators, col_names):
                 queue.append(next_el)
 
 
+class Permutation:
+
+    def __init__(self, p):
+        self.p = list(p)
+
+    def __call__(self, vector):
+        return vector[self.p]
+
+    def __len__(self):
+        return len(self.p)
+
+    def inverse(self):
+        result = [None] * len(self.p)
+        for i, v in enumerate(self.p):
+            result[v] = i
+        return self.__class__(result)
+
+
 class SymmetryGroup:
 
     def __init__(self, permutations):
-        self.permutations = permutations
+        self.permutations = list(permutations)
+
+    def __iter__(self):
+        return iter(self.permutations)
 
     def __call__(self, vector):
         seen = VectorMemory()
         for permutation in self.permutations:
-            permuted = vector[list(permutation)]
+            permuted = permutation(vector)
             if not seen(permuted):
                 yield permuted
 
@@ -60,7 +81,7 @@ class SymmetryGroup:
             VarPermutation.from_subst_rule(*gspec.split('<>'))
             for gspec in spec.replace(" ", "").split(';')
         ]
-        return cls(list(evaluate_generators(generators, col_names)))
+        return cls(map(Permutation, evaluate_generators(generators, col_names)))
 
 
 def NoSymmetry(vector):
