@@ -31,6 +31,10 @@ def _insert_zero_bit(pool, bit_index):
     return left | right
 
 
+def bits_to_num(bitset):
+    return sum(1<<i for i in bitset)
+
+
 def _nCr(n, r):
     """Binomial coefficient (n choose r)."""
     fac = math.factorial

@@ -227,6 +227,17 @@ def get_bits(num):
                  if num & (1 << i))
 
 
+def subsets(sup):
+    sup = sorted(list(sup))
+    for i in range(2**len(sup)):
+        yield set(sup[k] for k in get_bits(i))
+
+
+def supersets(sub, world):
+    sub, world = set(sub), set(world)
+    return map(sub.union, subsets(world - sub))
+
+
 def default_column_labels(dim):
     return ['_'] + ['_'+str(i) for i in range(1, dim)]
 

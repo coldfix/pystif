@@ -4,6 +4,7 @@ Output elemental inequalities for given number of variables.
 Usage:
     makesys -c COLS [-o FILE] INEQ...
     makesys -v VARS [-o FILE] INEQ...
+    makesys -v VARS [-o FILE] [INEQ...] -b
     makesys -v VARS [-o FILE] [INEQ...] -e
 
 Options:
@@ -12,6 +13,7 @@ Options:
     -c COLS, --cols COLS            Set column names or count
     -v VARS, --vars VARS            Set variable names or count
     -e, --elem-ineqs                Add elemental inequalities
+    -b, --bell                      Create a bell polytope
 
 This will output a matrix of inequalities for NUM_VARS random variables. Each
 row ``q`` corresponds to one inequality
@@ -33,8 +35,8 @@ from os import path
 from docopt import docopt
 import numpy as np
 
-from .core.it import elemental_inequalities, num_vars
-from .core.io import (System, SystemFile, _name_list,
+from .core.it import elemental_inequalities, num_vars, bits_to_num
+from .core.io import (System, SystemFile, _name_list, get_bits, supersets,
                       default_column_labels, column_varname_labels)
 
 
@@ -123,6 +125,25 @@ def _parse_eq_file(eq_str, col_idx):
         return sum((_parse_eq_line(l, col_idx) for l in f), [])
 
 
+def p_to_q(p_vec):
+    b_len = num_vars(len(p_vec))
+    q_vec = np.zeros(p_vec.shape)
+    total = set(range(b_len))
+    for i, v in enumerate(p_vec):
+        sub = get_bits(i)
+        for sup in supersets(sub, total):
+            sign = (-1) ** (len(sub) + len(sup) - b_len)
+            q_vec[bits_to_num(sup)] += v * sign
+    return q_vec
+
+
+def positivity(dim):
+    for i in range(1, dim):
+        x = np.zeros(dim)
+        x[i] = 1
+        yield x
+
+
 def main(args=None):
     opts = docopt(__doc__, args)
 
@@ -145,6 +166,9 @@ def main(args=None):
     dim = len(colnames)
     if opts['--elem-ineqs']:
         equations += list(elemental_inequalities(num_vars(dim)))
+    elif opts['--bell']:
+        equations += list(map(p_to_q, positivity(dim)))
+        # TODO: also normalization
 
     output = SystemFile(opts['--output'], columns=colnames)
     for e in equations:
