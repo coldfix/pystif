@@ -110,6 +110,7 @@ class ConvexPolyhedron:
         lp.add(space, 0, 0, embed=True)
         return self.__class__(lp, self.dim)
 
+    @cached
     def rank(self):
         """Geometric dimension of the projected polyhedron."""
         return len(self.basis())
@@ -135,7 +136,7 @@ class ConvexPolyhedron:
             if self.lp.get_objective_value() >= -atol:
                 # assert self.is_face(plane)
                 # assert self.face_rank(plane) >= self.face_rank(face)
-                return scale_to_int(plane)
+                return scale_to_int(plane), scale_to_int(inner)
             plane /= np.linalg.norm(plane)
             inner /= np.linalg.norm(inner)
             fx = np.dot(plane, vertex)
@@ -172,7 +173,7 @@ class ConvexPolyhedron:
                 direction = next(self.filter_non_singular_directions(nullspace))
             except StopIteration:
                 return face
-            face = self.get_adjacent_facet(face, -direction)
+            face, _ = self.get_adjacent_facet(face, -direction)
 
 
 class LinearSubspace:
@@ -235,3 +236,9 @@ class LinearSubspace:
             self.back(space.normals),
         ))
         return self.__class__(self.back(space.onb), normals)
+
+    def add_normals(self, normals):
+        return self.__class__.from_nullspace(np.vstack((
+            self.normals,
+            normals,
+        )))
