@@ -233,7 +233,8 @@ class AFI:
 def main(app):
     app.report_nullspace()
     quiet_rank = app.subdim-2 if app.quiet else 0
-    afi = AFI(app.polyhedron, app.symmetries, app.recursions, quiet_rank, app.info)
+    info = app.info(1)
+    afi = AFI(app.polyhedron, app.symmetries, app.recursions, quiet_rank, info)
     for facet in afi.solve():
         app.output(facet)
-    app.info()
+    info()

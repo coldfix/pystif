@@ -1,6 +1,7 @@
 
 from docopt import docopt
 from functools import wraps
+import os
 
 from .geom import ConvexPolyhedron
 from .io import System, SystemFile, StatusInfo
@@ -96,9 +97,8 @@ class Application:
     def quiet(self):
         return self.opts['--quiet']
 
-    @cachedproperty
-    def info(self):
-        if self.quiet > 1:
+    def info(self, level=0):
+        if self.quiet > level:
             return StatusInfo(open(os.devnull, 'w'))
         else:
             return StatusInfo()

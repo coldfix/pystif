@@ -147,9 +147,10 @@ def main(app):
             ray_file(ray)
         ray_file._print()
 
+    info = app.info(0)
     callbacks = (ray_file,
                  app.output,
-                 partial(print_status, app.info),
-                 partial(print_qhull, app.info))
+                 partial(print_status, info),
+                 partial(print_qhull, info))
 
     convex_hull_method(app.polyhedron, rays, *callbacks)

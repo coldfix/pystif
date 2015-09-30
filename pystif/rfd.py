@@ -56,7 +56,7 @@ def random_subspace(sub_dim, tot_dim):
     return orth.nullspace()
 
 
-def rss(system, polyhedron, symmetries, found_cb, runs, slice_dim, status):
+def rss(system, polyhedron, symmetries, found_cb, runs, slice_dim, status, sub_info):
 
     import random
     from .chm import convex_hull_method, print_status, print_qhull
@@ -74,7 +74,6 @@ def rss(system, polyhedron, symmetries, found_cb, runs, slice_dim, status):
         sys2, _ = system.prepare_for_projection(cols)
         poly2 = ConvexPolyhedron.from_cone(sys2, slice_dim+1, limit=1)
 
-        sub_info = StatusInfo()
         callbacks = (lambda ray: None,
                      lambda facet: None,
                      partial(print_status, sub_info),
@@ -109,11 +108,12 @@ def rfd_status(info, i, total, seen):
 def main(app):
     runs = int(app.opts['--runs'])
     slice_dim = int(app.opts['--slice-dim'])
-    status = partial(rfd_status, app.info)
+    status = partial(rfd_status, app.info(1))
 
     app.report_nullspace()
 
     if slice_dim:
-        rss(app.system, app.polyhedron, app.symmetries, app.output, runs, slice_dim, status)
+        rss(app.system, app.polyhedron, app.symmetries, app.output, runs, slice_dim, status,
+            app.info(0))
     else:
         rfd(app.polyhedron, app.symmetries, app.output, runs, status)
