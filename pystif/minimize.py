@@ -13,8 +13,9 @@ Options:
 
 from docopt import docopt
 
+from .core.app import application
 from .core.lp import Minimize
-from .core.io import System, SystemFile, StatusInfo, default_column_labels
+from .core.io import StatusInfo
 
 
 class MinimizeStatusInfo:
