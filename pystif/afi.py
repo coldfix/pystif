@@ -20,11 +20,10 @@ import os
 import numpy as np
 from docopt import docopt
 
+from .core.app import application
 from .core.array import scale_to_int
-from .core.io import StatusInfo, System, default_column_labels, SystemFile
-from .core.geom import ConvexPolyhedron, LinearSubspace
+from .core.io import StatusInfo
 from .core.linalg import addz, delz
-from .core.symmetry import NoSymmetry, SymmetryGroup
 from .core.util import VectorMemory
 from .chm import convex_hull_method, print_status, print_qhull
 
@@ -230,46 +229,12 @@ class AFI:
                   "\n" if i == num_eqs else "")
 
 
-def main(args=None):
-    opts = docopt(__doc__, args)
-
-    system = System.load(opts['INPUT'])
-    dim = system.dim
-    if not system.columns:
-        system.columns = default_column_labels(dim)
-
-    system, subdim = system.prepare_for_projection(opts['--subspace'])
-    polyhedron = ConvexPolyhedron.from_cone(system, subdim,
-                                            float(opts['--limit']))
-    facet_file = SystemFile(opts['--output'], columns=system.columns[:subdim])
-
-    if opts['--symmetry']:
-        col_names = system.columns[:subdim]
-        symmetries = SymmetryGroup.load(opts['--symmetry'], col_names)
-    else:
-        symmetries = NoSymmetry
-
-    recursions = int(opts['--recursions']) or -1
-
-    for face in addz(polyhedron.subspace().normals):
-        facet_file(face)
-        facet_file(-face)
-
-    quiet = opts['--quiet']
-    if quiet > 1:
-        info = StatusInfo(open(os.devnull, 'w'))
-    else:
-        info = StatusInfo()
-
-    quiet_rank = subdim-2 if quiet else 0
-
-    afi = AFI(polyhedron, symmetries, recursions, quiet_rank, info)
-
+@application
+def main(app):
+    app.report_nullspace()
+    quiet_rank = app.subdim-2 if app.quiet else 0
+    info = app.info(1)
+    afi = AFI(app.polyhedron, app.symmetries, app.recursions, quiet_rank, info)
     for facet in afi.solve():
-        facet_file(facet)
-
+        app.output(facet)
     info()
-
-
-if __name__ == '__main__':
-    main()

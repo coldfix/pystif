@@ -13,8 +13,9 @@ Options:
 
 from docopt import docopt
 
+from .core.app import application
 from .core.lp import Minimize
-from .core.io import System, SystemFile, StatusInfo, default_column_labels
+from .core.io import StatusInfo
 
 
 class MinimizeStatusInfo:
@@ -39,25 +40,8 @@ class VerboseMinimize(MinimizeStatusInfo, Minimize):
     pass
 
 
-def main(args=None):
-    opts = docopt(__doc__, args)
-
-    system = System.load(opts['INPUT'])
-    dim = system.dim
-    if not system.columns:
-        system.columns = default_column_labels(dim)
-
-    if opts['--quiet']:
-        m = Minimize()
-    else:
-        m = VerboseMinimize()
-
-    rows = m.minimize(system.matrix)
-
-    output = SystemFile(opts['--output'], columns=system.columns)
-    for row in rows:
-        output(row)
-
-
-if __name__ == '__main__':
-    main()
+@application
+def main(app):
+    m = Minimize() if app.quiet else VerboseMinimize()
+    for row in m.minimize(app.system.matrix):
+        app.output(row)

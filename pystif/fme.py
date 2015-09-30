@@ -16,10 +16,10 @@ Options:
 import random
 
 import numpy as np
-from docopt import docopt
 
+from .core.app import application
 from .core.fme import FME
-from .core.io import System, SystemFile, StatusInfo, default_column_labels
+from .core.io import StatusInfo
 
 
 class FMEStatusInfo:
@@ -47,32 +47,15 @@ class VerboseFME(FMEStatusInfo, FME):
     pass
 
 
-def main(args=None):
-    opts = docopt(__doc__, args)
-
-    system = System.load(opts['INPUT'])
-    dim = system.dim
-    if not system.columns:
-        system.columns = default_column_labels(dim)
-    system, subdim = system.prepare_for_projection(opts['--subspace'])
-
-    if opts['--quiet']:
-        fme = FME()
-    else:
-        fme = VerboseFME()
+@application
+def main(app):
+    fme = FME() if app.quiet else VerboseFME()
 
     random.seed()
-    num_drop = int(opts['--drop'])
+    num_drop = int(app.opts['--drop'])
     for i in range(num_drop):
-        d = random.randrange(system.shape[0])
-        system.matrix = np.delete(system.matrix, d, axis=0)
+        d = random.randrange(app.system.shape[0])
+        app.system.matrix = np.delete(app.system.matrix, d, axis=0)
 
-    rows = fme.solve_to(system.matrix, subdim)
-
-    output = SystemFile(opts['--output'], columns=system.columns[:subdim])
-    for row in rows:
-        output(row)
-
-
-if __name__ == '__main__':
-    main()
+    for row in fme.solve_to(app.system.matrix, app.subdim):
+        app.output(row)
