@@ -39,7 +39,12 @@ class Application:
         system = System.load(self.opts['INPUT'])
         if not system.columns:
             system.columns = default_column_labels(self.dim)
-        system, subdim = system.prepare_for_projection(self.opts['--subspace'])
+        try:
+            subspace = self.opts['--subspace']
+        except KeyError:
+            subdim = system.dim
+        else:
+            system, subdim = system.prepare_for_projection(subspace)
         system.subdim = subdim
         return system
 
