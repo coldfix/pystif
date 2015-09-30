@@ -21,13 +21,12 @@ Options:
 from functools import partial
 
 import numpy as np
-from docopt import docopt
 
-from .core.io import StatusInfo, System, default_column_labels, SystemFile
+from .core.app import application
+from .core.io import StatusInfo
 from .core.geom import (ConvexPolyhedron, LinearSubspace,
                         random_direction_vector)
 from .core.linalg import addz
-from .core.symmetry import NoSymmetry, SymmetryGroup
 from .core.util import VectorMemory
 
 
@@ -106,48 +105,15 @@ def rfd_status(info, i, total, seen):
     ))
 
 
-def main(args=None):
-    opts = docopt(__doc__, args)
+@application
+def main(app):
+    runs = int(app.opts['--runs'])
+    slice_dim = int(app.opts['--slice-dim'])
+    status = partial(rfd_status, app.info)
 
-    system = System.load(opts['INPUT'])
-    dim = system.dim
-    if not system.columns:
-        system.columns = default_column_labels(dim)
-
-    system, subdim = system.prepare_for_projection(opts['--subspace'])
-    polyhedron = ConvexPolyhedron.from_cone(system, subdim,
-                                            float(opts['--limit']))
-    facet_file = SystemFile(opts['--output'], columns=system.columns[:subdim])
-
-    if opts['--symmetry']:
-        col_names = system.columns[:subdim]
-        symmetries = SymmetryGroup.load(opts['--symmetry'], col_names)
-    else:
-        symmetries = NoSymmetry
-
-    runs = int(opts['--runs'])
-    slice_dim = int(opts['--slice-dim'])
-
-    for face in addz(polyhedron.subspace().normals):
-        facet_file(face)
-        facet_file(-face)
-
-    quiet = opts['--quiet']
-    if quiet > 1:
-        info = StatusInfo(open(os.devnull, 'w'))
-    else:
-        info = StatusInfo()
-
-    status = partial(rfd_status, info)
+    app.report_nullspace()
 
     if slice_dim:
-
-        rss(system, polyhedron, symmetries, facet_file, runs, slice_dim, status)
-
-
+        rss(app.system, app.polyhedron, app.symmetries, app.output, runs, slice_dim, status)
     else:
-        rfd(polyhedron, symmetries, facet_file, runs, status)
-
-
-if __name__ == '__main__':
-    main()
+        rfd(app.polyhedron, app.symmetries, app.output, runs, status)

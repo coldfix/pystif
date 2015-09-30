@@ -39,9 +39,10 @@ import numpy.random
 import scipy.spatial
 from docopt import docopt
 
+from .core.app import application
 from .core.array import scale_to_int
-from .core.io import System, default_column_labels, SystemFile, StatusInfo
-from .core.geom import ConvexPolyhedron, LinearSubspace
+from .core.io import SystemFile
+from .core.geom import LinearSubspace
 from .core.linalg import matrix_imker, addz, delz
 from .core.util import VectorMemory
 
@@ -133,44 +134,22 @@ def print_qhull(print_, num_points):
     print_("  > qhull on {} rays\n".format(num_points))
 
 
-def main(args=None):
-    opts = docopt(__doc__, args)
-
-    system = System.load(opts['INPUT'])
-    dim = system.dim
-    if not system.columns:
-        system.columns = default_column_labels(dim)
-
-    system, subdim = system.prepare_for_projection(opts['--subspace'])
-    polyhedron = ConvexPolyhedron.from_cone(system, subdim,
-                                            float(opts['--limit']))
-
-    resume = opts['--resume']
-    facet_file = SystemFile(opts['--output'], append=resume,
-                            columns=system.columns[:subdim])
-    ray_file = SystemFile(opts['--xrays'], append=resume, default=None,
-                          columns=system.columns[:subdim])
+@application
+def main(app):
+    ray_file = SystemFile(app.opts['--xrays'], append=app.resume, default=None,
+                          columns=app.system.columns[:app.subdim])
 
     if ray_file._matrix:
         rays = ray_file._matrix
     else:
-        rays = polyhedron.basis()
+        rays = app.polyhedron.basis()
         for ray in rays:
             ray_file(ray)
         ray_file._print()
 
-    if opts['--quiet']:
-        info = StatusInfo(open(os.devnull, 'w'))
-    else:
-        info = StatusInfo()
-
     callbacks = (ray_file,
-                 facet_file,
-                 partial(print_status, info),
-                 partial(print_qhull, info))
+                 app.output,
+                 partial(print_status, app.info),
+                 partial(print_qhull, app.info))
 
-    convex_hull_method(polyhedron, rays, *callbacks)
-
-
-if __name__ == '__main__':
-    main()
+    convex_hull_method(app.polyhedron, rays, *callbacks)

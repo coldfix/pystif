@@ -24,6 +24,13 @@ def cached(fn):
     return wrapper
 
 
+def cachedproperty(fn):
+    key = '_' + fn.__name__
+    def setter(self, val):
+        setattr(self, key, val)
+    return property(cached(fn), setter)
+
+
 class OrderedSet:
 
     """
