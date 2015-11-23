@@ -1,7 +1,7 @@
 language: python
 
 python:
-  - "3.4"
+  - "3.5"
 
 # Build inside docker containers instead of virtual machines. These are
 # faster, start quicker and support caching. Only downside: sudo is not

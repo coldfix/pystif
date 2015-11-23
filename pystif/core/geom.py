@@ -139,8 +139,8 @@ class ConvexPolyhedron:
                 return scale_to_int(plane), scale_to_int(inner)
             plane /= np.linalg.norm(plane)
             inner /= np.linalg.norm(inner)
-            fx = np.dot(plane, vertex)
-            sx = np.dot(inner, vertex)
+            fx = plane @ vertex
+            sx = inner @ vertex
             plane, inner = (
                 inner - sx/fx * plane,
                 fx * plane + sx * inner,
@@ -149,7 +149,7 @@ class ConvexPolyhedron:
     def filter_non_singular_directions(self, nullspace):
         while nullspace.shape[0] > 0:
             direction = random_direction_vector(nullspace.shape[0])
-            direction = np.dot(nullspace.T, direction)
+            direction = nullspace.T @ direction
             if self.is_face(direction):
                 direction = -direction
                 if self.is_face(direction):
@@ -211,19 +211,19 @@ class LinearSubspace:
     @cached
     def projector(self):
         """Projection matrix onto the subspace."""
-        return np.dot(self.onb.T, self.onb)
+        return self.onb.T @ self.onb
 
     def projection(self, v):
         """Return projection of vector onto the subspace [= back(into(v))]."""
-        return np.dot(v, self.projector().T)
+        return v @ self.projector().T
 
     def into(self, v):
         """Transform outer space vector into subspace."""
-        return np.dot(v, self.onb.T)
+        return v @ self.onb.T
 
     def back(self, v):
         """Transform a subspace vector back to outer space."""
-        return np.dot(v, self.onb)
+        return v @ self.onb
 
     def basis_vector(self, i):
         """Get a basis vector of the subspace."""

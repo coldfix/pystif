@@ -16,7 +16,7 @@ Installation
 
 First, install these dependencies:
 
-- python≥3.4
+- python≥3.5
 - GLPK (development files)
 - setuptools (should be installed by default on many systems)
 - cython
