@@ -1,6 +1,6 @@
 
 import itertools
-from fractions import gcd
+from math import gcd
 
 import numpy as np
 
