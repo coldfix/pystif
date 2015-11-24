@@ -10,14 +10,17 @@ Before running this script, install 'cython'.
 from setuptools import setup, Extension
 from Cython.Build import cythonize
 
+with open('README.rst') as f:
+    README = f.read()
+
 setup(
     name='pystif',
     version='0.0.0',
     description='Shannon type inequality finder',
-    long_description=None,
+    long_description=README,
     author='Thomas Gläßle',
     author_email='t_glaessle@gmx.de',
-    url=None,
+    url='https://github.com/coldfix/pystif',
     license='GPLv3',
     packages=[
         'pystif',
@@ -46,7 +49,7 @@ setup(
         ),
     ]),
     install_requires=[
-        'numpy',
+        'numpy>=1.10.0',    # support for '@' operator
         'scipy',
         'docopt',
     ],
@@ -59,7 +62,7 @@ setup(
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Developers',
         'Operating System :: OS Independent',
-        'Programming Language :: Python :: 3.4',
+        'Programming Language :: Python :: 3.5',
         'Topic :: Scientific/Engineering',
         'Intended Audience :: Science/Research',
         'License :: CC0 1.0 Universal (CC0 1.0) Public Domain Dedication',

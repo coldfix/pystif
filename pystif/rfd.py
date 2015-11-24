@@ -87,7 +87,7 @@ def rss(system, polyhedron, symmetries, found_cb, runs, slice_dim, status, sub_i
 
         for face in faces:
             status(i, runs, seen)
-            face = np.dot(face, subb)
+            face = face @ subb
             facet = polyhedron.refine_to_facet(face)
             if seen(facet):
                 continue

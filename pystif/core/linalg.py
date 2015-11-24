@@ -74,7 +74,7 @@ def plane_normal(v):
 
 def project_to_plane(v, n):
     """Project v into the subspace defined by x∙n = 0."""
-    return v - n * np.dot(v, n) / np.linalg.norm(n)
+    return v - n * (v @ n) / np.linalg.norm(n)
 
 
 def normalize_rows(M):
