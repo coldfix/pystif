@@ -8,6 +8,12 @@ from .lp import Problem
 from .util import call
 
 
+def _gcd(a, b):
+    if int(a) == a and int(b) == b:
+        return gcd(int(a), -int(b))
+    return 1
+
+
 class FME:
 
     """
@@ -48,7 +54,7 @@ class FME:
         """
         pos_coef = pos_row[col]
         neg_coef = neg_row[col]
-        div = gcd(pos_coef, -neg_coef)
+        div = _gcd(pos_coef, neg_coef)
         scaled = (pos_row * (-neg_coef // div) +
                   neg_row * (+pos_coef // div))
         # TODO: normalize result
