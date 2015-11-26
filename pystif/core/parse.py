@@ -3,12 +3,16 @@ Utilities for parsing input files with systems of linear (in-)equalities.
 
 The input file grammar looks somewhat like this:
 
-    line        ::=     equation? comment?
+    line        ::=     statement? comment?
+    statement   ::=     equation | var_decl
     comment     ::=     r"#.*"
     equation    ::=     terms relation terms
     relation    ::=     ">=" | "≥" | "<=" | "≤" | "="
     terms       ::=     sign? term (sign term)*
     term        ::=     number? name | number
+
+    var_decl    ::=     "rvar" var_list
+    var_list    ::=     (identifier ","?)*
 
 For example:
 
@@ -41,9 +45,14 @@ __all__ = [
 # - [CON] no custom tokens (≤,≥)
 # - [CON] have to write own Token class
 
+from functools import partial
+
 import numpy as np
 import funcparserlib.lexer as fpll
 import funcparserlib.parser as fplp
+
+from .io import column_varname_labels
+from .it import elemental_inequalities
 
 
 def make_lexer():
@@ -57,7 +66,7 @@ def make_lexer():
         ('WS',          (r'[ \t]+',)),
         ('NAME',        (r'[a-zA-Z_]\w*',)),
         ('NUMBER',      (r'[+\-]?\d+(\.\d+)?([eE][+\-]?\d+)?',)),
-        ('OP',          (r'[+\-]|≥|>=|≤|<=|=',)),
+        ('OP',          (r'[+\-]|≥|>=|≤|<=|=|\(|\)|,',)),
     ])
     def tokenize(text):
         trash = tt('COMMENT', 'WS')
@@ -74,8 +83,8 @@ def make_parser():
     where the exact type of ParseResult is an implementation detail. The
     current form is
 
-        ParseResult = [Inequality].
-        Inequality = [(str, float)]
+        ParseResult = [ParseIneq].
+        ParseIneq = [(str, float)]
 
     In other words, the parser returns a list of inequalities that are
     each represented by a list of variable names and coefficients. There can
@@ -86,10 +95,14 @@ def make_parser():
     # - line:       equation | elemental inequalities | positivities | q space
 
     v = fplp.pure
+    X = partial(exact, 'OP')
+    L = lambda text: fplp.skip(literal(text))
+
+    opt = lambda p: fplp.skip(fplp.maybe(p))
 
     # primitives
-    sign        = op('+') | op('-')
-    relation    = op('>=') | op('<=') | op('≥') | op('≤') | op('=')
+    sign        = X('+') | X('-')
+    relation    = X('>=') | X('<=') | X('≥') | X('≤') | X('=')
     number      = some('NUMBER')                        >> tokval >> to_number
     identifier  = some('NAME')                          >> tokval
     variable    = identifier
@@ -103,9 +116,14 @@ def make_parser():
     expression  = f_term + fplp.many(s_term)            >> collapse
     equation    = expression + relation + expression    >> make_equation
 
+    # commands
+    var_list    = fplp.many(identifier + opt(X(',')))
+    var_decl    = L('rvar') + var_list                  >> make_random_vars
+
     # toplevel
     eof         = fplp.skip(fplp.finished)
-    line        = (equation | v([])) + eof
+    line        = (equation | var_decl | v([])) + eof
+
     return line
 
 
@@ -199,6 +217,26 @@ def to_numpy_array(parse_result, col_names=('_',)):
     return result, col_idx._cols
 
 
+def to_parse_inequality(numpy_vector, colnames):
+    """
+    np.array, [str] -> ParseIneq = [(str, float)]
+    """
+    return [
+        (colnames[idx], coef)
+        for idx, coef in enumerate(numpy_vector)
+        if coef != 0
+    ]
+
+
+def to_parse_result(vectors, colnames):
+    """
+    Back-transform a numpy array to a parse result.
+
+    np.array, [str] -> ParseResult
+    """
+    return [to_parse_inequality(v, colnames) for v in vectors]
+
+
 #----------------------------------------
 # Parser internals
 #----------------------------------------
@@ -207,8 +245,22 @@ def tokval(tok):
     return tok.value
 
 
-def op(text):
-    return fplp.a(fpll.Token('OP', text)) >> tokval
+def exact(token_type, text):
+    return fplp.a(fpll.Token(token_type, text)) >> tokval
+
+
+def const(value):
+    return lambda tok: value
+
+
+def literal(text):
+    """
+    Matches any text that will produce the same series of filtered tokens as
+    the given text, i.e. the text plus optional whitespaces between tokens.
+    """
+    tokenize = make_lexer()
+    tokens = map(fplp.a, tokenize(text))
+    return sum(tokens, next(tokens)) >> const(text)
 
 
 def tt(*token_type):
@@ -248,12 +300,28 @@ def make_equation(equation):
     return [pos, neg]
 
 
+def make_random_vars(varnames):
+    """
+    Iterate all elemental inequalities for the given variables.
+
+    An inequality is represented as a list of pairs (name, coef).
+
+    [str] -> ParseResult
+    """
+    varnames = sorted(varnames)
+    colnames = column_varname_labels(varnames)
+    num_vars = len(varnames)
+    return to_parse_result(elemental_inequalities(num_vars), colnames)
+
+
 #----------------------------------------
 # ad-hoc testing:
 #----------------------------------------
 
+
 if __name__ == '__main__':
     d = parse_file([
+        'rvar x y',
         '- hello + 2 x + x ≤ world+ 3',
         '- x + x + x >= 2 x + 3',
     ])
