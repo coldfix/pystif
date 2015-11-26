@@ -39,7 +39,7 @@ from .core.it import elemental_inequalities, num_vars, bits_to_num
 from .core.io import (System, SystemFile, _name_list, get_bits, supersets,
                       default_column_labels, column_varname_labels)
 
-from .core.parse import _parse_eq_file, AutoInsert, create_index
+from .core.parse import parse_files, to_numpy_array
 
 
 def p_to_q(p_vec):
@@ -61,6 +61,10 @@ def positivity(dim):
         yield x
 
 
+def vstack(a, b):
+    return np.vstack((a, list(b)))
+
+
 def main(args=None):
     opts = docopt(__doc__, args)
 
@@ -68,23 +72,19 @@ def main(args=None):
         colnames = _name_list(opts['--cols'])
         if isinstance(colnames, int):
             colnames = default_column_labels(colnames)
-        col_idx = create_index(colnames)
     elif opts['--vars']:
         varnames = _name_list(opts['--vars'])
         colnames = column_varname_labels(varnames)
-        col_idx = create_index(colnames)
     else:
         colnames = []
-        col_idx = AutoInsert(colnames)
 
-    equations = []
-    for e in opts['INEQ']:
-        equations += _parse_eq_file(e, col_idx)
+    equations, colnames = to_numpy_array(parse_files(opts['INEQ']), colnames)
+
     dim = len(colnames)
     if opts['--elem-ineqs']:
-        equations += list(elemental_inequalities(num_vars(dim)))
+        equations = vstack(equations, elemental_inequalities(num_vars(dim)))
     elif opts['--bell']:
-        equations += list(map(p_to_q, positivity(dim)))
+        equations = vstack(equations, map(p_to_q, positivity(dim)))
         # TODO: also normalization
 
     output = SystemFile(opts['--output'], columns=colnames)

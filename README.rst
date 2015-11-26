@@ -22,9 +22,17 @@ First, install these dependencies:
 - cython
 - numpy
 - scipy
-- docopt (use ``pip install docopt`` if unavailable in your package manager)
+- docopt
+- funcparserlib
 
-To build and install pystif, type::
+On archlinux, these dependencies can be installed as follows::
+
+    pacman -S python python-setuptools
+    pacman -S glpk
+    pacman -S cython python-numpy python-scipy
+    pip install docopt funcparserlib
+
+To build and install pystif itself, type::
 
     python setup.py install
 
