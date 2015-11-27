@@ -6,10 +6,10 @@ The input file grammar looks somewhat like this:
     line        ::=     statement? comment?
     statement   ::=     equation | var_decl
     comment     ::=     r"#.*"
-    equation    ::=     terms relation terms
+    equation    ::=     expression relation expression
     relation    ::=     ">=" | "≥" | "<=" | "≤" | "="
-    terms       ::=     sign? term (sign term)*
-    term        ::=     number? name | number
+    expression  ::=     sign? term (sign term)*
+    term        ::=     (number "*"?)? name | number
 
     var_decl    ::=     "rvar" var_list
     var_list    ::=     (identifier ","?)*
@@ -17,7 +17,7 @@ The input file grammar looks somewhat like this:
 For example:
 
     3 X + 4Y = 0
-      X + 2  >= 3
+      X + 2  >= 4*Y
 
 The parser can be invoked using the ``parse_file`` or ``parse_files``
 functions. The results of multiple invocations can be combined using the
@@ -66,7 +66,7 @@ def make_lexer():
         ('WS',          (r'[ \t]+',)),
         ('NAME',        (r'[a-zA-Z_]\w*',)),
         ('NUMBER',      (r'[+\-]?\d+(\.\d+)?([eE][+\-]?\d+)?',)),
-        ('OP',          (r'[+\-]|≥|>=|≤|<=|=|\(|\)|,',)),
+        ('OP',          (r'[+\-*]|≥|>=|≤|<=|=|\(|\)|,',)),
     ])
     def tokenize(text):
         trash = tt('COMMENT', 'WS')
@@ -106,7 +106,7 @@ def make_parser():
     number      = some('NUMBER')                        >> tokval >> to_number
     identifier  = some('NAME')                          >> tokval
     variable    = identifier
-    var_term    = (number | v(1)) + variable
+    var_term    = (number + fplp.maybe(L('*') | v(1)) + variable
     constant    = number + v('_')
 
     # (in-)equalities
