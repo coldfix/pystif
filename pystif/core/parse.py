@@ -94,11 +94,12 @@ def make_parser():
     # - variable:   information_measure | identifier
     # - line:       equation | elemental inequalities | positivities | q space
 
-    v = fplp.pure
-    X = partial(exact, 'OP')
-    L = lambda text: fplp.skip(literal(text))
+    from funcparserlib.parser import maybe, skip, many, finished, pure
 
-    opt = lambda p: fplp.skip(fplp.maybe(p))
+    v = pure
+    X = partial(exact, 'OP')
+    L = lambda text: skip(literal(text))
+    Lo = lambda text: skip(maybe(literal(text)))
 
     # primitives
     sign        = X('+') | X('-')
@@ -106,22 +107,22 @@ def make_parser():
     number      = some('NUMBER')                        >> tokval >> to_number
     identifier  = some('NAME')                          >> tokval
     variable    = identifier
-    var_term    = (number + fplp.maybe(L('*') | v(1)) + variable
+    var_term    = (number + Lo('*') | v(1)) + variable
     constant    = number + v('_')
 
     # (in-)equalities
     term        = var_term | constant
     f_term      = (sign | v('+')) + term                >> process_term
     s_term      = sign + term                           >> process_term
-    expression  = f_term + fplp.many(s_term)            >> collapse
+    expression  = f_term + many(s_term)                 >> collapse
     equation    = expression + relation + expression    >> make_equation
 
     # commands
-    var_list    = fplp.many(identifier + opt(X(',')))
+    var_list    = many(identifier + Lo(','))
     var_decl    = L('rvar') + var_list                  >> make_random_vars
 
     # toplevel
-    eof         = fplp.skip(fplp.finished)
+    eof         = skip(finished)
     line        = (equation | var_decl | v([])) + eof
 
     return line
