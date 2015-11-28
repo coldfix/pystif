@@ -12,7 +12,7 @@ The input file grammar looks somewhat like this:
     expression  ::=     sign? term (sign term)*
     term        ::=     (number "*"?)? symbol | number
 
-    markov      ::=     "markov" var_list (":" var_list){2,+} ("|" var_list)?
+    markov      ::=     "markov" var_list (":" var_list){2+}  ("|" var_list)?
     mutual      ::=     "mutual" var_list (":" var_list)+     ("|" var_list)?
 
     var_decl    ::=     "rvar" var_list
@@ -20,7 +20,7 @@ The input file grammar looks somewhat like this:
 
     symbol      ::=     identifier | entropy | mutual_info
     entropy     ::=     "H(" var_list ("|" var_list)? ")"
-    mutual_info ::=     "I(" var_list (":" var_list)* ("|" var_list)? )"
+    mutual_info ::=     "I(" var_list (":" var_list)+ ("|" var_list)? )"
 
 For example:
 
@@ -42,6 +42,7 @@ __all__ = [
 ]
 
 # pyparsing:
+# - [PRO] BETTER ERROR MESSAGES
 # - [PRO] automatic whitespace removal
 # - [PRO] set parser action on the object (=> can be set later easily)
 # - [CON] no tokenizer
@@ -102,7 +103,13 @@ def make_parser():
     # - variable:   information_measure | identifier
     # - line:       equation | elemental inequalities | positivities | q space
 
-    from funcparserlib.parser import maybe, skip, many, finished, pure
+    from funcparserlib.parser import maybe, skip, finished, pure
+
+    def many(p, min=0):
+        if min == 0:
+            return fplp.many(p)
+        q = p + many(p, min-1) >> collapse
+        return q.named('(%s , { %s })' % (p.name, p.name))
 
     v = pure
     X = partial(exact, 'OP')
@@ -116,12 +123,17 @@ def make_parser():
     identifier  = some('NAME')                          >> tokval
     variable    = identifier                            >> make_variable
 
+    def var_g(n):
+        # n: minimum number of parts
+        if n == 0:
+            return var_g(1) | v([])
+        return var_list + many(L(':') + var_list, n-1)  >> collapse
+
     # information measures
     var_list    = many(identifier + Lo(','))            >> set
-    var_grps    = var_list + many(L(':') + var_list)    >> collapse
     conditional = L('|') + var_list | v(set())
     entropy     = L('H(') + var_list + conditional + L(')')     >> make_entropy
-    mutual_info = L('I(') + var_grps + conditional + L(')')     >> make_mut_inf
+    mutual_info = L('I(') + var_g(2) + conditional + L(')')     >> make_mut_inf
 
     # (in-)equalities
     symbol      = entropy | mutual_info | variable
@@ -135,8 +147,8 @@ def make_parser():
 
     # commands
     var_decl    = L('rvar') + var_list                  >> make_random_vars
-    markov      = L('markov') + var_grps + conditional  >> make_markov_chain
-    mutual      = L('mutual') + var_grps + conditional  >> make_mutual_indep
+    markov      = L('markov') + var_g(3) + conditional  >> make_markov_chain
+    mutual      = L('mutual') + var_g(2) + conditional  >> make_mutual_indep
 
     # toplevel
     eof         = skip(finished)
