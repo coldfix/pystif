@@ -34,6 +34,22 @@ to a numpy array and a list of column names using the ``to_numpy_array``
 function.
 """
 
+
+# TODO:
+# - explicit column aliases ("alias" statement)
+# - implicit column aliases (when defining information inequalities)
+# - "symmetry" statement
+# - result of statements should be callback objects
+# - composed expressions
+# - complement operator for var lists '~'
+# - unit tests for this module
+# - more doc strings
+# - use py3 type annotations
+#
+# - keep input statements as comments for *makesys*
+# - recognize and output "rvar" statement for *pretty*
+
+
 __all__ = [
     'parse_file',
     'parse_files',
