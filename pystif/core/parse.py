@@ -87,6 +87,7 @@ def make_lexer():
     () -> (str -> [Token])
     """
     tokenizer = fpll.make_tokenizer([
+        ('NEWLINE',     (r'[\r\n]+',)),
         ('COMMENT',     (r'#.*',)),
         ('WS',          (r'[ \t]+',)),
         ('NAME',        (r'[a-zA-Z_]\w*',)),
@@ -168,7 +169,7 @@ def make_parser():
     mutual      = L('mutual') + var_g(2) + conditional  >> make_mutual_indep
 
     # toplevel
-    eof         = skip(finished)
+    eof         = skip(many(some('NEWLINE'))) + skip(finished)
     line        = (equation | var_decl | markov | mutual | v([])) + eof
 
     return line
