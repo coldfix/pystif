@@ -4,7 +4,7 @@ Utilities for parsing input files with systems of linear (in-)equalities.
 The input file grammar looks somewhat like this:
 
     line        ::=     statement? comment?
-    statement   ::=     equation | var_decl | mutual
+    statement   ::=     equation | var_decl | markov | mutual
     comment     ::=     r"#.*"
 
     equation    ::=     expression relation expression
@@ -12,7 +12,8 @@ The input file grammar looks somewhat like this:
     expression  ::=     sign? term (sign term)*
     term        ::=     (number "*"?)? symbol | number
 
-    mutual      ::=     "mutual" var_list (":" var_list){2,+} ("|" var_list)?
+    markov      ::=     "markov" var_list (":" var_list){2,+} ("|" var_list)?
+    mutual      ::=     "mutual" var_list (":" var_list)+     ("|" var_list)?
 
     var_decl    ::=     "rvar" var_list
     var_list    ::=     (identifier ","?)*
@@ -134,11 +135,12 @@ def make_parser():
 
     # commands
     var_decl    = L('rvar') + var_list                  >> make_random_vars
+    markov      = L('markov') + var_grps + conditional  >> make_markov_chain
     mutual      = L('mutual') + var_grps + conditional  >> make_mutual_indep
 
     # toplevel
     eof         = skip(finished)
-    line        = (equation | var_decl | mutual | v([])) + eof
+    line        = (equation | var_decl | markov | mutual | v([])) + eof
 
     return line
 
@@ -404,6 +406,16 @@ def make_mut_inf(parts, cond):
     # ignore zero, there is one more "odd string".
     if cond:
         yield (_entropy_colname(cond), 1)
+
+
+@stararg
+@result_to_list
+def make_markov_chain(parts, cond):
+    A = set()
+    for a, b, c in zip(parts[:-2], parts[1:-1], parts[2:]):
+        A |= a
+        yield from make_mutual_indep(([A, c], b|cond))
+
 
 @stararg
 def make_mutual_indep(parts, cond):
