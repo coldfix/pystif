@@ -6,13 +6,18 @@ The input file grammar looks somewhat like this:
     line        ::=     statement? comment?
     statement   ::=     equation | var_decl
     comment     ::=     r"#.*"
+
     equation    ::=     expression relation expression
     relation    ::=     ">=" | "≥" | "<=" | "≤" | "="
     expression  ::=     sign? term (sign term)*
-    term        ::=     (number "*"?)? name | number
+    term        ::=     (number "*"?)? symbol | number
 
     var_decl    ::=     "rvar" var_list
     var_list    ::=     (identifier ","?)*
+
+    symbol      ::=     identifier | entropy | mutual_info
+    entropy     ::=     "H(" var_list ("|" var_list)? ")"
+    mutual_info ::=     "I(" var_list (":" var_list)* ("|" var_list)? )"
 
 For example:
 
@@ -65,8 +70,8 @@ def make_lexer():
         ('COMMENT',     (r'#.*',)),
         ('WS',          (r'[ \t]+',)),
         ('NAME',        (r'[a-zA-Z_]\w*',)),
-        ('NUMBER',      (r'[+\-]?\d+(\.\d+)?([eE][+\-]?\d+)?',)),
-        ('OP',          (r'[+\-*]|≥|>=|≤|<=|=|\(|\)|,',)),
+        ('NUMBER',      (r'[-+]?\d+(\.\d+)?([eE][+\-]?\d+)?',)),
+        ('OP',          (r'[-+*,:()≤=≥|]|>=|<=',)),
     ])
     def tokenize(text):
         trash = tt('COMMENT', 'WS')
@@ -106,19 +111,26 @@ def make_parser():
     relation    = X('>=') | X('<=') | X('≥') | X('≤') | X('=')
     number      = some('NUMBER')                        >> tokval >> to_number
     identifier  = some('NAME')                          >> tokval
-    variable    = identifier
-    var_term    = (number + Lo('*') | v(1)) + variable
-    constant    = number + v('_')
+    variable    = identifier                            >> make_variable
+
+    # information measures
+    var_list    = many(identifier + Lo(','))            >> set
+    inf_core    = var_list + many(L(':') + var_list)    >> collapse
+    conditional = L('|') + var_list | v(set())
+    entropy     = L('H(') + var_list + conditional + L(')')     >> make_entropy
+    mutual_info = L('I(') + inf_core + conditional + L(')')     >> make_mut_inf
 
     # (in-)equalities
+    symbol      = entropy | mutual_info | variable
+    var_term    = (number + Lo('*') | v(1)) + symbol    >> make_var_term
+    constant    = number                                >> make_constant
     term        = var_term | constant
-    f_term      = (sign | v('+')) + term                >> process_term
-    s_term      = sign + term                           >> process_term
-    expression  = f_term + many(s_term)                 >> collapse
+    f_term      = (sign | v('+')) + term                >> make_term
+    s_term      = sign + term                           >> make_term
+    expression  = f_term + many(s_term)                 >> collapse >> make_expr
     equation    = expression + relation + expression    >> make_equation
 
     # commands
-    var_list    = many(identifier + Lo(','))
     var_decl    = L('rvar') + var_list                  >> make_random_vars
 
     # toplevel
@@ -254,6 +266,10 @@ def const(value):
     return lambda tok: value
 
 
+def stararg(func):
+    return lambda args: func(*args)
+
+
 def literal(text):
     """
     Matches any text that will produce the same series of filtered tokens as
@@ -272,6 +288,10 @@ def some(*token_type):
     return fplp.some(tt(*token_type))
 
 
+#----------------------------------------
+# transformation functions for result
+#----------------------------------------
+
 def to_number(s):
     try:
         return int(s)
@@ -279,18 +299,22 @@ def to_number(s):
         return float(s)
 
 
-def process_term(signed_term):
-    sign, (coef, name) = signed_term
+def make_term(signed_term):
+    sign, terms = signed_term
     sign = 1 if sign == '+' else -1
-    return name, sign*coef
+    return [(name, sign*coef) for name, coef in terms]
+
+
+def make_expr(expr):
+    return [term for subexpr in expr for term in subexpr]
 
 
 def collapse(items):
     return [items[0]] + items[1]
 
 
-def make_equation(equation):
-    lhs, rel, rhs = equation
+@stararg
+def make_equation(lhs, rel, rhs):
     negate = lambda terms: [(name, -coef) for name, coef in terms]
     pos = lhs + negate(rhs)
     neg = rhs + negate(lhs)
@@ -315,13 +339,78 @@ def make_random_vars(varnames):
     return to_parse_result(elemental_inequalities(num_vars), colnames)
 
 
+def _entropy_colname(var_list):
+    return "".join(sorted(var_list))
+
+
+def make_constant(num):
+    return [('_', num)]
+
+
+@stararg
+def make_var_term(coef, terms):
+    return [(n, coef*c) for n, c in terms]
+
+
+def make_variable(varname):
+    return [(varname, 1)]
+
+
+@stararg
+def make_entropy(core, cond):
+    if cond:
+        return [
+            (_entropy_colname(core|cond), 1),
+            (_entropy_colname(cond), -1),
+        ]
+    return [(_entropy_colname(core), 1)]
+
+
+def result_to_list(func):
+    return lambda *args, **kwargs: list(func(*args, **kwargs))
+
+
+@stararg
+@result_to_list
+def make_mut_inf(parts, cond):
+    # Multivariate mutual information is recursively defined by
+    #
+    #          I(a:…:y:z) = I(a:…:y) - I(a:…:y|z)
+    #
+    # Here, it is calculated as the alternating sum of (conditional)
+    # entropies of all subsets of the parts [Jakulin & Bratko (2003)].
+    #
+    # See: http://en.wikipedia.org/wiki/Multivariate_mutual_information
+    num_parts = len(parts)
+    num_subsets = 2 ** num_parts
+
+    # Start at i=1 because i=0 which corresponds to H(empty set) gives no
+    # contribution to the sum. Furthermore, the i=0 is already reserved
+    # for the constant term for our purposes.
+    for i in range(1, num_subsets):
+        core = set()
+        sign = -1
+        for j, part in enumerate(parts):
+            if i & (1<<j):
+                core |= part;
+                sign = -sign
+        yield (_entropy_colname(core|cond), sign)
+
+    # The coefficient of the conditional part always sums to one: There are
+    # equally many N bit strings with odd/even number of set bits. Since we
+    # ignore zero, there is one more "odd string".
+    if cond:
+        yield (_entropy_colname(cond), 1)
+
+
 #----------------------------------------
 # ad-hoc testing:
 #----------------------------------------
 
-
 if __name__ == '__main__':
     d = parse_file([
+        'H(X,Y, Z | X,Z) >= 0',
+        'I(X,Y: Z | D) >= 0',
         'rvar x y',
         '- hello + 2 x + x ≤ world+ 3',
         '- x + x + x >= 2 x + 3',
