@@ -75,7 +75,7 @@ def make_lexer():
         ('WS',          (r'[ \t]+',)),
         ('NAME',        (r'[a-zA-Z_]\w*',)),
         ('NUMBER',      (r'[-+]?\d+(\.\d+)?([eE][+\-]?\d+)?',)),
-        ('OP',          (r'[-+*,:()≤=≥|]|>=|<=',)),
+        ('OP',          (r'[-+*,:;()≤=≥|]|>=|<=',)),
     ])
     def tokenize(text):
         trash = tt('COMMENT', 'WS')
@@ -122,12 +122,13 @@ def make_parser():
     number      = some('NUMBER')                        >> tokval >> to_number
     identifier  = some('NAME')                          >> tokval
     variable    = identifier                            >> make_variable
+    colon       = L(':') | L(';')
 
     def var_g(n):
         # n: minimum number of parts
         if n == 0:
             return var_g(1) | v([])
-        return var_list + many(L(':') + var_list, n-1)  >> collapse
+        return var_list + many(colon + var_list, n-1)   >> collapse
 
     # information measures
     var_list    = many(identifier + Lo(','))            >> set
