@@ -434,7 +434,7 @@ def make_mut_inf(parts, cond):
     # equally many N bit strings with odd/even number of set bits. Since we
     # ignore zero, there is one more "odd string".
     if cond:
-        yield (_entropy_colname(cond), 1)
+        yield (_entropy_colname(cond), -1)
 
 
 @stararg
