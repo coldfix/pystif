@@ -28,7 +28,16 @@ def remove_comments(lines, on_comment=None):
             yield line
 
 
-def read_system_from_file(file, *, ndmin=2):
+def read_system_from_file(file):
+    lines = list(file)
+    try:
+        return read_table_from_file(lines)
+    except ValueError:
+        from .parse import parse_file, to_numpy_array
+        return to_numpy_array(parse_file(lines))
+
+
+def read_table_from_file(file, *, ndmin=2):
     comments = []
     contents = remove_comments(file, comments.append)
     matrix = np.loadtxt(contents, ndmin=ndmin)
