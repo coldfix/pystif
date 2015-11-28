@@ -4,13 +4,15 @@ Utilities for parsing input files with systems of linear (in-)equalities.
 The input file grammar looks somewhat like this:
 
     line        ::=     statement? comment?
-    statement   ::=     equation | var_decl
+    statement   ::=     equation | var_decl | mutual
     comment     ::=     r"#.*"
 
     equation    ::=     expression relation expression
     relation    ::=     ">=" | "≥" | "<=" | "≤" | "="
     expression  ::=     sign? term (sign term)*
     term        ::=     (number "*"?)? symbol | number
+
+    mutual      ::=     "mutual" var_list (":" var_list){2,+} ("|" var_list)?
 
     var_decl    ::=     "rvar" var_list
     var_list    ::=     (identifier ","?)*
@@ -115,10 +117,10 @@ def make_parser():
 
     # information measures
     var_list    = many(identifier + Lo(','))            >> set
-    inf_core    = var_list + many(L(':') + var_list)    >> collapse
+    var_grps    = var_list + many(L(':') + var_list)    >> collapse
     conditional = L('|') + var_list | v(set())
     entropy     = L('H(') + var_list + conditional + L(')')     >> make_entropy
-    mutual_info = L('I(') + inf_core + conditional + L(')')     >> make_mut_inf
+    mutual_info = L('I(') + var_grps + conditional + L(')')     >> make_mut_inf
 
     # (in-)equalities
     symbol      = entropy | mutual_info | variable
@@ -132,10 +134,11 @@ def make_parser():
 
     # commands
     var_decl    = L('rvar') + var_list                  >> make_random_vars
+    mutual      = L('mutual') + var_grps + conditional  >> make_mutual_indep
 
     # toplevel
     eof         = skip(finished)
-    line        = (equation | var_decl | v([])) + eof
+    line        = (equation | var_decl | mutual | v([])) + eof
 
     return line
 
@@ -401,6 +404,16 @@ def make_mut_inf(parts, cond):
     # ignore zero, there is one more "odd string".
     if cond:
         yield (_entropy_colname(cond), 1)
+
+@stararg
+def make_mutual_indep(parts, cond):
+    # H(a,b,c,…|z) = H(a|z) + H(b|z) + H(c|z) + …
+    lhs = [(_entropy_colname(set.union(cond, *parts)), 1)]
+    rhs = [(_entropy_colname(set.union(cond, part)), 1) for part in parts]
+    if cond:
+        lhs += [(_entropy_colname(cond), -1)]
+        rhs += [(_entropy_colname(cond), -len(parts))]
+    return make_equation((lhs, '=', rhs))
 
 
 #----------------------------------------
