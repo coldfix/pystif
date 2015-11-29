@@ -8,7 +8,7 @@ The input file grammar looks somewhat like this:
     comment     ::=     r"#.*"
 
     equation    ::=     expression relation expression
-    relation    ::=     ">=" | "≥" | "<=" | "≤" | "="
+    relation    ::=     ">=" | "≥" | "<=" | "≤" | "==" | "="
     expression  ::=     sign? term (sign term)*
     term        ::=     (number "*"?)? symbol | number
 
@@ -92,7 +92,7 @@ def make_lexer():
         ('WS',          (r'[ \t]+',)),
         ('NAME',        (r'[a-zA-Z_]\w*',)),
         ('NUMBER',      (r'[-+]?\d+(\.\d+)?([eE][+\-]?\d+)?',)),
-        ('OP',          (r'[-+*,:;()≤=≥|]|>=|<=',)),
+        ('OP',          (r'[<=>]=|[-+*,:;()≤=≥|]',)),
     ])
     def tokenize(text):
         trash = tt('COMMENT', 'WS')
