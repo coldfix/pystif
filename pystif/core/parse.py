@@ -401,12 +401,13 @@ def make_entropy(core, cond):
     return [(_entropy_colname(core), 1)]
 
 
-def result_to_list(func):
-    return lambda *args, **kwargs: list(func(*args, **kwargs))
+def returns(result_type):
+    def decorate(func):
+        return lambda *args, **kwargs: result_type(func(*args, **kwargs))
 
 
 @stararg
-@result_to_list
+@returns(list)
 def make_mut_inf(parts, cond):
     # Multivariate mutual information is recursively defined by
     #
@@ -439,7 +440,7 @@ def make_mut_inf(parts, cond):
 
 
 @stararg
-@result_to_list
+@returns(list)
 def make_markov_chain(parts, cond):
     A = set()
     for a, b, c in zip(parts[:-2], parts[1:-1], parts[2:]):
