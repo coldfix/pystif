@@ -75,6 +75,7 @@ from functools import partial
 import numpy as np
 import funcparserlib.lexer as fpll
 import funcparserlib.parser as fplp
+from funcparserlib.parser import maybe, skip, finished, pure
 
 from .io import column_varname_labels
 from .it import elemental_inequalities
@@ -82,89 +83,10 @@ from .it import elemental_inequalities
 from .vector import Vector
 
 
-def make_lexer():
-    """
-    Return a tokenizer for the input file grammar.
-
-    () -> (str -> [Token])
-    """
-    tokenizer = fpll.make_tokenizer([
-        ('NEWLINE',     (r'[\r\n]+',)),
-        ('COMMENT',     (r'#.*',)),
-        ('WS',          (r'[ \t]+',)),
-        ('NAME',        (r'[a-zA-Z_]\w*',)),
-        ('NUMBER',      (r'[-+]?\d+(\.\d+)?([eE][+\-]?\d+)?',)),
-        ('OP',          (r'[<=>]=|[-+*,:;()≤=≥|]',)),
-    ])
-    def tokenize(text):
-        trash = tt('COMMENT', 'WS')
-        return [tok for tok in tokenizer(text) if not trash(tok)]
-    return tokenize
-
-
-def make_parser():
-    """
-    Return a parser that parses a system of linear (in-)equalities.
-
-    () -> ([Token] -> [Vector])
-    """
-    # TODO:
-    # - variable:   information_measure | identifier
-    # - line:       equation | elemental inequalities | positivities | q space
-
-    from funcparserlib.parser import maybe, skip, finished, pure
-
-    def many(p, min=0):
-        if min == 0:
-            return fplp.many(p)
-        q = p + many(p, min-1) >> collapse
-        return q.named('(%s , { %s })' % (p.name, p.name))
-
-    v = pure
-    X = partial(exact, 'OP')
-    L = lambda text: skip(literal(text))
-    Lo = lambda text: skip(maybe(literal(text)))
-
-    # primitives
-    sign        = X('+') >> const(+1) | X('-') >> const(-1)
-    relation    = X('>=') | X('<=') | X('≥') | X('≤') | X('=')
-    number      = some('NUMBER')                        >> tokval >> to_number
-    identifier  = some('NAME')                          >> tokval
-    variable    = identifier                            >> make_variable
-    colon       = L(':') | L(';')
-
-    def var_g(n):
-        # n: minimum number of parts
-        if n == 0:
-            return var_g(1) | v([])
-        return var_list + many(colon + var_list, n-1)   >> collapse
-
-    # information measures
-    var_list    = many(identifier + Lo(','))            >> set
-    conditional = L('|') + var_list | v(set())
-    entropy     = L('H(') + var_list + conditional + L(')')     >> make_entropy
-    mutual_info = L('I(') + var_g(2) + conditional + L(')')     >> make_mut_inf
-
-    # (in-)equalities
-    symbol      = entropy | mutual_info | variable
-    var_term    = (number + Lo('*') | v(1)) + symbol    >> scale_vector
-    constant    = number                                >> make_constant
-    term        = var_term | constant
-    f_term      = (sign | v(+1)) + term                 >> scale_vector
-    s_term      = sign + term                           >> scale_vector
-    expression  = f_term + many(s_term)                 >> collapse >> make_expr
-    equation    = expression + relation + expression    >> make_equation
-
-    # commands
-    var_decl    = L('rvar') + var_list                  >> make_random_vars
-    markov      = L('markov') + var_g(3) + conditional  >> make_markov_chain
-    mutual      = L('mutual') + var_g(2) + conditional  >> make_mutual_indep
-
-    # toplevel
-    eof         = skip(many(some('NEWLINE'))) + skip(finished)
-    line        = (equation | var_decl | markov | mutual | v([])) + eof
-
-    return line
+def tokenize(text: str) -> [fpll.Token]:
+    """Break an input string into a list of tokens accepted by the parser."""
+    trash = tt('COMMENT', 'WS')
+    return [tok for tok in _tokenizer(text) if not trash(tok)]
 
 
 def merge_parse_results(results):
@@ -173,7 +95,7 @@ def merge_parse_results(results):
 
     [[Vector]] -> [Vector]
     """
-    return sum(results, [])
+    return [v for vecs in results for v in vecs]
 
 
 def parse_file(lines):
@@ -183,10 +105,8 @@ def parse_file(lines):
 
     [str] -> [Vector]
     """
-    tokenize = make_lexer()
-    parser = make_parser()
     return merge_parse_results(
-        parser.parse(tokenize(l)) for l in lines)
+        line.parse(tokenize(l)) for l in lines)
 
 
 def _lines(filename):
@@ -295,6 +215,13 @@ def returns(result_type):
 # Parser internals
 #----------------------------------------
 
+def many(p, min=0):
+    if min == 0:
+        return fplp.many(p)
+    q = p + many(p, min-1) >> collapse
+    return q.named('(%s , { %s })' % (p.name, p.name))
+
+
 def tokval(tok):
     return tok.value
 
@@ -312,7 +239,6 @@ def literal(text):
     Matches any text that will produce the same series of filtered tokens as
     the given text, i.e. the text plus optional whitespaces between tokens.
     """
-    tokenize = make_lexer()
     tokens = map(fplp.a, tokenize(text))
     return sum(tokens, next(tokens)) >> const(text)
 
@@ -438,6 +364,68 @@ def make_mutual_indep(parts, cond):
         lhs += [(cond, -1)]
         rhs += [(cond, -len(parts))]
     return make_equation((Vector(lhs), '=', Vector(rhs)))
+
+
+#----------------------------------------
+# lexer/parser implementation
+#----------------------------------------
+
+_tokenizer = fpll.make_tokenizer([
+    ('NEWLINE',     (r'[\r\n]+',)),
+    ('COMMENT',     (r'#.*',)),
+    ('WS',          (r'[ \t]+',)),
+    ('NAME',        (r'[a-zA-Z_]\w*',)),
+    ('NUMBER',      (r'[-+]?\d+(\.\d+)?([eE][+\-]?\d+)?',)),
+    ('OP',          (r'[<=>]=|[-+*,:;()≤=≥|]',)),
+])
+
+# TODO:
+# - variable:   information_measure | identifier
+# - line:       equation | elemental inequalities | positivities | q space
+
+v = pure
+X = partial(exact, 'OP')
+L = lambda text: skip(literal(text))
+Lo = lambda text: skip(maybe(literal(text)))
+
+# primitives
+sign        = X('+') >> const(+1) | X('-') >> const(-1)
+relation    = X('>=') | X('<=') | X('≥') | X('≤') | X('=')
+number      = some('NUMBER')                        >> tokval >> to_number
+identifier  = some('NAME')                          >> tokval
+variable    = identifier                            >> make_variable
+colon       = L(':') | L(';')
+
+def var_g(n):
+    # n: minimum number of parts
+    if n == 0:
+        return var_g(1) | v([])
+    return var_list + many(colon + var_list, n-1)   >> collapse
+
+# information measures
+var_list    = many(identifier + Lo(','))            >> set
+conditional = L('|') + var_list | v(set())
+entropy     = L('H(') + var_list + conditional + L(')')     >> make_entropy
+mutual_info = L('I(') + var_g(2) + conditional + L(')')     >> make_mut_inf
+
+# (in-)equalities
+symbol      = entropy | mutual_info | variable
+var_term    = (number + Lo('*') | v(1)) + symbol    >> scale_vector
+constant    = number                                >> make_constant
+term        = var_term | constant
+f_term      = (sign | v(+1)) + term                 >> scale_vector
+s_term      = sign + term                           >> scale_vector
+expression  = f_term + many(s_term)                 >> collapse >> make_expr
+equation    = expression + relation + expression    >> make_equation
+
+# commands
+var_decl    = L('rvar') + var_list                  >> make_random_vars
+markov      = L('markov') + var_g(3) + conditional  >> make_markov_chain
+mutual      = L('mutual') + var_g(2) + conditional  >> make_mutual_indep
+
+# toplevel
+eof         = skip(many(some('NEWLINE'))) + skip(finished)
+line        = (equation | var_decl | markov | mutual | v([])) + eof
 
 
 #----------------------------------------
