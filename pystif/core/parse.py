@@ -79,6 +79,8 @@ import funcparserlib.parser as fplp
 from .io import column_varname_labels
 from .it import elemental_inequalities
 
+from .vector import Vector
+
 
 def make_lexer():
     """
@@ -104,17 +106,7 @@ def make_parser():
     """
     Return a parser that parses a system of linear (in-)equalities.
 
-    () -> ([Token] -> ParseResult)
-
-    where the exact type of ParseResult is an implementation detail. The
-    current form is
-
-        ParseResult = [ParseIneq].
-        ParseIneq = [(str, float)]
-
-    In other words, the parser returns a list of inequalities that are
-    each represented by a list of variable names and coefficients. There can
-    be multiple terms for the same variable in the same inequality.
+    () -> ([Token] -> [Vector])
     """
     # TODO:
     # - variable:   information_measure | identifier
@@ -134,7 +126,7 @@ def make_parser():
     Lo = lambda text: skip(maybe(literal(text)))
 
     # primitives
-    sign        = X('+') | X('-')
+    sign        = X('+') >> const(+1) | X('-') >> const(-1)
     relation    = X('>=') | X('<=') | X('≥') | X('≤') | X('=')
     number      = some('NUMBER')                        >> tokval >> to_number
     identifier  = some('NAME')                          >> tokval
@@ -155,11 +147,11 @@ def make_parser():
 
     # (in-)equalities
     symbol      = entropy | mutual_info | variable
-    var_term    = (number + Lo('*') | v(1)) + symbol    >> make_var_term
+    var_term    = (number + Lo('*') | v(1)) + symbol    >> scale_vector
     constant    = number                                >> make_constant
     term        = var_term | constant
-    f_term      = (sign | v('+')) + term                >> make_term
-    s_term      = sign + term                           >> make_term
+    f_term      = (sign | v(+1)) + term                 >> scale_vector
+    s_term      = sign + term                           >> scale_vector
     expression  = f_term + many(s_term)                 >> collapse >> make_expr
     equation    = expression + relation + expression    >> make_equation
 
@@ -179,7 +171,7 @@ def merge_parse_results(results):
     """
     Combine the results of multiple parser runs.
 
-    [ParseResult] -> ParseResult
+    [[Vector]] -> [Vector]
     """
     return sum(results, [])
 
@@ -189,7 +181,7 @@ def parse_file(lines):
     Parses a system of linear (in-)equalities from one file. The parameter
     must be given as an iterable of lines.
 
-    [str] -> ParseResult
+    [str] -> [Vector]
     """
     tokenize = make_lexer()
     parser = make_parser()
@@ -213,7 +205,7 @@ def _lines(filename):
 
 def parse_files(files):
     """
-    [Filename | Text] -> ParseResult
+    [Filename | Text] -> [Vector]
     """
     return merge_parse_results(
         parse_file(_lines(f)) for f in files)
@@ -252,12 +244,12 @@ def to_numpy_array(parse_result, col_names=('_',)):
     Further transform parser output to numpy array, also return list of column
     names in order.
 
-    ParseResult -> np.array, [str]
+    [Vector] -> np.array, [str]
     """
     col_idx = AutoInsert(list(col_names))
     indexed = [[(col_idx[name], coef)
-                for name, coef in terms]
-               for terms in parse_result]
+                for name, coef in vector.items()]
+               for vector in parse_result]
     result = np.zeros((len(indexed), len(col_idx)))
     for row, terms in enumerate(indexed):
         for idx, coef in terms:
@@ -267,22 +259,36 @@ def to_numpy_array(parse_result, col_names=('_',)):
 
 def to_parse_inequality(numpy_vector, colnames):
     """
-    np.array, [str] -> ParseIneq = [(str, float)]
+    np.array, [str] -> Vector
     """
-    return [
+    return Vector(
         (colnames[idx], coef)
         for idx, coef in enumerate(numpy_vector)
         if coef != 0
-    ]
+    )
 
 
 def to_parse_result(vectors, colnames):
     """
     Back-transform a numpy array to a parse result.
 
-    np.array, [str] -> ParseResult
+    np.array, [str] -> [Vector]
     """
     return [to_parse_inequality(v, colnames) for v in vectors]
+
+
+#----------------------------------------
+# Utility functions
+#----------------------------------------
+
+def stararg(func):
+    return lambda args: func(*args)
+
+
+def returns(result_type):
+    def decorate(func):
+        return lambda *args, **kwargs: result_type(func(*args, **kwargs))
+    return decorate
 
 
 #----------------------------------------
@@ -299,10 +305,6 @@ def exact(token_type, text):
 
 def const(value):
     return lambda tok: value
-
-
-def stararg(func):
-    return lambda args: func(*args)
 
 
 def literal(text):
@@ -334,14 +336,8 @@ def to_number(s):
         return float(s)
 
 
-def make_term(signed_term):
-    sign, terms = signed_term
-    sign = 1 if sign == '+' else -1
-    return [(name, sign*coef) for name, coef in terms]
-
-
 def make_expr(expr):
-    return [term for subexpr in expr for term in subexpr]
+    return sum(expr, Vector())
 
 
 def collapse(items):
@@ -350,14 +346,11 @@ def collapse(items):
 
 @stararg
 def make_equation(lhs, rel, rhs):
-    negate = lambda terms: [(name, -coef) for name, coef in terms]
-    pos = lhs + negate(rhs)
-    neg = rhs + negate(lhs)
     if rel == '>=' or rel == '≥':
-        return [pos]
+        return [lhs - rhs]
     if rel == '<=' or rel == '≤':
-        return [neg]
-    return [pos, neg]
+        return [rhs - lhs]
+    return [lhs - rhs, rhs - lhs]
 
 
 def make_random_vars(varnames):
@@ -366,7 +359,7 @@ def make_random_vars(varnames):
 
     An inequality is represented as a list of pairs (name, coef).
 
-    [str] -> ParseResult
+    [str] -> [Vector]
     """
     varnames = sorted(varnames)
     colnames = column_varname_labels(varnames)
@@ -374,41 +367,33 @@ def make_random_vars(varnames):
     return to_parse_result(elemental_inequalities(num_vars), colnames)
 
 
-def _entropy_colname(var_list):
-    return "".join(sorted(var_list))
-
-
-def make_constant(num):
-    return [('_', num)]
-
-
 @stararg
-def make_var_term(coef, terms):
-    return [(n, coef*c) for n, c in terms]
+def scale_vector(coef, vector):
+    return vector * coef
 
 
 def make_variable(varname):
-    return [(varname, 1)]
+    return Vector({varname: 1})
+
+
+def make_constant(num):
+    return Vector({'_': num})
 
 
 @stararg
 def make_entropy(core, cond):
-    if cond:
-        return [
-            (_entropy_colname(core|cond), 1),
-            (_entropy_colname(cond), -1),
-        ]
-    return [(_entropy_colname(core), 1)]
-
-
-def returns(result_type):
-    def decorate(func):
-        return lambda *args, **kwargs: result_type(func(*args, **kwargs))
+    return Vector((
+        (core|cond, 1),
+        (cond, -1),
+    ))
 
 
 @stararg
-@returns(list)
+@returns(Vector)
 def make_mut_inf(parts, cond):
+    """
+    [VarList], VarList -> Vector
+    """
     # Multivariate mutual information is recursively defined by
     #
     #          I(a:…:y:z) = I(a:…:y) - I(a:…:y|z)
@@ -417,26 +402,22 @@ def make_mut_inf(parts, cond):
     # entropies of all subsets of the parts [Jakulin & Bratko (2003)].
     #
     # See: http://en.wikipedia.org/wiki/Multivariate_mutual_information
-    num_parts = len(parts)
-    num_subsets = 2 ** num_parts
+    num_subsets = 2 ** len(parts)
 
     # Start at i=1 because i=0 which corresponds to H(empty set) gives no
     # contribution to the sum. Furthermore, the i=0 is already reserved
     # for the constant term for our purposes.
     for i in range(1, num_subsets):
-        core = set()
-        sign = -1
-        for j, part in enumerate(parts):
-            if i & (1<<j):
-                core |= part;
-                sign = -sign
-        yield (_entropy_colname(core|cond), sign)
+        subs = [part for j, part in enumerate(parts) if i & (1<<j)]
+        core = set.union(*subs)
+        sign = -(-1)**len(subs)
+        yield (core|cond, sign)
 
     # The coefficient of the conditional part always sums to one: There are
     # equally many N bit strings with odd/even number of set bits. Since we
     # ignore zero, there is one more "odd string".
     if cond:
-        yield (_entropy_colname(cond), -1)
+        yield (cond, -1)
 
 
 @stararg
@@ -451,12 +432,12 @@ def make_markov_chain(parts, cond):
 @stararg
 def make_mutual_indep(parts, cond):
     # H(a,b,c,…|z) = H(a|z) + H(b|z) + H(c|z) + …
-    lhs = [(_entropy_colname(set.union(cond, *parts)), 1)]
-    rhs = [(_entropy_colname(set.union(cond, part)), 1) for part in parts]
+    lhs = [(set.union(cond, *parts), 1)]
+    rhs = [(set.union(cond, part), 1) for part in parts]
     if cond:
-        lhs += [(_entropy_colname(cond), -1)]
-        rhs += [(_entropy_colname(cond), -len(parts))]
-    return make_equation((lhs, '=', rhs))
+        lhs += [(cond, -1)]
+        rhs += [(cond, -len(parts))]
+    return make_equation((Vector(lhs), '=', Vector(rhs)))
 
 
 #----------------------------------------
