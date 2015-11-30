@@ -44,7 +44,6 @@ function.
 # - complement operator for var lists '~'
 # - unit tests for this module
 # - more doc strings
-# - use py3 type annotations
 #
 # - keep input statements as comments for *makesys*
 # - recognize and output "rvar" statement for *pretty*
@@ -89,32 +88,21 @@ def tokenize(text: str) -> [fpll.Token]:
     return [tok for tok in _tokenizer(text) if not trash(tok)]
 
 
-def merge_parse_results(results):
-    """
-    Combine the results of multiple parser runs.
-
-    [[Vector]] -> [Vector]
-    """
+def merge_parse_results(results: [[Vector]]) -> [Vector]:
+    """Combine the results of multiple parser runs."""
     return [v for vecs in results for v in vecs]
 
 
-def parse_file(lines):
-    """
-    Parses a system of linear (in-)equalities from one file. The parameter
-    must be given as an iterable of lines.
-
-    [str] -> [Vector]
-    """
+def parse_file(lines: [str]) -> [Vector]:
+    """Parse a system of linear (in-)equalities from one file."""
     return merge_parse_results(
         line.parse(tokenize(l)) for l in lines)
 
 
-def _lines(filename):
+def _lines(filename: str) -> [str]:
     """
     Iterate over all lines in the file. If the parameter is not an existing
     file name, treat it as the file content itself.
-
-    (Filename | Text) -> [str]
     """
     try:
         with open(filename) as f:
@@ -123,10 +111,8 @@ def _lines(filename):
         yield from filename.split('\n')
 
 
-def parse_files(files):
-    """
-    [Filename | Text] -> [Vector]
-    """
+def parse_files(files: [str]) -> [Vector]:
+    """Concat and parse multiple files/expressions as one system."""
     return merge_parse_results(
         parse_file(_lines(f)) for f in files)
 
@@ -135,7 +121,8 @@ def parse_files(files):
 # Finalization of parse results
 #----------------------------------------
 
-def create_index(l):
+def create_index(l: list) -> dict:
+    """Create an index of the list items' indices."""
     return {v: i for i, v in enumerate(l)}
 
 
@@ -159,12 +146,10 @@ class AutoInsert:
             return index
 
 
-def to_numpy_array(parse_result, col_names=('_',)):
+def to_numpy_array(parse_result: [Vector], col_names=['_']) -> (np.array, [str]):
     """
     Further transform parser output to numpy array, also return list of column
     names in order.
-
-    [Vector] -> np.array, [str]
     """
     col_idx = AutoInsert(list(col_names))
     indexed = [[(col_idx[name], coef)
@@ -177,10 +162,8 @@ def to_numpy_array(parse_result, col_names=('_',)):
     return result, col_idx._cols
 
 
-def to_parse_inequality(numpy_vector, colnames):
-    """
-    np.array, [str] -> Vector
-    """
+def to_parse_inequality(numpy_vector: np.array, colnames: [str]) -> Vector:
+    """Convert a numpy vector to a parse Vector."""
     return Vector(
         (colnames[idx], coef)
         for idx, coef in enumerate(numpy_vector)
@@ -188,12 +171,8 @@ def to_parse_inequality(numpy_vector, colnames):
     )
 
 
-def to_parse_result(vectors, colnames):
-    """
-    Back-transform a numpy array to a parse result.
-
-    np.array, [str] -> [Vector]
-    """
+def to_parse_result(vectors: np.array, colnames: [str]) -> [Vector]:
+    """Back-transform a numpy matrix to a parse result."""
     return [to_parse_inequality(v, colnames) for v in vectors]
 
 
@@ -201,12 +180,14 @@ def to_parse_result(vectors, colnames):
 # Utility functions
 #----------------------------------------
 
-def stararg(func):
+def stararg(func: "(P…), -> R") -> "P… -> R":
+    """Unpack argument before invoking function."""
     return lambda args: func(*args)
 
 
-def returns(result_type):
-    def decorate(func):
+def returns(result_type: "R -> R'") -> "(P -> R) -> (P -> R')":
+    """Cast function result to result_type."""
+    def decorate(func: "P -> R") -> "P -> R'":
         return lambda *args, **kwargs: result_type(func(*args, **kwargs))
     return decorate
 
@@ -279,13 +260,11 @@ def make_equation(lhs, rel, rhs):
     return [lhs - rhs, rhs - lhs]
 
 
-def make_random_vars(varnames):
+def make_random_vars(varnames: [str]) -> [Vector]:
     """
     Iterate all elemental inequalities for the given variables.
 
     An inequality is represented as a list of pairs (name, coef).
-
-    [str] -> [Vector]
     """
     varnames = sorted(varnames)
     colnames = column_varname_labels(varnames)
@@ -316,10 +295,7 @@ def make_entropy(core, cond):
 
 @stararg
 @returns(Vector)
-def make_mut_inf(parts, cond):
-    """
-    [VarList], VarList -> Vector
-    """
+def make_mut_inf(parts: "[VarList]", cond: "VarList") -> Vector:
     # Multivariate mutual information is recursively defined by
     #
     #          I(a:…:y:z) = I(a:…:y) - I(a:…:y|z)
