@@ -1,8 +1,9 @@
-"""
+r"""
 Utilities for parsing input files with systems of linear (in-)equalities.
 
 The input file grammar looks somewhat like this:
 
+    document    ::=     line ("\n" line)*
     line        ::=     statement? comment?
     statement   ::=     equation | var_decl | markov | mutual
     comment     ::=     r"#.*"
@@ -27,11 +28,9 @@ For example:
     3 X + 4Y = 0
       X + 2  >= 4*Y
 
-The parser can be invoked using the ``parse_file`` or ``parse_files``
-functions. The results of multiple invocations can be combined using the
-``merge_parse_results`` function. The final parse result can then be converted
-to a numpy array and a list of column names using the ``to_numpy_array``
-function.
+The parser can be invoked using the ``parse_text`` or ``parse_files``
+functions. The final parse result can then be converted to a numpy array and
+a list of column names using the ``to_numpy_array`` function.
 """
 
 
@@ -50,9 +49,8 @@ function.
 
 
 __all__ = [
-    'parse_file',
+    'parse_text',
     'parse_files',
-    'merge_parse_results',
     'to_numpy_array',
 ]
 
@@ -70,6 +68,7 @@ __all__ = [
 # - [CON] have to write own Token class
 
 from functools import partial
+from itertools import chain
 
 import numpy as np
 import funcparserlib.lexer as fpll
@@ -88,33 +87,27 @@ def tokenize(text: str) -> [fpll.Token]:
     return [tok for tok in _tokenizer(text) if not trash(tok)]
 
 
-def merge_parse_results(results: [[Vector]]) -> [Vector]:
-    """Combine the results of multiple parser runs."""
-    return [v for vecs in results for v in vecs]
-
-
-def parse_file(lines: [str]) -> [Vector]:
+def parse_text(text: str) -> [Vector]:
     """Parse a system of linear (in-)equalities from one file."""
-    return merge_parse_results(
-        line.parse(tokenize(l)) for l in lines)
+    return document.parse(tokenize(text))
 
 
-def _lines(filename: str) -> [str]:
+def _content(filename: str) -> str:
     """
-    Iterate over all lines in the file. If the parameter is not an existing
-    file name, treat it as the file content itself.
+    Get the file content as a blob of text. If the parameter is not the name
+    of an existing file, treat it as the file content itself.
     """
     try:
         with open(filename) as f:
-            yield from f
+            return f.read()
     except FileNotFoundError:
-        yield from filename.split('\n')
+        return filename
 
 
 def parse_files(files: [str]) -> [Vector]:
     """Concat and parse multiple files/expressions as one system."""
-    return merge_parse_results(
-        parse_file(_lines(f)) for f in files)
+    return parse_text(
+        "\n".join(map(_content, files)))
 
 
 #----------------------------------------
@@ -190,6 +183,11 @@ def returns(result_type: "R -> R'") -> "(P -> R) -> (P -> R')":
     def decorate(func: "P -> R") -> "P -> R'":
         return lambda *args, **kwargs: result_type(func(*args, **kwargs))
     return decorate
+
+
+def flatten(ll: [[any]]) -> [any]:
+    """Flatten a two-level nested list."""
+    return list(chain.from_iterable(ll))
 
 
 #----------------------------------------
@@ -400,8 +398,10 @@ markov      = L('markov') + var_g(3) + conditional  >> make_markov_chain
 mutual      = L('mutual') + var_g(2) + conditional  >> make_mutual_indep
 
 # toplevel
-eof         = skip(many(some('NEWLINE'))) + skip(finished)
-line        = (equation | var_decl | markov | mutual | v([])) + eof
+eol         = skip(some('NEWLINE'))
+eof         = skip(finished)
+line        = equation | var_decl | markov | mutual | v([])
+document    = line + many(eol + line) + eof         >> collapse >> flatten
 
 
 #----------------------------------------
@@ -409,13 +409,13 @@ line        = (equation | var_decl | markov | mutual | v([])) + eof
 #----------------------------------------
 
 if __name__ == '__main__':
-    d = parse_file([
-        'H(X,Y, Z | X,Z) >= 0',
-        'I(X,Y: Z | D) >= 0',
-        'rvar x y',
-        '- hello + 2 x + x ≤ world+ 3',
-        '- x + x + x >= 2 x + 3',
-    ])
+    d = parse_text("""
+        H(X,Y, Z | X,Z) >= 0
+        I(X,Y: Z | D) >= 0
+        rvar x y
+        - hello + 2 x + x ≤ world+ 3
+        - x + x + x >= 2 x + 3
+    """)
     print(d)
     v, n = to_numpy_array(d)
     print(n)
