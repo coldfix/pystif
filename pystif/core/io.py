@@ -1,6 +1,7 @@
 from functools import partial
 from os import path
 import sys
+import re
 
 import numpy as np
 
@@ -9,9 +10,15 @@ from .lp import Problem
 from .util import VectorMemory
 
 
-# TODO: sort only on entropies/probabilities
 def _name(key):
-    return "".join(sorted(key))
+    _setfunc = lambda name, args: name + '(' + ','.join(sorted(args)) + ')'
+    if isinstance(key, set):
+        return _setfunc('H', key)
+    if key.startswith('H(') and key.endswith(')'):
+        return _setfunc('H', set(re.split('[ ,]', key[2:-1])))
+    if key.startswith('_') and key != '_':
+        return _setfunc('H', set(key[1:]))
+    return key
 
 
 def detect_prefix(s, prefix, on_prefix):
@@ -260,7 +267,7 @@ def default_column_labels(dim):
 
 
 def _column_label(index, varnames="ABCDEFGHIJKLMNOPQRSTUVWXYZ"):
-    return _name(varnames[i] for i in get_bits(index))
+    return _name({varnames[i] for i in get_bits(index)})
 
 
 def column_varname_labels(varnames):

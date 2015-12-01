@@ -12,7 +12,7 @@ data=$here/data
 # create system of elemental inequalities:
 makesys "rvar A a B b" -o init.txt
 
-subs="AB Ab aB ab A a B b"
+subs="_AB _Ab _aB _ab _A _a _B _b"
 symm="Aa <> aA; AaBb <> BbAa"
 
 # use different elimination methods:
