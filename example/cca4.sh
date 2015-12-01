@@ -9,18 +9,9 @@ set -x
 here=$(dirname $BASH_SOURCE)
 data=$here/data
 
-# create system of elemental inequalities and specify some
-# structural consraints manually:
-makesys -e -v "a b c d A B C D" -o raw.txt \
-    "A+B+C+D - ABCD = 0" \
-    "aAB + bcdABCD - AB - abcdABCD = 0" \
-    "bBC + acdABCD - BC - abcdABCD = 0" \
-    "cCD + abdABCD - CD - abcdABCD = 0" \
-    "dAD + abcABCD - AD - abcdABCD = 0" \
-
 # DISABLED FOR TEST PERFORMANCE:
 # minimize the initial system:
-# time minimize raw.txt -o min.txt
+# time minimize cca4.txt -o min.txt
 cp $data/init-4-1.txt min.txt
 
 # use different elimination methods:

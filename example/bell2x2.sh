@@ -10,7 +10,7 @@ here=$(dirname $BASH_SOURCE)
 data=$here/data
 
 # create system of elemental inequalities:
-makesys -e -v "A a B b" -o init.txt
+makesys "rvar A a B b" -o init.txt
 
 subs="AB Ab aB ab A a B b"
 symm="Aa <> aA; AaBb <> BbAa"

@@ -70,7 +70,7 @@ inequalities in a bipartite bell scenario:
 
 .. code-block::
 
-    makesys -v 4 -e -o full.txt
+    makesys "rvar A B C D" -o full.txt
     chm full.txt -o small.txt -l1 -s "AC BC AD BD A B C D"
     pretty small.txt -y "AB <> BA; ABCD <> CDAB"
 

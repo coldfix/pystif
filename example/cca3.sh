@@ -9,16 +9,8 @@ set -x
 here=$(dirname $BASH_SOURCE)
 data=$here/data
 
-# create system of elemental inequalities and specify some
-# structural consraints manually:
-makesys -e -v 6 -o raw.txt \
-    "D+E+F - DEF <= 0" \
-    "ADE + BCDEF - DE - ABCDEF = 0" \
-    "BEF + ACDEF - EF - ABCDEF = 0" \
-    "CDF + ABDEF - DF - ABCDEF = 0"
-
 # minimize the initial system:
-time minimize raw.txt -o min.txt
+time minimize $here/cca3.txt -o min.txt
 
 # use different elimination methods:
 time chm min.txt -s 8 -o fin-chm.txt
@@ -27,7 +19,7 @@ time afi min.txt -s 8 -o fin-afi.txt -q -r1
 time afi min.txt -s 8 -o fin-sym.txt -q -r1 -y "ABCDEF <> BCAEFD"
 
 # consistency check
-equiv min.txt raw.txt
+equiv min.txt $here/cca3.txt
 equiv min.txt $data/init-3-1.txt
 
 equiv fin-chm.txt $data/final-3-1.txt

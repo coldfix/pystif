@@ -38,8 +38,8 @@ def read_system_from_file(file):
     try:
         return read_table_from_file(lines)
     except ValueError:
-        from .parse import parse_file, to_numpy_array
-        return to_numpy_array(parse_file(lines))
+        from .parse import parse_text
+        return parse_text("\n".join(lines))
 
 
 def read_table_from_file(file, *, ndmin=2):
