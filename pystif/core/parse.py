@@ -5,7 +5,7 @@ The input file grammar looks somewhat like this:
 
     document    ::=     line ("\n"+ line)*
     line        ::=     statement? comment?
-    statement   ::=     equation | var_decl | markov | mutual
+    statement   ::=     equation | var_decl | mutual | markov
     comment     ::=     r"#.*"
 
     equation    ::=     expression relation expression
@@ -13,8 +13,8 @@ The input file grammar looks somewhat like this:
     expression  ::=     sign? term (sign term)*
     term        ::=     (number "*"?)? symbol | number
 
-    markov      ::=     "markov" var_list (":" var_list){2+}  ("|" var_list)?
     mutual      ::=     "mutual" var_list (":" var_list)+     ("|" var_list)?
+    markov      ::=     "markov" var_list (":" var_list){2+}  ("|" var_list)?
 
     var_decl    ::=     "rvar" var_list
     var_list    ::=     (identifier ","?)*
@@ -44,6 +44,7 @@ functions.
 # - complement operator for var lists '~'
 # - unit tests for this module
 # - more doc strings
+# - q-space, positivities
 #
 # - keep input statements as comments for *makesys*
 # - recognize and output "rvar" statement for *pretty*
@@ -80,36 +81,29 @@ from .it import elemental_inequalities
 from .vector import Vector, _name
 
 
-class Statement:
-
-    """
-    Statements (a.k.a. definitions/commands) are the building blocks of the
-    parser output. Each statement can define a bunch of properties that must
-    be part of the output system.
-    """
-
-    def columns(self) -> [str]:
-        """Return list of columns required/defined by this statement."""
-        return ()
-
-    def constraints(self, col_idx: {str: int}) -> np.array:
-        """Return constraint matrix defined by this statement."""
-        return np.empty((0, len(col_idx)))
-
-
-def tokenize(text: str) -> [fpll.Token]:
-    """Break an input string into a list of tokens accepted by the parser."""
-    trash = tt('COMMENT', 'WS')
-    return [tok for tok in _tokenizer(text) if not trash(tok)]
-
+#----------------------------------------
+# public API
+#----------------------------------------
 
 ParseResult = (np.array, [str])     # (constraint matrix, column names)
 
 
 def parse_text(text: str) -> ParseResult:
     """Parse a system of linear (in-)equalities from one file."""
-    return _parse_result(document.parse(tokenize(text)))
+    return accumulate_parse_results(document.parse(tokenize(text)))
 
+
+def parse_files(files: [str]) -> ParseResult:
+    """Concat and parse multiple files/expressions as one system."""
+    return parse_text(
+        "\n".join(map(_content, files)))
+
+
+#----------------------------------------
+# Utility functions
+#----------------------------------------
+
+# io
 
 def _content(filename: str) -> str:
     """
@@ -122,43 +116,6 @@ def _content(filename: str) -> str:
     except FileNotFoundError:
         return filename
 
-
-def parse_files(files: [str]) -> ParseResult:
-    """Concat and parse multiple files/expressions as one system."""
-    return parse_text(
-        "\n".join(map(_content, files)))
-
-
-#----------------------------------------
-# Finalization of parse results
-#----------------------------------------
-
-def create_index(l: [str]) -> {str: int}:
-    """Create an index of the list items' indices."""
-    return {v: i for i, v in enumerate(l)}
-
-
-def list_from_index(idx: {str: int}) -> [str]:
-    """Inverse of the create_index() function."""
-    return sorted(idx, key=lambda k: idx[k])
-
-
-def _parse_result(statements: [Statement]) -> ParseResult:
-    """
-    Further transform parser output to numpy array, also return list of column
-    names in order.
-    """
-    col_idx = {}
-    for stmt in statements:
-        for col in stmt.columns():
-            col_idx.setdefault(_name(col), len(col_idx))
-    result = np.vstack(stmt.constraints(col_idx) for stmt in statements)
-    return result, list_from_index(col_idx)
-
-
-#----------------------------------------
-# Utility functions
-#----------------------------------------
 
 # functools
 
@@ -188,9 +145,19 @@ def unslice(slice: np.array, indices: [int], num_cols: int) -> np.array:
     return res
 
 
-#----------------------------------------
-# Parser internals
-#----------------------------------------
+# misc
+
+def create_index(l: [str]) -> {str: int}:
+    """Create an index of the list items' indices."""
+    return {v: i for i, v in enumerate(l)}
+
+
+def list_from_index(idx: {str: int}) -> [str]:
+    """Inverse of the create_index() function."""
+    return sorted(idx, key=lambda k: idx[k])
+
+
+# parser utils
 
 def many(p, min=0):
     if min == 0:
@@ -211,7 +178,7 @@ def const(value):
     return lambda tok: value
 
 
-def literal(text):
+def literal(text: str) -> "Parser":
     """
     Matches any text that will produce the same series of filtered tokens as
     the given text, i.e. the text plus optional whitespaces between tokens.
@@ -220,56 +187,50 @@ def literal(text):
     return sum(tokens, next(tokens)) >> const(text)
 
 
-def tt(*token_type):
+def tt(*token_type: [str]) -> "Token -> bool":
     return lambda t: t.type in token_type
 
 
-def some(*token_type):
+def some(*token_type: [str]) -> "Parser":
     return fplp.some(tt(*token_type))
 
 
-#----------------------------------------
-# transformation functions for result
-#----------------------------------------
-
-def to_number(s):
-    try:
-        return int(s)
-    except ValueError:
-        return float(s)
-
-
-def make_expr(expr):
-    return sum(expr, Vector())
-
-
-def collapse(items):
+def collapse(items: (any, [any])) -> [any]:
     return [items[0]] + items[1]
 
 
-class SimpleConstraintList(Statement):
+#----------------------------------------
+# Parse results
+#----------------------------------------
 
-    def __init__(self, rows: [Vector]):
-        self.rows = list(rows)
+class Statement:
 
-    def columns(self):
-        return flatten(self.rows)
+    """
+    Statements (a.k.a. definitions/commands) are the building blocks of the
+    parser output. Each statement can define a bunch of properties that must
+    be part of the output system.
+    """
 
-    def constraints(self, col_idx):
-        res = np.zeros((len(self.rows), len(col_idx)))
-        for i, r in enumerate(self.rows):
-            for k, v in r.items():
-                res[i][col_idx[k]] = v
-        return res
+    def columns(self) -> [str]:
+        """Return list of columns required/defined by this statement."""
+        return ()
+
+    def constraints(self, col_idx: {str: int}) -> np.array:
+        """Return constraint matrix defined by this statement."""
+        return np.empty((0, len(col_idx)))
 
 
-@returns(SimpleConstraintList)
-def Constraint(lhs, rel, rhs):
-    if rel == '>=' or rel == '≥':
-        return [lhs - rhs]
-    if rel == '<=' or rel == '≤':
-        return [rhs - lhs]
-    return [lhs - rhs, rhs - lhs]
+def accumulate_parse_results(statements: [Statement]) -> ParseResult:
+    """
+    Further transform parser output to numpy array, also return list of column
+    names in order.
+    """
+    col_idx = {}
+    for stmt in statements:
+        for col in stmt.columns():
+            col_idx.setdefault(_name(col), len(col_idx))
+    result = np.vstack(stmt.constraints(col_idx) for stmt in statements)
+    return result, list_from_index(col_idx)
 
 
 class VarDecl(Statement):
@@ -293,21 +254,102 @@ class VarDecl(Statement):
                        len(col_idx))
 
 
+class ConstraintList(Statement):
+
+    """
+    A list of any sort of constraints.
+
+    Automatically reports required columns.
+    """
+
+    def __init__(self, rows: [Vector]):
+        self.rows = list(rows)
+
+    def columns(self):
+        return flatten(self.rows)
+
+    def constraints(self, col_idx):
+        res = np.zeros((len(self.rows), len(col_idx)))
+        for i, r in enumerate(self.rows):
+            for k, v in r.items():
+                res[i][col_idx[k]] = v
+        return res
+
+
+@returns(ConstraintList)
+def Constraint(lhs: Vector, rel: str, rhs: Vector):
+    """A single inequality or equality constraint."""
+    if rel == '>=' or rel == '≥':
+        return [lhs - rhs]
+    if rel == '<=' or rel == '≤':
+        return [rhs - lhs]
+    return [lhs - rhs, rhs - lhs]
+
+
+VarSet = {str}
+
+
+def MutualIndep(parts: [VarSet], cond: VarSet) -> Statement:
+    """
+    Output a constraint list representing the conditional mutual independence
+
+        part[0] ⟂ part[1] ⟂ … | cond
+    """
+    # The implementation formulates the independence as:
+    # H(a,b,c,…|z) = H(a|z) + H(b|z) + H(c|z) + …
+    lhs = [(set.union(cond, *parts), 1)]
+    rhs = [(set.union(cond, part), 1) for part in parts]
+    if cond:
+        lhs += [(cond, -1)]
+        rhs += [(cond, -len(parts))]
+    return Constraint(Vector(lhs), '=', Vector(rhs))
+
+
+@returns(ConstraintList)
+def MarkovChain(parts: [VarSet], cond: VarSet) -> Statement:
+    """
+    Output a constraint matrix representing the Markov chain
+
+        part[0] → part[1] → part[2] → … | cond
+    """
+    # Implementation is based on (ITNC, Proposition 2.8):
+    # A → B → C → D → E → …
+    #   ⇔   A → B → C       &&
+    #       A,B → C → D     &&
+    #       A,B,C → D → E   && …
+    # where each Markov chain (A → B → C) is equivalent to (A ⟂ C | B).
+    A = set()
+    for a, b, c in zip(parts[:-2], parts[1:-1], parts[2:]):
+        A |= a
+        yield from MutualIndep(([A, c], b|cond)).rows
+
+
+#----------------------------------------
+# subparser results
+#----------------------------------------
+
+def to_number(s: str):
+    try:
+        return int(s)
+    except ValueError:
+        return float(s)
+
+
 @stararg
-def scale_vector(coef, vector):
+def scale_vector(coef: float, vector: Vector):
     return vector * coef
 
 
-def make_variable(varname):
+def make_variable(varname: str):
     return Vector({varname: 1})
 
 
-def make_constant(num):
+def make_constant(num: float):
     return Vector({'_': num})
 
 
 @stararg
-def make_entropy(core, cond):
+def make_entropy(core: VarSet, cond: VarSet):
     return Vector((
         (core|cond, 1),
         (cond, -1),
@@ -316,7 +358,7 @@ def make_entropy(core, cond):
 
 @stararg
 @returns(Vector)
-def make_mut_inf(parts: "[VarList]", cond: "VarList") -> Vector:
+def make_mut_inf(parts: [VarSet], cond: VarSet) -> Vector:
     """
     Return the Multivariate Mutual Information vector for I(*parts|cond).
     """
@@ -346,26 +388,12 @@ def make_mut_inf(parts: "[VarList]", cond: "VarList") -> Vector:
         yield (cond, -1)
 
 
-@returns(SimpleConstraintList)
-def MarkovChain(parts: "[VarList]", cond: "VarList") -> Statement:
-    A = set()
-    for a, b, c in zip(parts[:-2], parts[1:-1], parts[2:]):
-        A |= a
-        yield from MutualIndep(([A, c], b|cond)).rows
-
-
-def MutualIndep(parts: "[VarList]", cond: "VarList") -> Statement:
-    # H(a,b,c,…|z) = H(a|z) + H(b|z) + H(c|z) + …
-    lhs = [(set.union(cond, *parts), 1)]
-    rhs = [(set.union(cond, part), 1) for part in parts]
-    if cond:
-        lhs += [(cond, -1)]
-        rhs += [(cond, -len(parts))]
-    return Constraint(Vector(lhs), '=', Vector(rhs))
+def make_expr(expr: [Vector]):
+    return sum(expr, Vector())
 
 
 #----------------------------------------
-# lexer/parser implementation
+# lexer definition
 #----------------------------------------
 
 _tokenizer = fpll.make_tokenizer([
@@ -377,9 +405,16 @@ _tokenizer = fpll.make_tokenizer([
     ('OP',          (r'[<=>]=|[-+*,:;()≤=≥|]',)),
 ])
 
-# TODO:
-# - variable:   information_measure | identifier
-# - line:       equation | elemental inequalities | positivities | q space
+
+def tokenize(text: str) -> [fpll.Token]:
+    """Break an input string into a list of tokens accepted by the parser."""
+    trash = tt('COMMENT', 'WS')
+    return [tok for tok in _tokenizer(text) if not trash(tok)]
+
+
+#----------------------------------------
+# parser definitions
+#----------------------------------------
 
 v = pure
 X = partial(exact, 'OP')
@@ -418,14 +453,14 @@ equation    = expression + relation + expression    >> stararg(Constraint)
 
 # commands
 var_decl    = L('rvar') + var_list                  >> VarDecl
-markov      = L('markov') + var_g(3) + conditional  >> stararg(MarkovChain)
 mutual      = L('mutual') + var_g(2) + conditional  >> stararg(MutualIndep)
+markov      = L('markov') + var_g(3) + conditional  >> stararg(MarkovChain)
 empty       = v(Statement())
 
 # toplevel
 eol         = skip(many(some('NEWLINE'), 1))
 eof         = skip(finished)
-line        = equation | var_decl | markov | mutual | empty
+line        = equation | var_decl | mutual | markov | empty
 document    = line + many(eol + line) + eof         >> collapse
 
 
