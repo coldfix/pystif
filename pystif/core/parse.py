@@ -13,8 +13,8 @@ The input file grammar looks somewhat like this:
     expression  ::=     sign? term (sign term)*
     term        ::=     (number "*"?)? symbol | number
 
-    mutual      ::=     "mutual" var_list (":" var_list)+     ("|" var_list)?
-    markov      ::=     "markov" var_list (":" var_list){2+}  ("|" var_list)?
+    mutual      ::=     var_list ("::" var_list)+    ("|" var_list)?
+    markov      ::=     var_list ("->" var_list){2+} ("|" var_list)?
 
     var_decl    ::=     "rvar" var_list
     var_list    ::=     (identifier ","?)*
@@ -402,7 +402,7 @@ _tokenizer = fpll.make_tokenizer([
     ('WS',          (r'[ \t]+',)),
     ('NAME',        (r'[a-zA-Z_]\w*',)),
     ('NUMBER',      (r'[-+]?\d+(\.\d+)?([eE][+\-]?\d+)?',)),
-    ('OP',          (r'[<=>]=|[-+*,:;()≤=≥|]',)),
+    ('OP',          (r'[<=>]=|->|[-+*,:;()≤=≥|]',)),
 ])
 
 
@@ -429,11 +429,11 @@ identifier  = some('NAME')                          >> tokval
 variable    = identifier                            >> make_variable
 colon       = L(':') | L(';')
 
-def var_g(n):
+def var_g(n, sep=colon):
     # n: minimum number of parts
     if n == 0:
         return var_g(1) | v([])
-    return var_list + many(colon + var_list, n-1)   >> collapse
+    return var_list + many(sep + var_list, n-1)   >> collapse
 
 # information measures
 var_list    = many(identifier + Lo(','))            >> set
@@ -453,8 +453,8 @@ equation    = expression + relation + expression    >> stararg(Constraint)
 
 # commands
 var_decl    = L('rvar') + var_list                  >> VarDecl
-mutual      = L('mutual') + var_g(2) + conditional  >> stararg(MutualIndep)
-markov      = L('markov') + var_g(3) + conditional  >> stararg(MarkovChain)
+mutual      = var_g(2, L('::')) + conditional       >> stararg(MutualIndep)
+markov      = var_g(3, L('->')) + conditional       >> stararg(MarkovChain)
 empty       = v(Statement())
 
 # toplevel
