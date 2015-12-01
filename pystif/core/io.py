@@ -9,6 +9,11 @@ from .lp import Problem
 from .util import VectorMemory
 
 
+# TODO: sort only on entropies/probabilities
+def _name(key):
+    return "".join(sorted(key))
+
+
 def detect_prefix(s, prefix, on_prefix):
     """
     Check whether ``s`` starts with ``prefix``. If so, call ``on_prefix`` with
@@ -42,8 +47,10 @@ def read_table_from_file(file, *, ndmin=2):
     contents = remove_comments(file, comments.append)
     matrix = np.loadtxt(contents, ndmin=ndmin)
     cols = []
+    def add_cols(s):
+        cols.extend(map(_name, s.split()))
     for line in comments:
-        detect_prefix(line.strip(), '::', lambda s: cols.extend(s.split()))
+        detect_prefix(line.strip(), '::', add_cols)
     return matrix, cols or None
 
 
@@ -137,6 +144,7 @@ class System:
         try:
             return int(col)
         except ValueError:
+            col = _name(col)
             return self.columns.index(col)
 
     def lp(self):
@@ -252,7 +260,7 @@ def default_column_labels(dim):
 
 
 def _column_label(index, varnames="ABCDEFGHIJKLMNOPQRSTUVWXYZ"):
-    return "".join(varnames[i] for i in get_bits(index))
+    return _name(varnames[i] for i in get_bits(index))
 
 
 def column_varname_labels(varnames):

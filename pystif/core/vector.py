@@ -4,6 +4,8 @@ A simple vector class for representing sparse vectors on a dynamic domain.
 
 from collections import abc
 
+from .io import _name
+
 
 __all__ = [
     'Vector'
@@ -14,10 +16,6 @@ def _items(of):
     if isinstance(of, abc.Mapping):
         return of.items()
     return of
-
-
-def _name(key):
-    return "".join(sorted(key))
 
 
 class Vector(abc.MutableMapping):
