@@ -29,8 +29,7 @@ For example:
       X + 2  >= 4*Y
 
 The parser can be invoked using the ``parse_text`` or ``parse_files``
-functions. The final parse result can then be converted to a numpy array and
-a list of column names using the ``to_numpy_array`` function.
+functions.
 """
 
 
@@ -53,7 +52,6 @@ a list of column names using the ``to_numpy_array`` function.
 __all__ = [
     'parse_text',
     'parse_files',
-    'to_numpy_array',
 ]
 
 # pyparsing:
@@ -105,9 +103,12 @@ def tokenize(text: str) -> [fpll.Token]:
     return [tok for tok in _tokenizer(text) if not trash(tok)]
 
 
-def parse_text(text: str) -> [Statement]:
+ParseResult = (np.array, [str])     # (constraint matrix, column names)
+
+
+def parse_text(text: str) -> ParseResult:
     """Parse a system of linear (in-)equalities from one file."""
-    return document.parse(tokenize(text))
+    return _parse_result(document.parse(tokenize(text)))
 
 
 def _content(filename: str) -> str:
@@ -122,7 +123,7 @@ def _content(filename: str) -> str:
         return filename
 
 
-def parse_files(files: [str]) -> [Statement]:
+def parse_files(files: [str]) -> ParseResult:
     """Concat and parse multiple files/expressions as one system."""
     return parse_text(
         "\n".join(map(_content, files)))
@@ -142,7 +143,7 @@ def list_from_index(idx: {str: int}) -> [str]:
     return sorted(idx, key=lambda k: idx[k])
 
 
-def to_numpy_array(parse_result: [Statement]) -> (np.array, [str]):
+def _parse_result(statements: [Statement]) -> ParseResult:
     """
     Further transform parser output to numpy array, also return list of column
     names in order.
@@ -426,14 +427,10 @@ document    = line + many(eol + line) + eof         >> collapse
 #----------------------------------------
 
 if __name__ == '__main__':
-    d = parse_text("""
-        H(X,Y, Z | X,Z) >= 0
-        I(X,Y: Z | D) >= 0
-        rvar x y
-        - hello + 2 x + x ≤ world+ 3
-        - x + x + x >= 2 x + 3
+    v, n = parse_text("""
+        rvar X Y Z
+        2 H(X,Y, Z | X,Z) >= 0
+        3 * I(X,Y: Z | X) >= 0
     """)
-    print(d)
-    v, n = to_numpy_array(d)
     print(n)
     print(v)

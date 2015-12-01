@@ -39,7 +39,7 @@ from .core.it import elemental_inequalities, num_vars, bits_to_num
 from .core.io import (System, SystemFile, _name_list, get_bits, supersets,
                       default_column_labels, column_varname_labels)
 
-from .core.parse import parse_files, to_numpy_array
+from .core.parse import parse_files
 
 
 def p_to_q(p_vec):
@@ -78,7 +78,7 @@ def main(args=None):
     else:
         colnames = []
 
-    equations, colnames = to_numpy_array(parse_files(opts['INEQ']), colnames)
+    equations, colnames = parse_files(opts['INEQ']), colnames
 
     dim = len(colnames)
     if opts['--elem-ineqs']:
