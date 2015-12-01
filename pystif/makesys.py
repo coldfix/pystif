@@ -1,22 +1,18 @@
 """
-Output elemental inequalities for given number of variables.
+Convert a system of linear constraints from human readable expressions to a
+simple matrix format compatible with ``numpy.loadtxt``.
 
 Usage:
-    makesys -c COLS [-o FILE] INEQ...
-    makesys -v VARS [-o FILE] INEQ...
-    makesys -v VARS [-o FILE] [INEQ...] -b
-    makesys -v VARS [-o FILE] [INEQ...] -e
+    makesys [-o OUTPUT] INPUT...
+    makesys [-o OUTPUT] -b VARS
 
 Options:
     -o OUTPUT, --output OUTPUT      Write inequalities to this file
-    -a, --append                    Append to output file
-    -c COLS, --cols COLS            Set column names or count
-    -v VARS, --vars VARS            Set variable names or count
-    -e, --elem-ineqs                Add elemental inequalities
-    -b, --bell                      Create a bell polytope
+    -b VARS, --bell VARS            Output bell polytope in Q space
 
-This will output a matrix of inequalities for NUM_VARS random variables. Each
-row ``q`` corresponds to one inequality
+The positional arguments can either be filenames or valid input expressions.
+
+Each row ``q`` of the output matrix corresponds to one inequality
 
     q∙x ≥ 0.
 
@@ -28,18 +24,24 @@ and so on, i.e. the bit representation of the column index corresponds to the
 subset of variables. The zero-th column will always be zero.
 """
 
-import re
-import sys
-from os import path
-
 from docopt import docopt
+
 import numpy as np
 
-from .core.it import elemental_inequalities, num_vars, bits_to_num
-from .core.io import (System, SystemFile, _name_list, get_bits, supersets,
-                      default_column_labels, column_varname_labels)
-
+from .core.io import SystemFile, _name_list, get_bits, supersets
+from .core.it import num_vars, bits_to_num
 from .core.parse import parse_files
+
+
+def _column_label(index, varnames="ABCDEFGHIJKLMNOPQRSTUVWXYZ"):
+    return "".join(varnames[i] for i in get_bits(index))
+
+
+def column_varname_labels(varnames):
+    if isinstance(varnames, int):
+        varnames = [chr(ord('A') + i) for i in range(varnames)]
+    dim = 2**len(varnames)
+    return ['_'] + [_column_label(i, varnames) for i in range(1, dim)]
 
 
 def p_to_q(p_vec):
@@ -61,35 +63,21 @@ def positivity(dim):
         yield x
 
 
-def vstack(a, b):
-    return np.vstack((a, list(b)))
-
-
 def main(args=None):
     opts = docopt(__doc__, args)
 
-    if opts['--cols']:
-        colnames = _name_list(opts['--cols'])
-        if isinstance(colnames, int):
-            colnames = default_column_labels(colnames)
-    elif opts['--vars']:
-        varnames = _name_list(opts['--vars'])
+    if opts['--bell']:
+        varnames = _name_list(opts['--bell'])
         colnames = column_varname_labels(varnames)
+        dim = len(colnames)
+        equations = np.vstack(map(p_to_q, positivity(dim)))
+
     else:
-        colnames = []
-
-    equations, colnames = parse_files(opts['INEQ']), colnames
-
-    dim = len(colnames)
-    if opts['--elem-ineqs']:
-        equations = vstack(equations, elemental_inequalities(num_vars(dim)))
-    elif opts['--bell']:
-        equations = vstack(equations, map(p_to_q, positivity(dim)))
-        # TODO: also normalization
+        equations, colnames = parse_files(opts['INPUT'])
 
     output = SystemFile(opts['--output'], columns=colnames)
     for e in equations:
-        output(np.hstack((e, np.zeros(dim-len(e)))))
+        output(e)
 
 
 if __name__ == '__main__':
