@@ -35,6 +35,8 @@ a list of column names using the ``to_numpy_array`` function.
 
 
 # TODO:
+# - support multi-char variables‽
+# - raise exception for multi-char variables
 # - explicit column aliases ("alias" statement)
 # - implicit column aliases (when defining information inequalities)
 # - "symmetry" statement
@@ -77,8 +79,24 @@ from funcparserlib.parser import maybe, skip, finished, pure
 
 from .io import column_varname_labels
 from .it import elemental_inequalities
+from .vector import Vector, _name
 
-from .vector import Vector
+
+class Statement:
+
+    """
+    Statements (a.k.a. definitions/commands) are the building blocks of the
+    parser output. Each statement can define a bunch of properties that must
+    be part of the output system.
+    """
+
+    def columns(self) -> [str]:
+        """Return list of columns required/defined by this statement."""
+        return ()
+
+    def constraints(self, col_idx: {str: int}) -> np.array:
+        """Return constraint matrix defined by this statement."""
+        return np.empty((0, len(col_idx)))
 
 
 def tokenize(text: str) -> [fpll.Token]:
@@ -87,7 +105,7 @@ def tokenize(text: str) -> [fpll.Token]:
     return [tok for tok in _tokenizer(text) if not trash(tok)]
 
 
-def parse_text(text: str) -> [Vector]:
+def parse_text(text: str) -> [Statement]:
     """Parse a system of linear (in-)equalities from one file."""
     return document.parse(tokenize(text))
 
@@ -104,7 +122,7 @@ def _content(filename: str) -> str:
         return filename
 
 
-def parse_files(files: [str]) -> [Vector]:
+def parse_files(files: [str]) -> [Statement]:
     """Concat and parse multiple files/expressions as one system."""
     return parse_text(
         "\n".join(map(_content, files)))
@@ -119,54 +137,22 @@ def create_index(l: list) -> dict:
     return {v: i for i, v in enumerate(l)}
 
 
-class AutoInsert:
-
-    """Autovivification for column names."""
-
-    def __init__(self, cols):
-        self._cols = cols
-        self._idx = create_index(cols)
-
-    def __len__(self):
-        return len(self._cols)
-
-    def __getitem__(self, key):
-        try:
-            return self._idx[key]
-        except KeyError:
-            self._cols.append(key)
-            self._idx[key] = index = len(self._cols) - 1
-            return index
+def list_from_index(idx: {str: int}) -> [str]:
+    """Inverse of the create_index() function."""
+    return sorted(idx, key=lambda k: idx[k])
 
 
-def to_numpy_array(parse_result: [Vector], col_names=['_']) -> (np.array, [str]):
+def to_numpy_array(parse_result: [Statement]) -> (np.array, [str]):
     """
     Further transform parser output to numpy array, also return list of column
     names in order.
     """
-    col_idx = AutoInsert(list(col_names))
-    indexed = [[(col_idx[name], coef)
-                for name, coef in vector.items()]
-               for vector in parse_result]
-    result = np.zeros((len(indexed), len(col_idx)))
-    for row, terms in enumerate(indexed):
-        for idx, coef in terms:
-            result[row][idx] += coef
-    return result, col_idx._cols
-
-
-def to_parse_inequality(numpy_vector: np.array, colnames: [str]) -> Vector:
-    """Convert a numpy vector to a parse Vector."""
-    return Vector(
-        (colnames[idx], coef)
-        for idx, coef in enumerate(numpy_vector)
-        if coef != 0
-    )
-
-
-def to_parse_result(vectors: np.array, colnames: [str]) -> [Vector]:
-    """Back-transform a numpy matrix to a parse result."""
-    return [to_parse_inequality(v, colnames) for v in vectors]
+    col_idx = {}
+    for stmt in statements:
+        for col in stmt.columns():
+            col_idx.setdefault(_name(col), len(col_idx))
+    result = np.vstack(stmt.constraints(col_idx) for stmt in statements)
+    return result, list_from_index(col_idx)
 
 
 #----------------------------------------
@@ -188,6 +174,13 @@ def returns(result_type: "R -> R'") -> "(P -> R) -> (P -> R')":
 def flatten(ll: [[any]]) -> [any]:
     """Flatten a two-level nested list."""
     return list(chain.from_iterable(ll))
+
+
+def unslice(slice: np.array, indices: [int], num_cols: int) -> np.array:
+    slice = np.asarray(slice)
+    res = np.zeros((slice.shape[0], num_cols))
+    res[:,indices] = slice
+    return res
 
 
 #----------------------------------------
@@ -249,8 +242,24 @@ def collapse(items):
     return [items[0]] + items[1]
 
 
-@stararg
-def make_equation(lhs, rel, rhs):
+class SimpleConstraintList(Statement):
+
+    def __init__(self, rows: [Vector]):
+        self.rows = list(rows)
+
+    def columns(self):
+        return flatten(self.rows)
+
+    def constraints(self, col_idx):
+        res = np.zeros((len(self.rows), len(col_idx)))
+        for i, r in enumerate(self.rows):
+            for k, v in r.items():
+                res[i][col_idx[k]] = v
+        return res
+
+
+@returns(SimpleConstraintList)
+def Constraint(lhs, rel, rhs):
     if rel == '>=' or rel == '≥':
         return [lhs - rhs]
     if rel == '<=' or rel == '≤':
@@ -258,16 +267,25 @@ def make_equation(lhs, rel, rhs):
     return [lhs - rhs, rhs - lhs]
 
 
-def make_random_vars(varnames: [str]) -> [Vector]:
+class VarDecl(Statement):
+
     """
     Iterate all elemental inequalities for the given variables.
 
     An inequality is represented as a list of pairs (name, coef).
     """
-    varnames = sorted(varnames)
-    colnames = column_varname_labels(varnames)
-    num_vars = len(varnames)
-    return to_parse_result(elemental_inequalities(num_vars), colnames)
+
+    def __init__(self, varnames: [str]):
+        self.varnames = sorted(varnames)
+        self.num_vars = len(varnames)
+
+    def columns(self):
+        return column_varname_labels(self.varnames)
+
+    def constraints(self, col_idx):
+        return unslice(list(elemental_inequalities(self.num_vars)),
+                       [col_idx[c] for c in self.columns()],
+                       len(col_idx))
 
 
 @stararg
@@ -320,24 +338,22 @@ def make_mut_inf(parts: "[VarList]", cond: "VarList") -> Vector:
         yield (cond, -1)
 
 
-@stararg
-@returns(list)
-def make_markov_chain(parts, cond):
+@returns(SimpleConstraintList)
+def MarkovChain(parts: "[VarList]", cond: "VarList") -> Statement:
     A = set()
     for a, b, c in zip(parts[:-2], parts[1:-1], parts[2:]):
         A |= a
-        yield from make_mutual_indep(([A, c], b|cond))
+        yield from MutualIndep(([A, c], b|cond)).rows
 
 
-@stararg
-def make_mutual_indep(parts, cond):
+def MutualIndep(parts: "[VarList]", cond: "VarList") -> Statement:
     # H(a,b,c,…|z) = H(a|z) + H(b|z) + H(c|z) + …
     lhs = [(set.union(cond, *parts), 1)]
     rhs = [(set.union(cond, part), 1) for part in parts]
     if cond:
         lhs += [(cond, -1)]
         rhs += [(cond, -len(parts))]
-    return make_equation((Vector(lhs), '=', Vector(rhs)))
+    return Constraint(Vector(lhs), '=', Vector(rhs))
 
 
 #----------------------------------------
@@ -390,18 +406,19 @@ term        = var_term | constant
 f_term      = (sign | v(+1)) + term                 >> scale_vector
 s_term      = sign + term                           >> scale_vector
 expression  = f_term + many(s_term)                 >> collapse >> make_expr
-equation    = expression + relation + expression    >> make_equation
+equation    = expression + relation + expression    >> stararg(Constraint)
 
 # commands
-var_decl    = L('rvar') + var_list                  >> make_random_vars
-markov      = L('markov') + var_g(3) + conditional  >> make_markov_chain
-mutual      = L('mutual') + var_g(2) + conditional  >> make_mutual_indep
+var_decl    = L('rvar') + var_list                  >> VarDecl
+markov      = L('markov') + var_g(3) + conditional  >> stararg(MarkovChain)
+mutual      = L('mutual') + var_g(2) + conditional  >> stararg(MutualIndep)
+empty       = v(Statement())
 
 # toplevel
 eol         = skip(some('NEWLINE'))
 eof         = skip(finished)
-line        = equation | var_decl | markov | mutual | v([])
-document    = line + many(eol + line) + eof         >> collapse >> flatten
+line        = equation | var_decl | markov | mutual | empty
+document    = line + many(eol + line) + eof         >> collapse
 
 
 #----------------------------------------
