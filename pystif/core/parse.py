@@ -133,7 +133,7 @@ def parse_files(files: [str]) -> ParseResult:
 # Finalization of parse results
 #----------------------------------------
 
-def create_index(l: list) -> dict:
+def create_index(l: [str]) -> {str: int}:
     """Create an index of the list items' indices."""
     return {v: i for i, v in enumerate(l)}
 
@@ -160,6 +160,8 @@ def _parse_result(statements: [Statement]) -> ParseResult:
 # Utility functions
 #----------------------------------------
 
+# functools
+
 def stararg(func: "(P…), -> R") -> "P… -> R":
     """Unpack argument before invoking function."""
     return lambda args: func(*args)
@@ -171,6 +173,8 @@ def returns(result_type: "R -> R'") -> "(P -> R) -> (P -> R')":
         return lambda *args, **kwargs: result_type(func(*args, **kwargs))
     return decorate
 
+
+# array utilities
 
 def flatten(ll: [[any]]) -> [any]:
     """Flatten a two-level nested list."""
@@ -313,6 +317,9 @@ def make_entropy(core, cond):
 @stararg
 @returns(Vector)
 def make_mut_inf(parts: "[VarList]", cond: "VarList") -> Vector:
+    """
+    Return the Multivariate Mutual Information vector for I(*parts|cond).
+    """
     # Multivariate mutual information is recursively defined by
     #
     #          I(a:…:y:z) = I(a:…:y) - I(a:…:y|z)
