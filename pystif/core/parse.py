@@ -3,7 +3,7 @@ Utilities for parsing input files with systems of linear (in-)equalities.
 
 The input file grammar looks somewhat like this:
 
-    document    ::=     line ("\n" line)*
+    document    ::=     line ("\n"+ line)*
     line        ::=     statement? comment?
     statement   ::=     equation | var_decl | markov | mutual
     comment     ::=     r"#.*"
@@ -415,7 +415,7 @@ mutual      = L('mutual') + var_g(2) + conditional  >> stararg(MutualIndep)
 empty       = v(Statement())
 
 # toplevel
-eol         = skip(some('NEWLINE'))
+eol         = skip(many(some('NEWLINE'), 1))
 eof         = skip(finished)
 line        = equation | var_decl | markov | mutual | empty
 document    = line + many(eol + line) + eof         >> collapse
