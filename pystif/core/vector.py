@@ -4,8 +4,6 @@ A simple vector class for representing sparse vectors on a dynamic domain.
 
 from collections import abc
 
-import numpy as np
-
 
 __all__ = [
     'Vector'
@@ -86,10 +84,3 @@ class Vector(abc.MutableMapping):
 
     def __repr__(self):
         return "{}({})".format(self.__class__.__name__, self)
-
-    def as_numpy_array(self, col_idx):
-        """Convert the vector to a numpy array."""
-        r = np.zeros(len(col_idx))
-        for n, c in self.items():
-            r[col_idx[n]] = c
-        return r
