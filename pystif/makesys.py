@@ -45,22 +45,74 @@ def column_varname_labels(varnames):
 
 
 def p_to_q(p_vec):
+    """
+    Transform a probability vector from Q to P parametrization.
+
+    Consider a collection of n probability variables X1,…,Xn that take values
+    in {0, 1}. Any realization of X1,…,Xn can be represented as a bit string
+    of n digits.
+
+    For a subset A ⊂ {1,…,n} we define p and q by
+
+        q(A) = Prob{ (Xi=1 ∀ i in A) }
+        p(A) = Prob{ (Xi=1 ∀ i in A) AND (Xj=0 ∀ i not in A) }
+
+    In words:
+
+        q(A) is the probability that "at least" all the variables indexed by
+        elements of A assume the value 1 – while all the others may be 0 or 1.
+
+        p(A) is the probability that "exactly" all the variables indexed by
+        elements of A assume the value 1 – while all the others must be 0.
+
+    Thus q is related to p by the transformation:
+
+        q(A) = Σ[B ⊃ A] p(B)
+
+    This relation can be inverted with the Möbius inversion forumla to give:
+
+        p(A) = Σ[B ⊃ A] q(B) × (-1)**(|A| + |B|)
+
+    Assuming the input argument is a vector  v = Σ v_A p(A)  the result is
+    computed by substiting above inversion formula for p(A) and collecting
+    terms with same q(B).
+    """
     b_len = num_vars(len(p_vec))
     q_vec = np.zeros(p_vec.shape)
     total = set(range(b_len))
     for i, v in enumerate(p_vec):
         sub = get_bits(i)
         for sup in supersets(sub, total):
-            sign = (-1) ** (len(sub) + len(sup) - b_len)
+            sign = (-1) ** (len(sup) + len(sub))
             q_vec[bits_to_num(sup)] += v * sign
     return q_vec
 
 
-def positivity(dim):
-    for i in range(1, dim):
-        x = np.zeros(dim)
-        x[i] = 1
-        yield x
+def q_to_p(q_vec):
+    """
+    This function transforms a probability vector from Q to P parametrization.
+
+    The input argument is a vector  v = Σ v_A q(A)  and the result is computed
+    by substiting
+
+        q(A) = Σ[B ⊇ A] p(B)
+
+    and collecting the terms of p(B) for same B in the corresponding component.
+
+    I implemented this function mainly as a consistency check for the `p_to_q`
+    function above. They should be the inverse of each other, i.e.
+
+        >>> x == q_to_p(p_to_q(x))
+        True
+    """
+    b_len = num_vars(len(q_vec))
+    p_vec = np.zeros(q_vec.shape)
+    total = set(range(b_len))
+    for i, v in enumerate(q_vec):
+        sub = get_bits(i)
+        for sup in supersets(sub, total):
+            p_vec[bits_to_num(sup)] += v
+    return p_vec
 
 
 def main(args=None):
@@ -70,7 +122,8 @@ def main(args=None):
         varnames = _name_list(opts['--bell'])
         colnames = column_varname_labels(varnames)
         dim = len(colnames)
-        equations = np.vstack(map(p_to_q, positivity(dim)))
+        equations = np.vstack(map(p_to_q, np.eye(dim)[1:]))
+        # equations = np.vstack(map(q_to_p, equations))
 
     else:
         equations, colnames = parse_files(opts['INPUT'])
