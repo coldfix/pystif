@@ -22,9 +22,17 @@ First, install these dependencies:
 - cython
 - numpy
 - scipy
-- docopt (use ``pip install docopt`` if unavailable in your package manager)
+- docopt
+- funcparserlib
 
-To build and install pystif, type::
+On archlinux, these dependencies can be installed as follows::
+
+    pacman -S python python-setuptools
+    pacman -S glpk
+    pacman -S cython python-numpy python-scipy
+    pip install docopt funcparserlib
+
+To build and install pystif itself, type::
 
     python setup.py install
 
@@ -62,7 +70,7 @@ inequalities in a bipartite bell scenario:
 
 .. code-block::
 
-    makesys -v 4 -e -o full.txt
+    makesys "rvar A B C D" -o full.txt
     chm full.txt -o small.txt -l1 -s "AC BC AD BD A B C D"
     pretty small.txt -y "AB <> BA; ABCD <> CDAB"
 

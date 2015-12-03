@@ -52,6 +52,7 @@ setup(
         'numpy>=1.10.0',    # support for '@' operator
         'scipy',
         'docopt',
+        'funcparserlib>=0.3.6',
     ],
     setup_requires=[
         # In fact, these need to be installed before running setup.py - they

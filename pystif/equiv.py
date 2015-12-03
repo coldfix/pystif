@@ -55,6 +55,7 @@ def main(args=None):
     opts = docopt(__doc__)
     sys_a = System.load(opts['A'])
     sys_b = System.load(opts['B'])
+    sys_b, _ = sys_b.slice(sys_a.columns, fill=True)
     status = 0
     kwd = {'elem_ineqs': opts['--elem-ineqs'],
            'quiet': opts['--quiet']}

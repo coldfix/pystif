@@ -1,4 +1,4 @@
-#:: _ AB Ab aB ab A a B b
+#:: _ H(A,B) H(A,b) H(a,B) H(a,b) H(A) H(a) H(B) H(b)
   0   0  -1   0   0   1   0   0   1
   0   0   0   0   1   0  -1   0   0
   0   1   0   0   0   0   0  -1   0

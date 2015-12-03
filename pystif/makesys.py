@@ -1,22 +1,18 @@
 """
-Output elemental inequalities for given number of variables.
+Convert a system of linear constraints from human readable expressions to a
+simple matrix format compatible with ``numpy.loadtxt``.
 
 Usage:
-    makesys -c COLS [-o FILE] INEQ...
-    makesys -v VARS [-o FILE] INEQ...
-    makesys -v VARS [-o FILE] [INEQ...] -b
-    makesys -v VARS [-o FILE] [INEQ...] -e
+    makesys [-o OUTPUT] INPUT...
+    makesys [-o OUTPUT] -b VARS
 
 Options:
     -o OUTPUT, --output OUTPUT      Write inequalities to this file
-    -a, --append                    Append to output file
-    -c COLS, --cols COLS            Set column names or count
-    -v VARS, --vars VARS            Set variable names or count
-    -e, --elem-ineqs                Add elemental inequalities
-    -b, --bell                      Create a bell polytope
+    -b VARS, --bell VARS            Output bell polytope in Q space
 
-This will output a matrix of inequalities for NUM_VARS random variables. Each
-row ``q`` corresponds to one inequality
+The positional arguments can either be filenames or valid input expressions.
+
+Each row ``q`` of the output matrix corresponds to one inequality
 
     q∙x ≥ 0.
 
@@ -28,151 +24,113 @@ and so on, i.e. the bit representation of the column index corresponds to the
 subset of variables. The zero-th column will always be zero.
 """
 
-import re
-import sys
-from os import path
-
 from docopt import docopt
+
 import numpy as np
 
-from .core.it import elemental_inequalities, num_vars, bits_to_num
-from .core.io import (System, SystemFile, _name_list, get_bits, supersets,
-                      default_column_labels, column_varname_labels)
+from .core.io import SystemFile, _name_list, get_bits, supersets
+from .core.it import num_vars, bits_to_num
+from .core.parse import parse_files
 
 
-def create_index(l):
-    return {v: i for i, v in enumerate(l)}
+def _column_label(index, varnames="ABCDEFGHIJKLMNOPQRSTUVWXYZ"):
+    return "".join(varnames[i] for i in get_bits(index))
 
 
-class AutoInsert:
-
-    """Autovivification for column names."""
-
-    def __init__(self, cols):
-        self._cols = cols
-        self._idx = create_index(cols)
-
-    def __len__(self):
-        return len(self._cols)
-
-    def __getitem__(self, key):
-        try:
-            return self._idx[key]
-        except KeyError:
-            self._cols.append(key)
-            self._idx[key] = index = len(self._cols) - 1
-            return index
-
-
-def _parse_expr(expr):
-    re_number = r'\s*([+\-]?(?:\d+(?:\.\d*)?|\d*\.\d+)(?:[eE][+\-]?\d+)?)'
-    re_ident = r'\s*([a-zA-Z_][\w\.]*)'
-    re_sign = r'\s*([-+])'
-    re_head = re.compile("".join((
-        '^', re_sign, '?', re_number, '?', re_ident,
-        '|^', re_sign, '?', re_number
-    )))
-    re_tail = re.compile("".join((
-        '^', re_sign, re_number, '?', re_ident,
-        '|^', re_sign, re_number
-    )))
-    signs = {'+': 1, '-': -1, None: 1}
-    m = re_head.match(expr)
-    while m:
-        ident = m.group(3)
-        if ident:
-            sign, number = m.groups()[:2]
-        else:
-            ident = 0
-            sign, number = m.groups()[3:]
-        coef = signs[sign]
-        if number is not None:
-            coef *= float(number)
-        yield (ident, coef)
-        expr = expr[m.end():]
-        m = re_tail.match(expr)
-    if expr.strip():
-        raise ValueError("Unexpected token at: {!r}".format(expr))
-
-
-def _parse_eq_line(line, col_idx):
-    line = line.strip()
-    if not line or line.startswith('#'):
-        return []
-    m = re.match("^([^≥≤<>=]*)(≤|≥|<=|>=|=)([^≥≤<>=]*)$", line)
-    if not m:
-        raise ValueError("Invalid constraint format: {!r}.\n"
-                         "Must contain exactly one relation".format(line))
-    lhs, rel, rhs = m.groups()
-    terms = list(_parse_expr(lhs))
-    terms += [(col, -coef) for col, coef in _parse_expr(rhs)]
-    indexed = [(0 if col == 0 else col_idx[col], coef)
-               for col, coef in terms]
-    v = np.zeros(len(col_idx))
-    for idx, coef in indexed:
-        v[idx] += coef
-    if rel == '<=' or rel == '≤':
-        return [-v]
-    if rel == '>=' or rel == '≥':
-        return [v]
-    return [-v, v]
-
-
-def _parse_eq_file(eq_str, col_idx):
-    if not path.exists(eq_str):
-        return _parse_eq_line(eq_str, col_idx)
-    with open(eq_str) as f:
-        return sum((_parse_eq_line(l, col_idx) for l in f), [])
+def column_varname_labels(varnames):
+    if isinstance(varnames, int):
+        varnames = [chr(ord('A') + i) for i in range(varnames)]
+    dim = 2**len(varnames)
+    return ['_'] + [_column_label(i, varnames) for i in range(1, dim)]
 
 
 def p_to_q(p_vec):
+    """
+    Transform a probability vector from Q to P parametrization.
+
+    Consider a collection of n probability variables X1,…,Xn that take values
+    in {0, 1}. Any realization of X1,…,Xn can be represented as a bit string
+    of n digits.
+
+    For a subset A ⊂ {1,…,n} we define p and q by
+
+        q(A) = Prob{ (Xi=1 ∀ i in A) }
+        p(A) = Prob{ (Xi=1 ∀ i in A) AND (Xj=0 ∀ i not in A) }
+
+    In words:
+
+        q(A) is the probability that "at least" all the variables indexed by
+        elements of A assume the value 1 – while all the others may be 0 or 1.
+
+        p(A) is the probability that "exactly" all the variables indexed by
+        elements of A assume the value 1 – while all the others must be 0.
+
+    Thus q is related to p by the transformation:
+
+        q(A) = Σ[B ⊃ A] p(B)
+
+    This relation can be inverted with the Möbius inversion forumla to give:
+
+        p(A) = Σ[B ⊃ A] q(B) × (-1)**(|A| + |B|)
+
+    Assuming the input argument is a vector  v = Σ v_A p(A)  the result is
+    computed by substiting above inversion formula for p(A) and collecting
+    terms with same q(B).
+    """
     b_len = num_vars(len(p_vec))
     q_vec = np.zeros(p_vec.shape)
     total = set(range(b_len))
     for i, v in enumerate(p_vec):
         sub = get_bits(i)
         for sup in supersets(sub, total):
-            sign = (-1) ** (len(sub) + len(sup) - b_len)
+            sign = (-1) ** (len(sup) + len(sub))
             q_vec[bits_to_num(sup)] += v * sign
     return q_vec
 
 
-def positivity(dim):
-    for i in range(1, dim):
-        x = np.zeros(dim)
-        x[i] = 1
-        yield x
+def q_to_p(q_vec):
+    """
+    This function transforms a probability vector from Q to P parametrization.
+
+    The input argument is a vector  v = Σ v_A q(A)  and the result is computed
+    by substiting
+
+        q(A) = Σ[B ⊇ A] p(B)
+
+    and collecting the terms of p(B) for same B in the corresponding component.
+
+    I implemented this function mainly as a consistency check for the `p_to_q`
+    function above. They should be the inverse of each other, i.e.
+
+        >>> x == q_to_p(p_to_q(x))
+        True
+    """
+    b_len = num_vars(len(q_vec))
+    p_vec = np.zeros(q_vec.shape)
+    total = set(range(b_len))
+    for i, v in enumerate(q_vec):
+        sub = get_bits(i)
+        for sup in supersets(sub, total):
+            p_vec[bits_to_num(sup)] += v
+    return p_vec
 
 
 def main(args=None):
     opts = docopt(__doc__, args)
 
-    if opts['--cols']:
-        colnames = _name_list(opts['--cols'])
-        if isinstance(colnames, int):
-            colnames = default_column_labels(colnames)
-        col_idx = create_index(colnames)
-    elif opts['--vars']:
-        varnames = _name_list(opts['--vars'])
+    if opts['--bell']:
+        varnames = _name_list(opts['--bell'])
         colnames = column_varname_labels(varnames)
-        col_idx = create_index(colnames)
-    else:
-        colnames = []
-        col_idx = AutoInsert(colnames)
+        dim = len(colnames)
+        equations = np.vstack(map(p_to_q, np.eye(dim)[1:]))
+        # equations = np.vstack(map(q_to_p, equations))
 
-    equations = []
-    for e in opts['INEQ']:
-        equations += _parse_eq_file(e, col_idx)
-    dim = len(colnames)
-    if opts['--elem-ineqs']:
-        equations += list(elemental_inequalities(num_vars(dim)))
-    elif opts['--bell']:
-        equations += list(map(p_to_q, positivity(dim)))
-        # TODO: also normalization
+    else:
+        equations, colnames = parse_files(opts['INPUT'])
 
     output = SystemFile(opts['--output'], columns=colnames)
     for e in equations:
-        output(np.hstack((e, np.zeros(dim-len(e)))))
+        output(e)
 
 
 if __name__ == '__main__':

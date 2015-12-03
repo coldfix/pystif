@@ -1,4 +1,4 @@
-#:: _ A B AB C AC BC ABC
+#:: _ H(A) H(B) H(A,B) H(C) H(A,C) H(B,C) H(A,B,C)
   0   0   0  -1   0   0   0   1
   0   0   1   0   1   0  -1   0
   0   1   0   0   1  -1   0   0
