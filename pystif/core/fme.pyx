@@ -1,5 +1,6 @@
 
 import itertools
+from functools import partial
 from math import gcd
 
 import numpy as np
@@ -95,9 +96,7 @@ class FME:
 
     def choose_next_column(self, rows, cols_to_eliminate):
         """Heuristic for choosing the next column to eliminate."""
-        return min(((col, self.get_column_rank(rows, col))
-                    for col in cols_to_eliminate),
-                   key=lambda cr: cr[1])[0]
+        return min(cols_to_eliminate, key=partial(self.get_column_rank, rows))
 
     def eliminate_columns_from_system(self, rows, cols_to_eliminate):
         """Eliminate columns with the specified indices from the system."""
