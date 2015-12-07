@@ -76,16 +76,16 @@ class PointSet(OrderedSet):
     """
 
     def __init__(self, points=()):
-        super(PointSet, self).__init__(tuple(p) for p in points)
+        super().__init__(tuple(p) for p in points)
 
     def __contains__(self, point):
-        return super(PointSet, self).__contains__(tuple(point))
+        return super().__contains__(tuple(point))
 
     def index(self, point):
-        return super(PointSet, self).index(tuple(point))
+        return super().index(tuple(point))
 
     def add(self, point):
-        return super(PointSet, self).add(tuple(point))
+        return super().add(tuple(point))
 
 
 class VectorMemory:
