@@ -8,7 +8,7 @@ import numpy as np
 from . cimport glpk as glp
 from .array cimport int_array, double_array, double_view, INF, NAN, DBL_MAX
 from .array import _as_matrix
-from .util import call
+from .util import safe_call
 
 
 __all__ = [
@@ -483,15 +483,15 @@ class Minimize:
     cb_stop = None
 
     def minimize(self, rows):
-        call(self.cb_start, rows)
+        safe_call(self.cb_start, rows)
         ret = []
         lp = Problem(rows)
         for idx in range(lp.num_rows-1, -1, -1):
             row = rows[idx]
-            call(self.cb_step, idx, ret)
+            safe_call(self.cb_step, idx, ret)
             lp.del_row(idx)
             if not lp.implies(row):
                 lp.add_row(row)
                 ret.append(row)
-        call(self.cb_stop, ret)
+        safe_call(self.cb_stop, ret)
         return ret

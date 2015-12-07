@@ -7,7 +7,7 @@ from functools import wraps
 from .array import scale_to_int
 
 
-def call(fn, *args, **kw):
+def safe_call(fn, *args, **kw):
     return fn and fn(*args, **kw)
 
 
