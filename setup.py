@@ -32,7 +32,6 @@ setup(
             'equiv = pystif.equiv:main',
             'makesys = pystif.makesys:main',
             'pretty = pystif.pretty:main',
-            'mergesys = pystif.mergesys:main',
             'fme = pystif.fme:main',
             'minimize = pystif.minimize:main',
             'afi = pystif.afi:main',
