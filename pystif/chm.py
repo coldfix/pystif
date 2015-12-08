@@ -43,7 +43,7 @@ from .core.app import application
 from .core.array import scale_to_int
 from .core.io import SystemFile
 from .core.geom import LinearSubspace
-from .core.linalg import matrix_imker, addz, delz
+from .core.linalg import addz, delz
 from .core.util import VectorMemory
 
 
@@ -61,9 +61,6 @@ def convex_hull_method(polyhedron, rays,
     for face in addz(subspace.normals):
         report_yes(face)
         report_yes(-face)
-
-    if subspace.dim == points.shape[1]:
-        subspace = LinearSubspace.all_space(points.shape[1])
 
     # initial hull
     points = subspace.into(points)

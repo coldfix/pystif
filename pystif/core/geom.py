@@ -2,7 +2,7 @@
 import numpy as np
 
 from .array import scale_to_int, make_int_exact
-from .linalg import (matrix_imker, matrix_nullspace,
+from .linalg import (matrix_imker_nice, matrix_nullspace,
                      basis_vector, plane_normal, addz, delz)
 from .util import PointSet, cached
 
@@ -195,13 +195,13 @@ class LinearSubspace:
     @classmethod
     def from_rowspace(cls, matrix):
         """Create subspace from basis (row-) vectors."""
-        onb, normals = matrix_imker(np.atleast_2d(matrix))
+        onb, normals = matrix_imker_nice(np.atleast_2d(matrix))
         return cls(onb, normals)
 
     @classmethod
     def from_nullspace(cls, matrix):
         """Create subspace from normal (row-) vectors."""
-        normals, onb = matrix_imker(np.atleast_2d(matrix))
+        normals, onb = matrix_imker_nice(np.atleast_2d(matrix))
         return cls(onb, normals)
 
     def nullspace(self):
