@@ -43,7 +43,6 @@ from .core.app import application
 from .core.array import scale_to_int
 from .core.io import SystemFile
 from .core.geom import LinearSubspace
-from .core.linalg import addz, delz
 from .core.util import VectorMemory
 
 
@@ -53,12 +52,12 @@ def convex_hull_method(polyhedron, rays,
 
     result = []
 
-    points = delz(rays)
+    points = np.copy(rays)
 
     # Now make sure the dataset lives in a full dimensional subspace
     subspace = LinearSubspace.from_rowspace(points)
 
-    for face in addz(subspace.normals):
+    for face in subspace.normals:
         report_yes(face)
         report_yes(-face)
 
@@ -89,7 +88,6 @@ def convex_hull_method(polyhedron, rays,
             # ``face ∙ (x,1) ≤ 0``
             face = -face[:-1]
             face = subspace.back(face)
-            face = np.hstack((0, face))
             face = scale_to_int(face)
 
             if seen(face):
@@ -104,7 +102,7 @@ def convex_hull_method(polyhedron, rays,
                 if seen_ray(ray):
                     continue
                 report_ray(ray)
-                new_points.append(subspace.into(ray[1:]))
+                new_points.append(subspace.into(ray))
 
         if new_points:
             status_info(total, total, yes)

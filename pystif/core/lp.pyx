@@ -94,7 +94,7 @@ cdef class Problem:
                   int num_cols=0,
                   double lb_row=0, double ub_row=INF,
                   double lb_col=-INF, double ub_col=INF,
-                  bint const_col=True):
+                  bint const_col=False):
         """
         Init system from constraint matrix L.
 

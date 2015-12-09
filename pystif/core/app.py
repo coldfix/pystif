@@ -3,9 +3,8 @@ from docopt import docopt
 from functools import wraps
 import os
 
-from .geom import ConvexPolyhedron
+from .geom import ConvexCone
 from .io import System, SystemFile, StatusInfo
-from .linalg import addz
 from .symmetry import SymmetryGroup, NoSymmetry
 from .util import cachedproperty
 
@@ -67,7 +66,7 @@ class Application:
 
     @cachedproperty
     def polyhedron(self):
-        return ConvexPolyhedron.from_cone(self.system, self.subdim, self.limit)
+        return ConvexCone.from_cone(self.system, self.subdim, self.limit)
 
     @cachedproperty
     def output(self):
@@ -89,7 +88,7 @@ class Application:
         return int(self.opts['--recursions']) or -1
 
     def report_nullspace(self):
-        for face in addz(self.polyhedron.subspace().normals):
+        for face in self.polyhedron.subspace().normals:
             self.report_facet(face)
             self.report_facet(-face)
 

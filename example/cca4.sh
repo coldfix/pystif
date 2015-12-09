@@ -15,9 +15,9 @@ data=$here/data
 cp $data/init-4-1.txt min.txt
 
 # use different elimination methods:
-time chm min.txt -s 16 -o fin-chm.txt -q
-time fme min.txt -s 16 -o fin-fme.txt -q
-time afi min.txt -s 16 -o fin-afi.txt -q -r1 \
+time chm min.txt -s 15 -o fin-chm.txt -q
+time fme min.txt -s 15 -o fin-fme.txt -q
+time afi min.txt -s 15 -o fin-afi.txt -q -r1 \
     -y "abcdABCD <> bcdaBCDA; abcdABCD <> dcbaDCBA"
 
 # consistency check

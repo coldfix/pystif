@@ -24,15 +24,14 @@ import numpy as np
 
 from .core.app import application
 from .core.io import StatusInfo
-from .core.geom import (ConvexPolyhedron, LinearSubspace,
+from .core.geom import (ConvexCone, LinearSubspace,
                         random_direction_vector)
-from .core.linalg import addz
 from .core.util import VectorMemory
 
 
 def rfd(polyhedron, symmetries, found_cb, runs, status):
 
-    face = np.hstack((0, np.ones(polyhedron.dim-1)))
+    face = np.ones(polyhedron.dim)
     seen = VectorMemory()
 
     for i in range(runs):
@@ -64,7 +63,7 @@ def rss(system, polyhedron, symmetries, found_cb, runs, slice_dim, status, sub_i
 
     subdim = polyhedron.dim
 
-    face = np.hstack((0, np.ones(polyhedron.dim-1)))
+    face = np.ones(polyhedron.dim)
     seen = VectorMemory()
 
     for i in range(runs):
@@ -72,7 +71,7 @@ def rss(system, polyhedron, symmetries, found_cb, runs, slice_dim, status, sub_i
         status(i, runs, seen)
         cols = sorted(random.sample(range(1, subdim), slice_dim))
         sys2, _ = system.prepare_for_projection(cols)
-        poly2 = ConvexPolyhedron.from_cone(sys2, slice_dim+1, limit=1)
+        poly2 = ConvexCone.from_cone(sys2, slice_dim+1, limit=1)
 
         callbacks = (lambda ray: None,
                      lambda facet: None,

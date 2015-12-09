@@ -104,13 +104,3 @@ def project_to_plane(v, n):
 
 def normalize_rows(M):
     return M / np.linalg.norm(M, axis=-1)[:,np.newaxis]
-
-
-def addz(mat):
-    mat = np.atleast_2d(mat)
-    return np.hstack((np.zeros((mat.shape[0], 1)), mat))
-
-
-def delz(mat):
-    mat = np.atleast_2d(mat)
-    return mat[:,1:]
