@@ -88,11 +88,26 @@ sacraficing too much performance if at all possible.
 Conventions
 ~~~~~~~~~~~
 
-Most of the utilities input and output files that represent a linear system
-of equations. The files have a simple matrix structure (``numpy.loadtxt``)
-and each row corresponds to one inequality ``q∙x ≥ 0``. There is also a format
-that is more convenient for humans to read and write. For examples look for
-``*.txt`` files in the ``example/`` and ``example/data/`` subfolders.
+This software operates on convex cones in half-space representation, i.e. the
+cone is given by a number of linear constraints of the following standard
+form::
+
+    P = {x : Qx ≥ 0} ⊂ ℝⁿ
+
+The constraint matrix ``Q`` can be specified in either of two input formats:
+
+- The first format is a complete listing of all matrix coefficients,
+  compatible with ``numpy.loadtxt`` and ``numpy.savetxt``. Each row
+  corresponds to one inequality ``q∙x ≥ 0``. Column names are defined in a
+  line of the form  ``#:: c1 c2 c3 …``
+
+- The second format is easier to read and write for most humans (presumably)
+  as you can specify constraints in the form ``2a + 10b >= c``. It also allows
+  to use Shannon information measures (e.g. ``2 I(X:Y|Z) <= H(X)`` and define
+  Markov conveniently as ``A -> B -> C -> D``.
+
+For examples look for ``*.txt`` files in the ``example/`` and
+``example/data/`` subfolders.
 
 Note that inhomogenious systems can be emulated by thinking of one of the
 columns as constant ``1`` (don't you dare thinking of another number!).
