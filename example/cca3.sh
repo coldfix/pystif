@@ -13,10 +13,10 @@ data=$here/data
 time minimize $here/cca3.txt -o min.txt
 
 # use different elimination methods:
-time chm min.txt -s 8 -o fin-chm.txt
-time fme min.txt -s 8 -o fin-fme.txt
-time afi min.txt -s 8 -o fin-afi.txt -q -r1
-time afi min.txt -s 8 -o fin-sym.txt -q -r1 -y "ABCDEF <> BCAEFD"
+time chm min.txt -s 7 -o fin-chm.txt
+time fme min.txt -s 7 -o fin-fme.txt
+time afi min.txt -s 7 -o fin-afi.txt -q -r1
+time afi min.txt -s 7 -o fin-sym.txt -q -r1 -y "ABCDEF <> BCAEFD"
 
 # consistency check
 equiv min.txt $here/cca3.txt

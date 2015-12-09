@@ -2,10 +2,9 @@
 Check the equivalence of two system of equations.
 
 Usage:
-    equiv [-e] [-q] [-1] A B
+    equiv [-q] [-1] A B
 
 Options:
-    -e, --elem-ineqs    Add elemental inequalities before checking difference
     -q, --quiet         No output, result is only signaled via return value
     -1, --one-way       Check only if A implies B, not the other way round
 
@@ -24,7 +23,6 @@ import sys
 import numpy as np
 from docopt import docopt
 
-from .core.it import elemental_inequalities, num_vars
 from .core.io import format_vector, System
 
 
@@ -42,10 +40,8 @@ def show_missing_constraints(lp, constraints, name_a, name_b):
     return len(missing)
 
 
-def check_implies(sys_a, sys_b, name_a, name_b, elem_ineqs=False, quiet=False):
+def check_implies(sys_a, sys_b, name_a, name_b, quiet=False):
     lp = sys_a.lp()
-    if elem_ineqs:
-        lp.add(list(elemental_inequalities(num_vars(lp.num_cols))))
     if quiet:
         return lp.implies(sys_b.matrix)
     return show_missing_constraints(lp, sys_b, name_a, name_b) == 0
@@ -57,8 +53,7 @@ def main(args=None):
     sys_b = System.load(opts['B'])
     sys_b, _ = sys_b.slice(sys_a.columns, fill=True)
     status = 0
-    kwd = {'elem_ineqs': opts['--elem-ineqs'],
-           'quiet': opts['--quiet']}
+    kwd = {'quiet': opts['--quiet']}
     if not check_implies(sys_a, sys_b, 'A', 'B', **kwd):
         status |= 1
     if not opts['--one-way']:

@@ -23,7 +23,6 @@ from docopt import docopt
 from .core.app import application
 from .core.array import scale_to_int
 from .core.io import StatusInfo
-from .core.linalg import addz, delz
 from .core.util import VectorMemory
 from .chm import convex_hull_method, print_status, print_qhull
 
@@ -34,7 +33,7 @@ class Face:
     Stores the currently known local geometric structure of a face. This state
     is computed and altered during the AFI procedure.
 
-    :ivar ConvexPolyhedron polyhedron:  Provider for LP primitives
+    :ivar ConvexCone polyhedron:        Provider for LP primitives
     :ivar LinearSubspace subspace:      Defining subspace
     :ivar list subfaces:                Known subfaces
     :ivar dict adjacent:                facet, subface -> adjacent facet
@@ -109,7 +108,7 @@ class AFI:
         Iterate over essentially different subfaces (:class:`Face`) of `body`.
 
         :param Face body: abstract face graph
-        :param ConvexPolyhedron polyhedron: face realization subspace
+        :param ConvexCone polyhedron: face realization subspace
         """
         if body.solved:
             yield from self._sol(body)
@@ -129,7 +128,7 @@ class AFI:
         """Iterate over the vertices of a 1D face."""
         # NOTE: currently only handling rays originating at zero, so we
         # just need a single additional subface (~vertex):
-        normal = addz(body.subspace.onb)[0]
+        normal = body.subspace.onb[0]
         facet = self.get_subface_instance(body, normal)
         body.add_subface(facet, normal)
         return [(facet, normal)]
@@ -169,7 +168,7 @@ class AFI:
         rank = face.rank-1
         self.info(rank, "Search rank {} facet", rank)
         # TODO: obtain chain of subfaces of dimensions 1 to N in single sweep
-        guess = np.hstack((0, np.ones(self.polyhedron.dim-1)))
+        guess = np.ones(self.polyhedron.dim)
         normal = face.polyhedron.refine_to_facet(guess)
         facet = self.get_subface_instance(face, normal)
         self.info(rank, "Search rank {} facet [done]\n", rank)
@@ -195,7 +194,7 @@ class AFI:
 
     def _intersect(self, face, normal):
         polyhedron = face.polyhedron.intersection(normal)
-        polyhedron._subspace = face.subspace.add_normals(delz(normal)[0])
+        polyhedron._subspace = face.subspace.add_normals(normal)
         polyhedron._rank = face.rank - 1
         return polyhedron
 

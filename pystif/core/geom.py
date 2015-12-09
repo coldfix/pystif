@@ -2,8 +2,8 @@
 import numpy as np
 
 from .array import scale_to_int, make_int_exact
-from .linalg import (matrix_imker, matrix_nullspace,
-                     basis_vector, plane_normal, addz, delz)
+from .linalg import (matrix_imker_nice, matrix_nullspace,
+                     basis_vector, plane_normal)
 from .util import PointSet, cached
 
 
@@ -13,7 +13,7 @@ def random_direction_vector(dim):
     return v
 
 
-class ConvexPolyhedron:
+class ConvexCone:
 
     """
     Utility for finding the extreme points (vertices) of a convex polyhedron
@@ -31,7 +31,7 @@ class ConvexPolyhedron:
     def from_cone(cls, system, dim, limit):
         """Create search problem from the system ``L∙x≥0, x≤limit``."""
         lp = system.lp()
-        for i in range(1, dim):
+        for i in range(dim):
             lp.set_col_bnds(i, 0, limit)
         return cls(lp, dim)
 
@@ -48,17 +48,16 @@ class ConvexPolyhedron:
         projected polytope itself (which may be less than ``self.dim``).
         """
         points = np.empty((0, self.dim))
-        orth = LinearSubspace.all_space(self.dim-1)
+        orth = LinearSubspace.all_space(self.dim)
         while orth.dim > 0:
             # Choose vector from orthogonal space and optimize along its
             # direction:
             d = random_direction_vector(orth.dim)
             v = orth.back(d)
-            v = np.hstack((0, v))
-            x = self.search(v)[1:]
+            x = self.search(v)
             p = make_int_exact(orth.into(x))
             if all(p == 0):
-                x = self.search(-v)[1:]
+                x = self.search(-v)
                 p = make_int_exact(orth.into(x))
             if all(p == 0):
                 # Optimizing along ``v`` yields a vector in our ray space.
@@ -69,13 +68,13 @@ class ConvexPolyhedron:
                 orth = orth.back_space(LinearSubspace.from_nullspace(p))
                 points = np.vstack((
                     points,
-                    np.hstack((0, x)),
+                    x
                 ))
         return points
 
     @cached
     def subspace(self):
-        return LinearSubspace.from_rowspace(delz(self.basis()))
+        return LinearSubspace.from_rowspace(self.basis())
 
     def search(self, q):
         """
@@ -92,14 +91,13 @@ class ConvexPolyhedron:
         assert len(q) == self.dim
         extreme_point = self.lp.minimize(q, embed=True)
         extreme_point = extreme_point[0:self.dim]
-        extreme_point[0] = 0
         extreme_point = scale_to_int(extreme_point)
         self.points.add(extreme_point)
         return extreme_point
 
     def intersection(self, space):
         """
-        Return the ConvexPolyhedron obtained from the intersection with the
+        Return the ConvexCone obtained from the intersection with the
         given subspace.
 
         :param space: specified by its normal vector(s).
@@ -159,16 +157,15 @@ class ConvexPolyhedron:
 
     def refine_to_facet(self, face):
         assert self.is_face(face)
-        face = self.subspace().projection(face[1:])
-        face = np.hstack((0, face))
+        face = self.subspace().projection(face)
         face = scale_to_int(face)
         while True:
             subspace = self.intersection(face).basis()
-            nullspace = addz(matrix_nullspace(delz(np.vstack((
-                addz(self.subspace().normals),
+            nullspace = matrix_nullspace(np.vstack((
+                self.subspace().normals,
                 subspace,
                 face,
-            )))))
+            )))
             try:
                 direction = next(self.filter_non_singular_directions(nullspace))
             except StopIteration:
@@ -195,13 +192,13 @@ class LinearSubspace:
     @classmethod
     def from_rowspace(cls, matrix):
         """Create subspace from basis (row-) vectors."""
-        onb, normals = matrix_imker(np.atleast_2d(matrix))
+        onb, normals = matrix_imker_nice(np.atleast_2d(matrix))
         return cls(onb, normals)
 
     @classmethod
     def from_nullspace(cls, matrix):
         """Create subspace from normal (row-) vectors."""
-        normals, onb = matrix_imker(np.atleast_2d(matrix))
+        normals, onb = matrix_imker_nice(np.atleast_2d(matrix))
         return cls(onb, normals)
 
     def nullspace(self):

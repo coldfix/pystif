@@ -49,10 +49,10 @@ def read_system_from_file(file):
         return parse_text("\n".join(lines))
 
 
-def read_table_from_file(file, *, ndmin=2):
+def read_table_from_file(file):
     comments = []
     contents = remove_comments(file, comments.append)
-    matrix = np.loadtxt(contents, ndmin=ndmin)
+    matrix = np.loadtxt(contents, ndmin=2)
     cols = []
     def add_cols(s):
         cols.extend(map(_name, s.split()))
@@ -61,8 +61,18 @@ def read_table_from_file(file, *, ndmin=2):
     return matrix, cols or None
 
 
-def read_system(filename, *, ndmin=2):
-    """Read linear system from file, return tuple (colnames, matrix)."""
+def read_system(filename):
+    """Read linear system from file, return tuple (matrix, colnames)."""
+    matrix, cols = _read_system(filename)
+    if '_' in cols:
+        ccol = cols.index('_')
+        if np.allclose(matrix[:,ccol], 0):
+            matrix = np.delete(matrix, ccol, axis=1)
+            del cols[ccol]
+    return matrix, cols
+
+
+def _read_system(filename):
     if filename == '-':
         return read_system_from_file(sys.stdin)
     else:
@@ -123,7 +133,7 @@ class System:
 
     def slice(self, columns, fill=False):
         """Return reordered system. ``fill=True`` appends missing columns."""
-        indices = [0] + [self._get_column_index(c) for c in columns]
+        indices = [self._get_column_index(c) for c in columns]
         indices = _unique(indices)
         subdim = len(indices)
         if fill:

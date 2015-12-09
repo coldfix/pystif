@@ -80,10 +80,6 @@ cdef class Problem:
 
             q₀ + q∙x ≥ 0
 
-    In fact, this behaviour is enabled by default and all of the pystif
-    modules assume equations in this form. For your own LPs this mode can be
-    disabled by specifying ``const_col=False`` in the constructor.
-
     By default rows are lower-bounded by zero (see above) and columns are
     unbounded (i.e. variables may assume any value).
     """
@@ -94,19 +90,16 @@ cdef class Problem:
                   int num_cols=0,
                   double lb_row=0, double ub_row=INF,
                   double lb_col=-INF, double ub_col=INF,
-                  bint const_col=True):
+                  ):
         """
         Init system from constraint matrix L.
-
-        You must either specify the constraint matrix or a positive value for
-        the number of columns for ``const_col`` to take effect.
         """
         self._lp = glp.create_prob()
         if L is not None:
             L = _as_matrix(L)
-            self.add(L, lb_row, ub_row, lb_col, ub_col, const_col=const_col)
+            self.add(L, lb_row, ub_row, lb_col, ub_col)
         elif num_cols > 0:
-            self.add_cols(num_cols, lb_col, ub_col, const_col=const_col)
+            self.add_cols(num_cols, lb_col, ub_col)
 
     def __dealloc__(self):
         glp.delete_prob(self._lp)
@@ -135,7 +128,7 @@ cdef class Problem:
     def add(self, L,
             double lb_row=0, double ub_row=INF,
             double lb_col=-INF, double ub_col=INF,
-            *, bint embed=False, bint const_col=True):
+            *, bint embed=False):
         """
         Add the constraint matrix L∙x ≥ 0. Return the row index of the first
         added constraint.
@@ -145,7 +138,7 @@ cdef class Problem:
         cdef int i
         cdef int s = self.add_rows(num_rows, lb_row, ub_row)
         if self.num_cols == 0:
-            self.add_cols(num_cols, lb_col, ub_col, const_col=const_col)
+            self.add_cols(num_cols, lb_col, ub_col)
         try:
             for i, row in enumerate(L):
                 self.set_row(s+i, row, embed=embed)
@@ -173,7 +166,7 @@ cdef class Problem:
         Add one col with specified bounds. If coefs is given, its size must be
         equal to the current number of rows.
         """
-        cdef int i = self.add_cols(1, lb, ub, const_col=False)
+        cdef int i = self.add_cols(1, lb, ub)
         try:
             if coefs is not None:
                 self.set_col(i, coefs, embed=embed)
@@ -192,8 +185,7 @@ cdef class Problem:
             self.del_rows(range(s, s+num_rows))
             raise
 
-    def add_cols(self, int num_cols, double lb=-INF, double ub=INF, *,
-                 bint const_col=True):
+    def add_cols(self, int num_cols, double lb=-INF, double ub=INF, *):
         """Add multiple cols and set their bounds."""
         if num_cols <= 0:
             raise ValueError("Invalid number of columns: {}"
@@ -201,8 +193,6 @@ cdef class Problem:
         cdef int s = glp.add_cols(self._lp, num_cols)-1
         try:
             self.set_col_bnds(range(s, s+num_cols), lb, ub)
-            if const_col and self.num_cols == num_cols:
-                self.set_col_bnds(0, 1, 1)
             return s
         except:
             self.del_cols(range(s, s+num_cols))
