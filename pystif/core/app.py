@@ -88,7 +88,7 @@ class Application:
         return int(self.opts['--recursions']) or -1
 
     def report_nullspace(self):
-        for face in self.polyhedron.subspace().normals:
+        for face in self.polyhedron.nullspace_int():
             self.report_facet(face)
             self.report_facet(-face)
 

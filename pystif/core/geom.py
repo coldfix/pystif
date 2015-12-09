@@ -4,6 +4,7 @@ import numpy as np
 from .array import scale_to_int, make_int_exact
 from .linalg import (matrix_imker_nice, matrix_nullspace,
                      basis_vector, plane_normal)
+from .lp import Problem
 from .util import PointSet, cached
 
 
@@ -171,6 +172,47 @@ class ConvexCone:
             except StopIteration:
                 return face
             face, _ = self.get_adjacent_facet(face, -direction)
+
+    def nullspace_int(self) -> list:
+        """
+        Return basis vectors of nullspace – but with integer coefficients
+        rather than whatever comes out of the nullspace analysis.
+
+        NOTE: This is a slow operation… If you want performance, just use the
+        subspace().normals matrix.
+        """
+        subspace = self.subspace()
+        normals = subspace.normals
+        if len(normals) == 0:
+            return []
+        if len(normals) == 1:
+            return [scale_to_int(normals[0])]
+        # Let's do some magic to get integer coefficients (this is slow…):
+        L = self.lp.get_matrix()
+        lp = Problem(                               # Find f = qL s.t.
+            L.T[self.dim:],                         # (qL)_i = 0  ∀ i > m
+            lb_col=0)                               #    q_i ≥ 0  ∀ i
+        lp.add(np.ones(len(L)), 1, 1)               #   Σq_i = 1
+        lp.add(subspace.onb @ L.T[:self.dim], 0, 0, #    qLP = 0
+               embed=True)
+        normals = []
+        orth = subspace.nullspace()
+        while orth.dim > 0:
+            # Choose vector from orthogonal space and optimize along its
+            # direction:
+            d = random_direction_vector(orth.dim)
+            v = orth.back(d)
+            q = lp.minimize((L[:,:self.dim] @ v).T, embed=True)
+            q = scale_to_int(q)
+            f = (L.T @ q)[:self.dim]
+            p = make_int_exact(orth.into(f))
+            new = orth.back_space(LinearSubspace.from_nullspace(p))
+            # TODO: This condition should always be fulfilled by the
+            # construction of f – but for now my trust is limited:
+            if new.dim < orth.dim and self.is_face(f) and self.is_face(-f):
+                orth = new
+                normals.append(f)
+        return normals
 
 
 class LinearSubspace:

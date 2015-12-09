@@ -57,7 +57,7 @@ def convex_hull_method(polyhedron, rays,
     # Now make sure the dataset lives in a full dimensional subspace
     subspace = LinearSubspace.from_rowspace(points)
 
-    for face in subspace.normals:
+    for face in polyhedron.nullspace_int():
         report_yes(face)
         report_yes(-face)
 
