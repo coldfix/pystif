@@ -69,9 +69,9 @@ def rss(system, polyhedron, symmetries, found_cb, runs, slice_dim, status, sub_i
     for i in range(runs):
 
         status(i, runs, seen)
-        cols = sorted(random.sample(range(1, subdim), slice_dim))
+        cols = sorted(random.sample(range(subdim), slice_dim))
         sys2, _ = system.prepare_for_projection(cols)
-        poly2 = ConvexCone.from_cone(sys2, slice_dim+1, limit=1)
+        poly2 = ConvexCone.from_cone(sys2, slice_dim, limit=1)
 
         callbacks = (lambda ray: None,
                      lambda facet: None,
@@ -81,7 +81,7 @@ def rss(system, polyhedron, symmetries, found_cb, runs, slice_dim, status, sub_i
 
         subb = np.array([
             basis_vector(subdim, c)
-            for c in [0] + cols
+            for c in cols
         ])
 
         for face in faces:
