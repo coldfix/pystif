@@ -41,7 +41,7 @@ def _coef(coef):
 
 def format_human_readable(constraint, columns):
     lhs = [(_coef(c), columns[i], c > 0)
-           for i, c in enumerate(constraint[1:])
+           for i, c in enumerate(constraint)
            if c != 0]
     # len() is used as approximation for number of terms involved. For most
     # cases this should be fine.
@@ -50,8 +50,7 @@ def format_human_readable(constraint, columns):
     lhs = ["{} {}".format(coef, col) for coef, col, _ in lhs]
     if not lhs:
         lhs = ["0"]
-    rhs = -constraint[0]
-    return "{} ≥ {}".format(" ".join(lhs).lstrip('+ '), _fmt_float(rhs))
+    return "{} ≥ 0".format(" ".join(lhs).lstrip('+ '))
 
 
 def vars_from_colname(column_name):
@@ -89,9 +88,9 @@ def main(args=None):
     opts = docopt(__doc__, args)
     system = System.load(opts['INPUT'])
     if system.columns:
-        columns = system.columns[1:]
+        columns = system.columns
     elif opts['--canonical']:
-        columns = column_varname_labels(num_vars(system.dim))[1:]
+        columns = column_varname_labels(num_vars(system.dim))
     else:
         columns = default_column_labels(system.dim)
     print_ = print_to(opts['--output'])

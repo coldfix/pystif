@@ -133,7 +133,7 @@ class System:
 
     def slice(self, columns, fill=False):
         """Return reordered system. ``fill=True`` appends missing columns."""
-        indices = [0] + [self._get_column_index(c) for c in columns]
+        indices = [self._get_column_index(c) for c in columns]
         indices = _unique(indices)
         subdim = len(indices)
         if fill:
