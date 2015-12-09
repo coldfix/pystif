@@ -2,11 +2,10 @@
 Print equations in human readable format.
 
 Usage:
-    pretty INPUT [-o OUTPUT] [-c] [-g | -y SYM]
+    pretty INPUT [-o OUTPUT] [-g | -y SYM]
 
 Options:
     -o OUTPUT, --output OUTPUT      Output file
-    -c, --canonical                 Assume canonical column labels
     -g, --group                     Group similar constraints
     -y SYM, --symmetry SYM          Specify symmetry group generators
 """
@@ -16,7 +15,6 @@ from collections import Counter, defaultdict
 
 from docopt import docopt
 
-from .core.it import num_vars
 from .core.io import (System, print_to, VectorMemory,
                       default_column_labels, column_varname_labels)
 from .core.symmetry import SymmetryGroup
@@ -89,8 +87,6 @@ def main(args=None):
     system = System.load(opts['INPUT'])
     if system.columns:
         columns = system.columns
-    elif opts['--canonical']:
-        columns = column_varname_labels(num_vars(system.dim))
     else:
         columns = default_column_labels(system.dim)
     print_ = print_to(opts['--output'])

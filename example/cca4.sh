@@ -23,8 +23,8 @@ time afi min.txt -s 15 -o fin-afi.txt -q -r1 \
 # consistency check
 equiv min.txt $data/init-4-1.txt
 
-equiv fin-chm.txt $data/final-4-1.txt -e
-equiv fin-fme.txt $data/final-4-1.txt -e
-equiv fin-afi.txt $data/final-4-1.txt -e
+equiv fin-chm.txt $data/final-4-1.txt
+equiv fin-fme.txt $data/final-4-1.txt
+equiv fin-afi.txt $data/final-4-1.txt
 
 pretty fin-chm.txt -y "abcd <> bcda; abcd <> dcba"
