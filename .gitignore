@@ -30,3 +30,6 @@ pip-log.txt
 .tox
 nosetests.xml
 htmlcov
+
+# Default output folder for benchmark logs
+tmp
