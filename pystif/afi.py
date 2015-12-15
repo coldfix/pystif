@@ -288,13 +288,9 @@ def main(app):
     app.report_nullspace()
     quiet_rank = app.subdim-2 if app.quiet else 0
     info = app.info(1)
+    app.start_timer()
     afi = AFI(app.polyhedron, app.symmetries, app.recursions, quiet_rank, info)
     for facet in afi.solve():
         app.output(facet)
     info()
-
-    if app.opts['--info']:
-        summ = afi.summary()
-        summ['subspace'] = app.opts['--subspace']
-        with open(app.opts['--info'], 'w') as f:
-            yaml.safe_dump(summ, f, default_flow_style=False)
+    app.summary = afi.summary

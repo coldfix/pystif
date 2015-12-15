@@ -65,52 +65,49 @@ def make_tasks(input_files, output_dims, num_runs, prefix):
 
 
 def exec_task(task, print_):
-    results = (
-        *single_pass(task, 'afi', '-r1'),
-        *single_pass(task, 'chm'),
-        #*single_pass(task, 'fme'),
-    )
-
-    # Extract geometrical info on the resulting polytope. This needs to be
-    # done separately from the measured AFI call, since evaluating the facial
-    # structure can take considerable time:
-    summary_file = task.prefix + task.name + '-summary.yml'
-    single_pass(task, 'afi', '-r1', '-i', summary_file)
-    with open(summary_file) as f:
-        summary = yaml.safe_load(f)
-
+    afi = single_pass(task, 'afi', '-r1')
+    chm = single_pass(task, 'chm')
     num_rows, dim = task.system.shape
-
     print_(
-        dim, num_rows, len(task.subspace), *results,
-        summary['num_facets'],
-        summary['num_ridges'],
-        summary['num_vertices'],
-        summary['ridges_per_facet'][0],
-        summary['vertices_per_facet'][0],
-        summary['vertices_per_ridge'][0],
+        dim,
+        num_rows,
+        len(task.subspace),
+        afi['time'],
+        afi['returncode'],
+        chm['time'],
+        chm['returncode'],
+        afi['num_facets'],
+        afi['num_ridges'],
+        afi['num_vertices'],
+        afi['ridges_per_facet'][0],
+        afi['vertices_per_facet'][0],
+        afi['vertices_per_ridge'][0],
     )
 
 
 def single_pass(task, method, *cmd_args):
     space = " ".join(map(str, task.subspace))
-    outf = '{}{}-{}.txt'.format(task.prefix, task.name, method)
-    logf = '{}{}-{}.log'.format(task.prefix, task.name, method)
-    with open(logf, 'w') as log:
+    basename = '{}{}-{}'.format(task.prefix, task.name, method)
+    outf = basename + '.txt'
+    logf = basename + '.log'
+    inff = basename + '.yml'
+    errf = basename + '.err'
+    with open(logf, 'w') as log, open(errf, 'w') as err:
         argv = [
             method, '-q',
             '-s', space,
             task.filename,
             '-o', outf,
+            '-i', inff,
             *cmd_args
         ]
         print("\nCommand: {}".format(argv), file=log)
-        start = time.time()
-        proc = subprocess.run(argv, stdout=log, stderr=subprocess.STDOUT)
-        end = time.time()
-        delta = end - start
+        proc = subprocess.run(argv, stdout=log, stderr=err)
         print("\nFinished in: {} seconds".format(delta), file=log)
-    return delta, proc.returncode
+    with open(inff) as f:
+        summary = yaml.safe_load(f)
+    summary['returncode'] = proc.returncode
+    return summary
 
 
 # utility functions

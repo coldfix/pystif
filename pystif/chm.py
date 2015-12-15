@@ -2,7 +2,7 @@
 Find projection of a convex cone to a lower dimensional subspace.
 
 Usage:
-    chm INPUT -s SUBSPACE [-o OUTPUT] [-x XRAYS] [-l LIMIT] [-r] [-q]
+    chm INPUT -s SUBSPACE [-o OUTPUT] [-x XRAYS] [-l LIMIT] [-r] [-q] [-i FILE]
 
 Options:
     -o OUTPUT, --output OUTPUT      Save facets of projected cone
@@ -13,6 +13,7 @@ Options:
     -r, --resume                    Resume using previously computed rays
                                     (must be fully dimensional!)
     -q, --quiet                     Less status output
+    -i FILE, --info FILE            Print short summary to file (YAML)
 
 Note:
     * output files may be specified as '-' to use STDIN/STDOUT
@@ -148,4 +149,5 @@ def main(app):
                  partial(print_status, info),
                  partial(print_qhull, info))
 
+    app.start_timer()
     convex_hull_method(app.polyhedron, rays, *callbacks)

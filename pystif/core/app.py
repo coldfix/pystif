@@ -1,7 +1,11 @@
 
-from docopt import docopt
-from functools import wraps
+from contextlib import contextmanager
+from functools import wraps, partial
 import os
+import time
+
+from docopt import docopt
+import yaml
 
 from .geom import ConvexCone
 from .io import System, SystemFile, StatusInfo
@@ -9,12 +13,30 @@ from .symmetry import SymmetryGroup, NoSymmetry
 from .util import cachedproperty
 
 
+def main_func(func, doc, args=None):
+    app = Application(args, func)
+    if doc:
+        app.doc = doc
+    app.start_timer()
+    result = app.run()
+    app.stop_timer()
+    info_file = app.opts.get('--info')
+    if info_file:
+        info = {
+            'start': app.start,
+            'stop': app.stop,
+            'time': app.stop - app.start,
+            'subspace': app.opts['--subspace'],
+        }
+        if app.summary:
+            info.update(app.summary())
+        with open(info_file, 'w') as f:
+            yaml.safe_dump(info, f, default_flow_style=False)
+    return result
+
+
 def application(func, doc=None):
-    def main(args=None):
-        app = Application(args, func)
-        if doc:
-            app.doc = doc
-        return app.run()
+    main = partial(main_func, func, doc)
     if func.__globals__['__name__'] == '__main__':
         main()
     return main
@@ -25,6 +47,9 @@ class Application:
     def __init__(self, args=None, func=None):
         self.args = args
         self.func = func
+        self.start = None
+        self.stop = None
+        self.summary = None
 
     @cachedproperty
     def doc(self):
@@ -110,3 +135,10 @@ class Application:
         if self.func:
             return self.func(self)
         raise NotImplementedError()
+
+    def start_timer(self):
+        self.start = time.time()
+
+    def stop_timer(self):
+        if self.stop is None:
+            self.stop = time.time()
