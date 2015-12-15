@@ -1,0 +1,10 @@
+rvar a b c d A B C D
+
+# iid initial state
+A :: B :: C :: D
+
+# causality DAG
+a :: b,c,d,C,D | A,B
+b :: a,c,d,A,D | B,C
+c :: a,b,d,A,B | C,D
+d :: a,b,c,B,C | A,D
