@@ -12,9 +12,11 @@ import sys
 
 data = np.loadtxt(sys.argv[1])
 cols = [
-    'dim', 'num_rows', 'subdim',
-    't_afi', 'ret_afi',
-    't_chm', 'ret_chm',
+    'dim',
+    'num_rows',
+    'subdim',
+    't_afi',
+    't_chm',
     'num_facets',
     'num_ridges',
     'num_vertices',

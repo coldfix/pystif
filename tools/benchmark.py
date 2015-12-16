@@ -67,15 +67,22 @@ def make_tasks(input_files, output_dims, num_runs, prefix):
 def exec_task(task, print_):
     afi = single_pass(task, 'afi', '-r1')
     chm = single_pass(task, 'chm')
+    if not afi or not chm:
+        print_(
+            dim,
+            num_rows,
+            len(task.subspace),
+            bool(afi),
+            bool(chm),
+        )
+        return
     num_rows, dim = task.system.shape
     print_(
         dim,
         num_rows,
         len(task.subspace),
         afi['time'],
-        afi['returncode'],
         chm['time'],
-        chm['returncode'],
         afi['num_facets'],
         afi['num_ridges'],
         afi['num_vertices'],
@@ -104,10 +111,10 @@ def single_pass(task, method, *cmd_args):
         print("\nCommand: {}".format(argv), file=log)
         proc = subprocess.run(argv, stdout=log, stderr=err)
         print("\nFinished in: {} seconds".format(delta), file=log)
+    if proc.returncode != 0:
+        return None
     with open(inff) as f:
-        summary = yaml.safe_load(f)
-    summary['returncode'] = proc.returncode
-    return summary
+        return yaml.safe_load(f)
 
 
 # utility functions
