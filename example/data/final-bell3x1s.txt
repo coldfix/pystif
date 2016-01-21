@@ -1,0 +1,21 @@
+# command line: ../cfme/bin/eliminate 6
+# start date:   Mon Jun 15 12:46:24 2015
+# git commit:   67ee489b6b82405e60718d11dcd7f87f2ab24aca
+# running time:  0.015s wall, 0.000s user + 0.000s system = 0.000s CPU (n/a%)
+
+
+# Elimination order:
+#      9   9   6   6   8   9   7   7   7   6
+
+  1  -1   0   0   0 
+ -1   1   1   1   0 
+  0   1   0   0   0 
+  0   0   0   1   0 
+  1   0  -1   0   0 
+  1  -1  -1   0   1 
+  0   0   1   0   0 
+  1   0   0  -1   0 
+  1  -1   0  -1   1 
+  1   0  -1  -1   1 
+  1  -1  -1  -1   2 
+

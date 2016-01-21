@@ -52,6 +52,7 @@ setup(
         'scipy',
         'docopt',
         'funcparserlib>=0.3.6',
+        'PyYAML',
     ],
     setup_requires=[
         # In fact, these need to be installed before running setup.py - they

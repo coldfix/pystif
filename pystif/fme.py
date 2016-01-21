@@ -2,7 +2,7 @@
 Perform a simple Fourier-Motzkin-Elimination (FME) on the rows.
 
 Usage:
-    fme INPUT [-o OUTPUT] -s SUBSPACE [-q] [-d DROP]
+    fme INPUT [-o OUTPUT] -s SUBSPACE [-q] [-d DROP] [-i FILE]
 
 Options:
     -o OUTPUT, --output OUTPUT      Save facets of projected cone
@@ -11,6 +11,7 @@ Options:
     -d DROP, --drop DROP            Randomly drop DROP inequalities from the
                                     initial system before beginning the FME
                                     [default: 0]
+    -i FILE, --info FILE            Print short summary to file (YAML)
 """
 
 import random
@@ -57,5 +58,7 @@ def main(app):
         d = random.randrange(app.system.shape[0])
         app.system.matrix = np.delete(app.system.matrix, d, axis=0)
 
-    for row in fme.solve_to(app.system.matrix, app.subdim):
+    system = app.system
+    app.start_timer()
+    for row in fme.solve_to(system.matrix, app.subdim):
         app.output(row)

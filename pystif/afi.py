@@ -2,7 +2,7 @@
 Project convex cone to subspace by an adjacent facet iteration method.
 
 Usage:
-    afi INPUT -s SUBSPACE [-o OUTPUT] [-l LIMIT] [-y SYMMETRIES] [-r NUM] [-q]...
+    afi INPUT -s SUBSPACE [-o OUTPUT] [-l LIMIT] [-y SYMMETRIES] [-r NUM] [-q]... [-i FILE]
 
 Options:
     -o OUTPUT, --output OUTPUT      Set output file for solution
@@ -12,6 +12,7 @@ Options:
     -y SYM, --symmetry SYM          Symmetry group generators
     -r NUM, --recursions NUM        Number of AFI recursions [default: 0]
     -q, --quiet                     Show less output
+    -i FILE, --info FILE            Print short summary to file (YAML)
 """
 
 from functools import partial
@@ -20,11 +21,19 @@ import os
 import numpy as np
 from docopt import docopt
 
+import yaml
+
 from .core.app import application
 from .core.array import scale_to_int
 from .core.io import StatusInfo
-from .core.util import VectorMemory
+from .core.util import VectorMemory, PointSet
 from .chm import convex_hull_method, print_status, print_qhull
+
+
+def mean_variance(samples):
+    return (float(np.mean(samples)),
+            float(np.var(samples)),
+            float(np.std(samples, ddof=1)))
 
 
 class Face:
@@ -97,6 +106,9 @@ class AFI:
         self.full_rank = polyhedron.rank()
         self._info = info
         self.whole = Face(polyhedron)
+        # for info summary:
+        self._vertices = PointSet()
+        self._num_chm = 0
 
     def solve(self):
         """Iterate over facet normal vectors of the overall polyhedron."""
@@ -135,11 +147,12 @@ class AFI:
 
     def _chm(self, body):
         """Iterate over all subfaces of an arbitrary face using CHM."""
+        self._num_chm += 1
         if body.rank <= self.quiet_rank:
             sub_info = StatusInfo(open(os.devnull, 'w'))
         else:
             sub_info = self._info
-        callbacks = (lambda ray: None,
+        callbacks = (self._vertices.add,
                      lambda facet: None,
                      partial(print_status, sub_info),
                      partial(print_qhull, sub_info))
@@ -227,13 +240,57 @@ class AFI:
                   len(queue), str(i).rjust(len_eqs), num_eqs,
                   "\n" if i == num_eqs else "")
 
+    def summary(self):
+        # TODO: make this work in the presence of symmetries!
+        # TODO: some non-vertices counted?
+        facets = self.whole.subfaces
+        ridges = set()
+        vertices = self._vertices
+        for f in facets:
+            for r in f.subfaces:
+                if r in ridges:
+                    continue
+                # if any(is_face_identical(r, _r) for _r in ridges):
+                #     continue
+                ridges.add(r)
+        # TODO: other statistics like variance of quantities:
+        # - vertex/ridge
+        # - vertex/face
+        # - ridge/face
+        rpf = mean_variance([
+            len(f.subfaces) for f in facets
+        ])
+        vpf = mean_variance([
+            sum(1 for v in vertices if np.allclose(f.subspace.normals @ v, 0))
+            for f in facets
+        ])
+        vpr = mean_variance([
+            sum(1 for v in vertices if np.allclose(r.subspace.normals @ v, 0))
+            for r in ridges
+        ])
+        return {
+            'num_facets': len(facets),
+            'num_ridges': len(ridges),
+            'num_vertices': len(vertices),
+            'num_chm': self._num_chm,
+            'ridges_per_facet': rpf,
+            'vertices_per_facet': vpf,
+            'vertices_per_ridge': vpr,
+        }
+
+
+def is_face_identical(a, b):
+    return a is b or np.allclose(a.subspace.onb @ b.subspace.normals.T, 0)
+
 
 @application
 def main(app):
     app.report_nullspace()
     quiet_rank = app.subdim-2 if app.quiet else 0
     info = app.info(1)
+    app.start_timer()
     afi = AFI(app.polyhedron, app.symmetries, app.recursions, quiet_rank, info)
     for facet in afi.solve():
         app.output(facet)
     info()
+    app.summary = afi.summary
