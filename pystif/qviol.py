@@ -156,6 +156,16 @@ def violation(state, expr, mcombo):
     return np.dot(entropies, expr)
 
 
+def random_direction_pair():
+    d = np.random.normal(size=3)
+    d /= np.linalg.norm(d)
+    n = np.random.normal(size=2)
+    s = d[:2] @ n
+    n = np.hstack((n, -s/d[2]))
+    n /= np.linalg.norm(n)
+    return d, n
+
+
 def main(args=None):
 
     opts = docopt(__doc__, args)
@@ -165,7 +175,15 @@ def main(args=None):
     # set up measurements
     alpha = (0, 3*pi/4, 6*pi/4)
     #alpha = (0, 0, 0)
-    parties = [[Qbit.xzspin(a), Qbit.xzspin(a+pi/2)] for a in alpha]
+    #parties = [[Qbit.xzspin(a), Qbit.xzspin(a+pi/2)] for a in alpha]
+
+    d1, n1 = random_direction_pair()
+    d2, n2 = random_direction_pair()
+    parties = [
+        [Qbit.xzspin(0), Qbit.xzspin(pi/2)],
+        [Qbit.rotspin(d1), Qbit.rotspin(n1)],
+        [Qbit.rotspin(d2), Qbit.rotspin(n2)],
+    ]
 
     # measurement combinations
     mcols = mkcombo(['Aa', 'Bb', 'Cc'])
