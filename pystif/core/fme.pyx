@@ -1,3 +1,4 @@
+from __future__ import print_function
 
 import itertools
 from functools import partial
@@ -5,8 +6,9 @@ from math import gcd
 
 import numpy as np
 
-from .lp import Problem
+from .lp import Problem, Minimize
 from .util import safe_call
+from .term import TerminalInput
 
 
 def _gcd(a, b):
@@ -30,6 +32,9 @@ class FME:
     cb_start = None
     cb_step = None
     cb_stop = None
+
+    def __init__(self):
+        self.term = TerminalInput()
 
     def partition_by_column_sign(self, rows, int col):
         """
@@ -103,6 +108,10 @@ class FME:
         cdef int col
         safe_call(self.cb_start, rows, cols_to_eliminate)
         while cols_to_eliminate:
+            if self.term.avail() and self.term.get() == b'm':
+                print("\nMinimizing...", len(rows), end=' ', flush=True)
+                rows = Minimize().minimize(rows)
+                print("->", len(rows))
             col = self.choose_next_column(rows, cols_to_eliminate)
             rows = self.eliminate_column_from_system(rows, col)
             cols_to_eliminate = [

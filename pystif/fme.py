@@ -27,6 +27,7 @@ class FMEStatusInfo:
 
     def __init__(self):
         self.info = StatusInfo()
+        super().__init__()
 
     def cb_start(self, rows, cols_to_eliminate):
         num_cols = len(rows[0])
