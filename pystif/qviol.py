@@ -19,6 +19,8 @@ from docopt import docopt
 
 from .core.symmetry import SymmetryGroup
 from .core.util import scale_to_int
+from .core.io import System, _varset
+from .core import parse
 
 
 def dagger(M):
@@ -142,10 +144,10 @@ def H(pdist):
     return sum(map(h, pdist))
 
 
-def mkcombo(parties):
-    return [combo
-            for a, b in itertools.combinations(parties, 2)
-            for combo in itertools.product(a, b)]
+def select_combinations(parties, columns):
+    _sel_op = lambda p: parties[ord(p.lower())-ord('a')][p.islower()]
+    return [[_sel_op(p) for p in _varset(colname)]
+            for colname in columns]
 
 
 def violation(state, expr, mcombo):
@@ -170,6 +172,15 @@ def main(args=None):
 
     opts = docopt(__doc__, args)
 
+    _sys = System.load(opts['EXPRS'])
+    exprs = _sys.matrix
+    mcols = _sys.columns
+    if opts['--symmetry']:
+        sg = SymmetryGroup.load(opts['--symmetry'], mcols)
+        groups = group_by_symmetry(sg, exprs)
+        # take one representative from each category:
+        exprs = [g[0] for g in groups]
+
     system = CompositeQuantumSystem((2, 2, 2))
 
     # set up measurements
@@ -186,40 +197,27 @@ def main(args=None):
     ]
 
     # measurement combinations
-    mcols = mkcombo(['Aa', 'Bb', 'Cc'])
     # initial:  [[a, b] per party]
     # lift:     [[(y, n) per angle] per party]
     # mkcombo:  [[(ay, an), (by, bn)] per operator pairing among different parties]
     # product:  [[(ay,by), (ay,bn), (an,by), (an,bn)] per operator pairing (a,b)]
     # matmul:   [[ay@by, ay@bn, an@by, an@bn] per operator pairing (a,b)]
-    mcombo = mkcombo(system.lift_all(parties))
+    mcombo = select_combinations(system.lift_all(parties), mcols)
     mcombo = [itertools.product(*m) for m in mcombo]
     mcombo = [[reduce(matmul, parts) for parts in m] for m in mcombo]
 
-    # TODO: rearrange + discard symmetries
-    exprs = np.loadtxt(opts['EXPRS'])
-    if opts['--symmetry']:
-        sg = SymmetryGroup.load(opts['--symmetry'], mcols)
-        groups = group_by_symmetry(sg, exprs)
-        # take one representative from each category:
-        exprs = [g[0] for g in groups]
-
     c = 0
-    expr = exprs[13]
     for i in range(50):
         for expr in exprs:
             state = np.random.normal(size=2*system.dim-2)
             result = scipy.optimize.minimize(violation, state, (expr, mcombo))
-            if result.success:
-                print(result.fun)
-                if result.fun < 0:
-                    print(result)
-                    c += 1
+            if result.fun < 0:
+                print('\n', result, sep='')
+                c += 1
             else:
-                print(result.message)
-                print(result.x)
+                print('.' if result.success else 'x', end='', flush=True)
 
-    print(c, "/", len(exprs))
+    print(c, '/', len(exprs))
 
 
 if __name__ == '__main__':

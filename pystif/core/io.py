@@ -10,15 +10,18 @@ from .lp import Problem
 from .util import VectorMemory
 
 
-def _name(key):
-    _setfunc = lambda name, args: name + '(' + ','.join(sorted(args)) + ')'
+def _varset(key):
     if isinstance(key, set):
-        return _setfunc('H', key)
+        return key
     if key.startswith('H(') and key.endswith(')'):
-        return _setfunc('H', set(re.split('[ ,]', key[2:-1])))
+        return set(re.split('[ ,]', key[2:-1]))
     if key.startswith('_') and key != '_':
-        return _setfunc('H', set(key[1:]))
-    return key
+        return set(key[1:])
+    raise {key}
+
+
+def _name(key):
+    return 'H(' + ','.join(sorted(_varset(key))) + ')'
 
 
 def detect_prefix(s, prefix, on_prefix):
