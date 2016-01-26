@@ -8,6 +8,12 @@ from .lp import Problem
 from .util import PointSet, cached
 
 
+def unit_vector(dim, idx):
+    r = np.zeros(dim)
+    r[idx] = 1
+    return r
+
+
 class ConvexCone:
 
     """
@@ -87,6 +93,49 @@ class ConvexCone:
         extreme_point = self.lp.minimize(q, embed=True)
         extreme_point = extreme_point[0:self.dim]
         extreme_point = scale_to_int(extreme_point)
+        self.points.add(extreme_point)
+        return extreme_point
+
+    def search_ensure_vertex(self, q):
+        """
+        Like ``search()``, but ensure that the resulting point is an extreme
+        point.
+
+        This uses the extreme_point algorithm in 5.4.1. from
+
+            Lassez, C. and Lassez, J.L., 1990, Quantifier Elimination for
+            Conjunctions of Linear Constraints via a Convex Hull Algorithm
+        """
+        dim = self.dim
+        m = np.empty(dim)
+        assert len(q) == dim
+        k = next(k for k, qk in enumerate(q) if qk != 0)
+        inf = float("inf")
+
+        lp = self.lp.copy()
+        h = lp.minimum(q, embed=True)
+
+        # replace x_k by (h - Σa[i] x[i]) in Y
+        for i, row in enumerate(lp.get_matrix()):
+            c = row[k]/q[k]
+            if row[k] == 0:
+                continue
+            lb, ub = lp.get_row_bnds(i)
+            for j in range(dim):
+                row[j] -= q[j]*c
+            lp.set_row(i, row)
+            lp.set_row_bnds(i, lb-h*c, ub-h*c)
+
+        for i in range(dim):
+            if i == k:
+                continue
+            m[i] = lp.minimum(unit_vector(dim, i), embed=True)
+            # replace x[i] by its optimum m[i] in Y
+            lp.set_col_bnds(i, m[i], m[i])
+
+        m[k] = (h - sum(q[i]*m[i] for i in range(dim) if i != k)) / q[k]
+
+        extreme_point = scale_to_int(m)
         self.points.add(extreme_point)
         return extreme_point
 
