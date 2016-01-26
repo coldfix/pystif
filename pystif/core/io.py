@@ -51,8 +51,9 @@ def read_system_from_file(file):
     try:
         return read_table_from_file(lines)
     except ValueError:
-        from .parse import parse_text
-        return parse_text("\n".join(lines))
+        pass
+    from .parse import parse_text
+    return parse_text("\n".join(lines))
 
 
 def read_table_from_file(file):
@@ -167,8 +168,9 @@ class System:
         try:
             return int(col)
         except ValueError:
-            col = _name(col)
-            return self.columns.index(col)
+            pass
+        col = _name(col)
+        return self.columns.index(col)
 
     def lp(self):
         """Get the LP."""

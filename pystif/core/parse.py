@@ -332,7 +332,8 @@ def to_number(s: str):
     try:
         return int(s)
     except ValueError:
-        return float(s)
+        pass
+    return float(s)
 
 
 @stararg
