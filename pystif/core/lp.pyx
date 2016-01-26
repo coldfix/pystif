@@ -143,7 +143,7 @@ cdef class Problem:
             for i, row in enumerate(L):
                 self.set_row(s+i, row, embed=embed)
             return s
-        except:
+        except Exception:
             self.del_rows(range(s, s+num_rows))
             raise
 
@@ -157,7 +157,7 @@ cdef class Problem:
             if coefs is not None:
                 self.set_row(i, coefs, embed=embed)
             return i
-        except:
+        except Exception:
             self.del_row(i)
             raise
 
@@ -171,7 +171,7 @@ cdef class Problem:
             if coefs is not None:
                 self.set_col(i, coefs, embed=embed)
             return i
-        except:
+        except Exception:
             self.del_col(i)
             raise
 
@@ -181,7 +181,7 @@ cdef class Problem:
         try:
             self.set_row_bnds(range(s, s+num_rows), lb, ub)
             return s
-        except:
+        except Exception:
             self.del_rows(range(s, s+num_rows))
             raise
 
@@ -194,7 +194,7 @@ cdef class Problem:
         try:
             self.set_col_bnds(range(s, s+num_cols), lb, ub)
             return s
-        except:
+        except Exception:
             self.del_cols(range(s, s+num_cols))
             raise
 

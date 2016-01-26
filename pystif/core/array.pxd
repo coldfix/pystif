@@ -18,6 +18,7 @@ cdef inline double[:] double_view(x):
     try:
         return x
     except (ValueError, TypeError):
-        # ValueError: numpy dtype mismatch (e.g. int)
-        # TypeError: x doesn't support buffer interface (e.g. list)
-        return np.ascontiguousarray(x, np.float64)
+        pass
+    # ValueError: numpy dtype mismatch (e.g. int)
+    # TypeError: x doesn't support buffer interface (e.g. list)
+    return np.ascontiguousarray(x, np.float64)

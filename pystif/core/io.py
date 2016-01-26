@@ -10,15 +10,21 @@ from .lp import Problem
 from .util import VectorMemory
 
 
-def _name(key):
-    _setfunc = lambda name, args: name + '(' + ','.join(sorted(args)) + ')'
-    if isinstance(key, set):
-        return _setfunc('H', key)
+def _varset(key):
+    if isinstance(key, (set,list,tuple)):
+        return set(key)
     if key.startswith('H(') and key.endswith(')'):
-        return _setfunc('H', set(re.split('[ ,]', key[2:-1])))
+        return set(re.split('[ ,]', key[2:-1]))
     if key.startswith('_') and key != '_':
-        return _setfunc('H', set(key[1:]))
-    return key
+        return set(key[1:])
+    raise ValueError("Unknown format.")
+
+
+def _name(key):
+    try:
+        return 'H(' + ','.join(sorted(_varset(key))) + ')'
+    except ValueError:
+        return key
 
 
 def detect_prefix(s, prefix, on_prefix):
@@ -45,8 +51,9 @@ def read_system_from_file(file):
     try:
         return read_table_from_file(lines)
     except ValueError:
-        from .parse import parse_text
-        return parse_text("\n".join(lines))
+        pass
+    from .parse import parse_text
+    return parse_text("\n".join(lines))
 
 
 def read_table_from_file(file):
@@ -161,8 +168,9 @@ class System:
         try:
             return int(col)
         except ValueError:
-            col = _name(col)
-            return self.columns.index(col)
+            pass
+        col = _name(col)
+        return self.columns.index(col)
 
     def lp(self):
         """Get the LP."""

@@ -18,9 +18,10 @@ def cached(fn):
         try:
             return getattr(self, key)
         except AttributeError:
-            val = fn(self)
-            setattr(self, key, val)
-            return val
+            pass
+        val = fn(self)
+        setattr(self, key, val)
+        return val
     return wrapper
 
 
