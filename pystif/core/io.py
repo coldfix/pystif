@@ -11,17 +11,20 @@ from .util import VectorMemory
 
 
 def _varset(key):
-    if isinstance(key, set):
-        return key
+    if isinstance(key, (set,list,tuple)):
+        return set(key)
     if key.startswith('H(') and key.endswith(')'):
         return set(re.split('[ ,]', key[2:-1]))
     if key.startswith('_') and key != '_':
         return set(key[1:])
-    raise {key}
+    raise ValueError("Unknown format.")
 
 
 def _name(key):
-    return 'H(' + ','.join(sorted(_varset(key))) + ')'
+    try:
+        return 'H(' + ','.join(sorted(_varset(key))) + ')'
+    except ValueError:
+        return key
 
 
 def detect_prefix(s, prefix, on_prefix):
