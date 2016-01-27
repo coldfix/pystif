@@ -29,6 +29,8 @@ from .core.geom import (ConvexCone, LinearSubspace,
                         random_direction_vector)
 from .core.util import VectorMemory
 
+from .afi import AFI
+
 
 def rfd(polyhedron, symmetries, found_cb, runs, status):
 
@@ -43,6 +45,31 @@ def rfd(polyhedron, symmetries, found_cb, runs, status):
         for f in symmetries(facet):
             found_cb(f)
             seen(f)
+
+
+class AFI2(AFI):
+
+    def _chm(self, body):
+        if self._num_chm >= 1:
+            return ()
+        return super()._chm(body)
+
+
+def rfd2(polyhedron, symmetries, recursions, found_cb, runs, status, info):
+
+    face = np.ones(polyhedron.dim)
+    seen = VectorMemory()
+
+    quiet_rank = polyhedron.dim - recursions
+
+    for i in range(runs):
+        afi = AFI2(polyhedron, symmetries, recursions, quiet_rank, info)
+        status(i, runs, seen)
+        for f in afi.solve():
+            found_cb(f)
+            seen(f)
+
+    info()
 
 
 def random_subspace(sub_dim, tot_dim):
@@ -117,4 +144,5 @@ def main(app):
         rss(app.system, app.polyhedron, app.symmetries, app.output, runs, slice_dim, status,
             app.info(0))
     else:
-        rfd(app.polyhedron, app.symmetries, app.output, runs, status)
+        #rfd(app.polyhedron, app.symmetries, app.output, runs, status)
+        rfd2(app.polyhedron, app.symmetries, 5, app.output, runs, status, app.info(1))
