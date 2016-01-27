@@ -2,12 +2,13 @@
 Print equations in human readable format.
 
 Usage:
-    pretty INPUT [-o OUTPUT] [-g | -y SYM]
+    pretty INPUT [-o OUTPUT] [-g | -y SYM] [-q]
 
 Options:
     -o OUTPUT, --output OUTPUT      Output file
     -g, --group                     Group similar constraints
     -y SYM, --symmetry SYM          Specify symmetry group generators
+    -q, --quiet                     Less output in the presence of symmetries
 """
 
 
@@ -17,7 +18,7 @@ from docopt import docopt
 
 from .core.io import (System, print_to, VectorMemory,
                       default_column_labels, column_varname_labels)
-from .core.symmetry import SymmetryGroup
+from .core.symmetry import SymmetryGroup, group_by_symmetry
 
 
 def _fmt_float(f):
@@ -100,14 +101,19 @@ def main(args=None):
             dump(g)
     elif opts['--symmetry']:
         sg = SymmetryGroup.load(opts['--symmetry'], system.columns)
-        seen = VectorMemory()
-        for row in system.matrix:
-            if seen(row):
-                continue
-            for sym in sg(row):
-                dump([sym])
-                seen(sym)
-            print_()
+        groups = group_by_symmetry(sg, system.matrix)
+        for g in groups:
+            if opts['--quiet']:
+                dump([g[0]])
+            else:
+                dump(g)
+                print_()
+        lengths = list(map(len, groups))
+        print_()
+        print_('# Number of inequalities:')
+        print_('#   groups:', len(g))
+        print_('#   items: ', *lengths)
+        print_('#   total: ', sum(lengths))
     else:
         dump(system.matrix)
 

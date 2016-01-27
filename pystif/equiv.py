@@ -2,11 +2,12 @@
 Check the equivalence of two system of equations.
 
 Usage:
-    equiv [-q] [-1] A B
+    equiv [-q...] [-1] [-y SYMMETRIES] A B
 
 Options:
-    -q, --quiet         No output, result is only signaled via return value
-    -1, --one-way       Check only if A implies B, not the other way round
+    -q, --quiet                 Less output, result is signaled via return value
+    -1, --one-way               Check only if A implies B, not the other way round
+    -y SYM, --symmetry SYM      Symmetry group generators
 
 The program's return code signifies whether the two systems are equivalent:
 
@@ -24,27 +25,26 @@ import numpy as np
 from docopt import docopt
 
 from .core.io import format_vector, System
+from .core.symmetry import NoSymmetry, SymmetryGroup, group_by_symmetry
 
 
-def show_missing_constraints(lp, constraints, name_a, name_b):
-    """Show the difference of these constraints."""
-    missing = [constr for constr in constraints.matrix
-               if not lp.implies(constr)]
-    if not missing:
-        print("{} implies {}!".format(name_a, name_b))
-        return 0
-    print("{} does not imply the following inequalities of {}:"
-          .format(name_a, name_b))
-    for constr in missing:
-        print(format_vector(constr))
-    return len(missing)
-
-
-def check_implies(sys_a, sys_b, name_a, name_b, quiet=False):
+def check_implies(sys_a, sys_b, name_a, name_b, *, symmetries, quiet=False):
     lp = sys_a.lp()
-    if quiet:
-        return lp.implies(sys_b.matrix)
-    return show_missing_constraints(lp, sys_b, name_a, name_b) == 0
+    # take one representative from each category:
+    groups = group_by_symmetry(symmetries, sys_b.matrix)
+    missing = [g for g in groups if not lp.implies(g[0])]
+    if quiet <= 1:
+        if missing:
+            print("{} misses {} ({} intrinsic) constraints of {}!".format(
+                name_a, sum(map(len, missing)), len(missing), name_b))
+        else:
+            print("{} implies {}!".format(name_a, name_b))
+    if quiet == 0:
+        print("{} misses the following inequalities of {}:"
+                .format(name_a, name_b))
+        for constr in missing:
+            print(format_vector(constr))
+    return len(missing) == 0
 
 
 def main(args=None):
@@ -52,8 +52,14 @@ def main(args=None):
     sys_a = System.load(opts['A'])
     sys_b = System.load(opts['B'])
     sys_b, _ = sys_b.slice(sys_a.columns, fill=True)
+
+    if opts.get('--symmetry'):
+        symm = SymmetryGroup.load(opts['--symmetry'], sys_a.columns)
+    else:
+        symm = NoSymmetry
+
     status = 0
-    kwd = {'quiet': opts['--quiet']}
+    kwd = {'quiet': opts['--quiet'], 'symmetries': symm}
     if not check_implies(sys_a, sys_b, 'A', 'B', **kwd):
         status |= 1
     if not opts['--one-way']:
