@@ -4,7 +4,7 @@ Utilities to generate the symmetries of equations.
 
 import numpy as np
 
-from .util import VectorMemory
+from .util import VectorMemory, scale_to_int
 
 
 class VarPermutation:
@@ -86,3 +86,19 @@ class SymmetryGroup:
 
 def NoSymmetry(vector):
     yield vector
+
+
+def group_by_symmetry(sg, vectors):
+    groups = []
+    belong = {}
+    for row in vectors:
+        row_ = tuple(scale_to_int(row))
+        if row_ in belong:
+            belong[row_].append(row)
+            continue
+        group = [row]
+        groups.append(group)
+        for sym in sg(row):
+            sym_ = tuple(scale_to_int(sym))
+            belong[sym_] = group
+    return groups

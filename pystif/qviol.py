@@ -17,8 +17,7 @@ import scipy.optimize
 import numpy as np
 from docopt import docopt
 
-from .core.symmetry import SymmetryGroup
-from .core.util import scale_to_int
+from .core.symmetry import SymmetryGroup, group_by_symmetry
 from .core.io import System, _varset
 from .core import parse
 
@@ -115,22 +114,6 @@ class CompositeQuantumSystem:
                   self.lift(complement(m), i))
                  for m in povms]
                 for i, povms in enumerate(parties)]
-
-
-def group_by_symmetry(sg, vectors):
-    groups = []
-    belong = {}
-    for row in vectors:
-        row_ = tuple(scale_to_int(row))
-        if row_ in belong:
-            belong[row_].append(row)
-            continue
-        group = [row]
-        groups.append(group)
-        for sym in sg(row):
-            sym_ = tuple(scale_to_int(sym))
-            belong[sym_] = group
-    return groups
 
 
 # composed operations
