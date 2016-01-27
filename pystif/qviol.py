@@ -190,11 +190,11 @@ def main(args=None):
     mcombo = [[reduce(matmul, parts) for parts in m] for m in mcombo]
 
     c = 0
-    for i in range(50):
+    for i in range(5000):
         for expr in exprs:
             state = np.random.normal(size=2*system.dim-2)
             result = scipy.optimize.minimize(violation, state, (expr, mcombo))
-            if result.fun < 0:
+            if result.fun < -1e-11:
                 print('\n', result, sep='')
                 c += 1
             else:
