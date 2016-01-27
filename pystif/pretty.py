@@ -111,7 +111,7 @@ def main(args=None):
         lengths = list(map(len, groups))
         print_()
         print_('# Number of inequalities:')
-        print_('#   groups:', len(g))
+        print_('#   groups:', len(groups))
         print_('#   items: ', *lengths)
         print_('#   total: ', sum(lengths))
     else:
