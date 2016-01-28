@@ -57,6 +57,7 @@ class Face:
         self.adjacent = {}
         self.normals = {}
         self.solved = False
+        self.visited = False
         self.rank = self.subspace.onb.shape[0]
 
     def add_subface(self, subface, normal):
@@ -69,6 +70,14 @@ class Face:
         self.subfaces.append(subface)
         self.normals[subface] = normal
 
+    def unvisit(self):
+        """
+        Clear visited flag if not fully solved.
+        """
+        if self.visited and not self.solved:
+            self.visited = False
+            for f in self.subfaces:
+                f.unvisit()
 
 class AFIQueue:
 
@@ -122,7 +131,7 @@ class AFI:
         :param Face body: abstract face graph
         :param ConvexCone polyhedron: face realization subspace
         """
-        if body.solved:
+        if body.visited:
             yield from self._sol(body)
         elif body.rank == 1:
             yield from self._ray(body)
@@ -130,10 +139,10 @@ class AFI:
             yield from self._chm(body)
         else:
             yield from self._afi(body)
-        body.solved = True
+        body.visited = True
 
     def _sol(self, body):
-        """."""
+        """Iterate over all previously discovered subfaces of a polytope."""
         yield from body.normals.items()
 
     def _ray(self, body):
@@ -143,6 +152,7 @@ class AFI:
         normal = body.subspace.onb[0]
         facet = self.get_subface_instance(body, normal)
         body.add_subface(facet, normal)
+        body.solved = True
         return [(facet, normal)]
 
     def _chm(self, body):
@@ -160,6 +170,7 @@ class AFI:
         ineqs, _ = convex_hull_method(poly, poly.basis(), *callbacks)
         for ineq in ineqs:
             yield self.get_subface_instance(body, ineq), ineq
+        body.solved = True
 
     def _afi(self, body):
         """Iterate over all subfaces of an arbitrary face using AFI."""
@@ -172,12 +183,23 @@ class AFI:
                 self.status_info(queue, subfaces, i, body.rank)
                 yield from queue.add(*self.get_adjacent_face(body, facet, subface))
             self.status_info(queue, subfaces, len(subfaces), body.rank)
+        body.solved = all(face.solved for face in body.subfaces)
 
     def init_face(self, face):
         """Ensure knowledge of a subface."""
         if face.subfaces:
             subface = face.subfaces[0]
             return subface, face.normals[subface]
+        return self._search_subface(face)
+
+    def _search_subface(self, face):
+        """
+        Search a subface using an LP.
+
+        :returns: a tuple ``(Face, normal)``.
+        """
+        if face.solved:
+            return self.init_face(face)
         rank = face.rank-1
         self.info(rank, "Search rank {} facet", rank)
         # TODO: obtain chain of subfaces of dimensions 1 to N in single sweep
@@ -186,6 +208,8 @@ class AFI:
         facet = self.get_subface_instance(face, normal)
         self.info(rank, "Search rank {} facet [done]\n", rank)
         return facet, normal
+
+
 
     def get_adjacent_face(self, sup, face, sub):
         try:

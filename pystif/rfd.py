@@ -49,10 +49,21 @@ def rfd(polyhedron, symmetries, found_cb, runs, status):
 
 class AFI2(AFI):
 
+    def new_round(self):
+        self.do_chm = True
+        body = self.whole
+        body.unvisit()
+        while body.rank > self.full_rank - self.recursions:
+            subface, normal = self._search_subface(body)
+            body.subfaces.remove(subface)
+            body.subfaces.insert(0, subface)
+            body = subface
+
     def _chm(self, body):
-        if self._num_chm >= 1:
-            return ()
-        return super()._chm(body)
+        if self.do_chm:
+            self.do_chm = False
+            return super()._chm(body)
+        return ()
 
 
 def rfd2(polyhedron, symmetries, recursions, found_cb, runs, status, info):
@@ -62,9 +73,11 @@ def rfd2(polyhedron, symmetries, recursions, found_cb, runs, status, info):
 
     quiet_rank = polyhedron.dim - recursions
 
+    afi = AFI2(polyhedron, symmetries, recursions, quiet_rank, info)
+
     for i in range(runs):
-        afi = AFI2(polyhedron, symmetries, recursions, quiet_rank, info)
         status(i, runs, seen)
+        afi.new_round()
         for f in afi.solve():
             found_cb(f)
             seen(f)
