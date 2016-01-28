@@ -19,6 +19,7 @@ Options:
     -i FILE, --info FILE            Print short summary to file (YAML)
 """
 
+import gc
 from functools import partial
 
 import numpy as np
@@ -81,6 +82,7 @@ def rfd2(polyhedron, symmetries, recursions, found_cb, runs, status, info):
         for f in afi.solve():
             found_cb(f)
             seen(f)
+        gc.collect()
 
     info()
 
