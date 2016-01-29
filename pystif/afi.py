@@ -43,16 +43,20 @@ class Face:
     is computed and altered during the AFI procedure.
 
     :ivar ConvexCone polyhedron:        Provider for LP primitives
-    :ivar LinearSubspace subspace:      Defining subspace
-    :ivar list subfaces:                Known subfaces
+    :ivar LinearSubspace subspace:      Defining r-dimensional subspace
+    :ivar list supfaces:                Known (r+1)-dimensional superfaces
+    :ivar list subfaces:                Known (r-1)-dimensional subfaces
     :ivar dict adjacent:                facet, subface -> adjacent facet
-    :ivar dict normals:                 subface -> normal vector (relative to first supface)
+    :ivar dict normals:                 subface -> normal vector
     :ivar bool solved:                  completely solved
+    :ivar bool visited:                 Visited during this AFI run
+    :ivar int rank:                     Dimensionality
     """
 
     def __init__(self, polyhedron):
         self.polyhedron = polyhedron
         self.subspace = polyhedron.subspace()
+        self.supfaces = []
         self.subfaces = []
         self.adjacent = {}
         self.normals = {}
@@ -67,6 +71,7 @@ class Face:
         :param Face subface:    the subface (may be incomplete at this time)
         :param normal:          normal vector of the subface for this face
         """
+        subface.supfaces.append(self)
         self.subfaces.append(subface)
         self.normals[subface] = normal
 
@@ -78,6 +83,16 @@ class Face:
             self.visited = False
             for f in self.subfaces:
                 f.unvisit()
+
+    def is_same_face(self, sup, normal):
+        """
+        Check if the subface defined by a superface and normal is the same
+        as this one.
+        """
+        normal = np.atleast_2d(normal)
+        return (np.allclose(self.subspace.onb @ normal.T, 0) and
+                np.allclose(self.subspace.onb @ sup.subspace.normals.T, 0))
+
 
 class AFIQueue:
 
@@ -115,6 +130,8 @@ class AFI:
         self.full_rank = polyhedron.rank()
         self._info = info
         self.whole = Face(polyhedron)
+        self.faces = [[] for i in range(self.full_rank)]
+        self.faces[-1].append(self.whole)
         # for info summary:
         self._vertices = PointSet()
         self._num_chm = 0
@@ -209,8 +226,6 @@ class AFI:
         self.info(rank, "Search rank {} facet [done]\n", rank)
         return facet, normal
 
-
-
     def get_adjacent_face(self, sup, face, sub):
         try:
             f = sup.adjacent[face, sub]
@@ -248,9 +263,15 @@ class AFI:
         for f, n in face.normals.items():
             if np.allclose(n, normal):
                 return f
+        rank = face.rank - 1
+        for f in self.faces[rank]:
+            if f.is_same_face(face, normal):
+                face.add_subface(f, normal)
+                return f
         polyhed = self._intersect(face, normal)
         subface = Face(polyhed)
         face.add_subface(subface, normal)
+        self.faces[rank].append(subface)
         return subface
 
     def info(self, rank, text, *args, **kwargs):

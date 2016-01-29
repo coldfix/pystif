@@ -72,7 +72,7 @@ def rfd2(polyhedron, symmetries, recursions, found_cb, runs, status, info):
     face = np.ones(polyhedron.dim)
     seen = VectorMemory()
 
-    quiet_rank = polyhedron.dim - recursions
+    quiet_rank = polyhedron.dim - 1
 
     afi = AFI2(polyhedron, symmetries, recursions, quiet_rank, info)
 
