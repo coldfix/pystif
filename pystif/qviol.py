@@ -1,25 +1,29 @@
 """
-Small script to find quantum violations
+Find quantum violations for the tripartite bell scenario.
 
 Usage:
-    qviol EXPRS [-y SYM]
+    qviol EXPRS [-c CONSTR] [-o FILE] [-n NUM]
 
 Options:
-    -y SYM, --symmetry SYM                  Specify symmetry group generators
+    -o FILE, --output FILE              Set output file
+    -c CONSTR, --constraints CONSTR     Optimization constraints (CHSH|CHSHE)
+    -n NUM, --num-runs NUM              Number of searches for each inequality [default: 10]
 """
 
 from operator import matmul, mul
-from functools import reduce
+from functools import reduce, partial
 import itertools
-from math import log2, sin, cos, pi
+from math import log2, sin, cos, pi, sqrt, acos, atan2
+import cmath
+import sys
 
 import scipy.optimize
 import numpy as np
 from docopt import docopt
+import yaml
 
 from .core.symmetry import SymmetryGroup, group_by_symmetry
 from .core.io import System, _varset
-from .core import parse
 
 
 def dagger(M):
@@ -29,36 +33,85 @@ def dagger(M):
     return M.conj().T
 
 
-def complex2real(z):
-    assert abs(z.imag) < 1e-13
+def cartesian_to_spherical(v):
+    """
+    Coordinate transformation from Cartesian to spherical.
+
+    For an input vector of the form
+
+        r sin(θ) cos(φ)
+        r sin(θ) sin(φ)
+        r cos(θ)
+
+    Returns (r, theta, phi).
+    """
+    r = np.linalg.norm(v)
+    theta = acos(v[2]/r)
+    phi = atan2(v[1], v[0])
+    return (r, theta, phi)
+
+
+def to_unit_vector(v):
+    """Normalize a cartesian vector."""
+    return v / np.linalg.norm(v)
+
+
+def random_direction_angles():
+    """Return unit vector on the sphere in spherical coordinates (θ, φ)."""
+    v = np.random.normal(size=3)
+    r, theta, phi = cartesian_to_spherical(v)
+    return theta, phi
+
+
+def random_direction_vector(size):
+    """Return unit vector on the sphere in cartesian coordinates (x, y, z)."""
+    return to_unit_vector(np.random.normal(size=size))
+
+
+def complex2real(z: complex, eps=1e-13) -> float:
+    """
+    Convert a complex number to a real number.
+
+    Use this function after calculating the expectation value of a hermitian
+    operator.
+    """
+    if z.imag > eps:
+        raise ValueError("{} is not a real number.".format(z))
     return z.real
 
 
-def complement(P):
+def expectation_value(psi, M) -> complex:
     """
-    Return (id - P).
+    Return the expectation value <ψ|M|ψ>.
 
-    :param np.ndarray P: projection operator
-    """
-    dim = P.shape[0]
-    return np.eye(dim) - P
-
-
-def expectation_value(state, M):
-    """
-    Return expectation value of the observable
-
-    :param np.ndarray state: vector m*1
+    :param np.ndarray psi: vector m*1
     :param np.ndarray M: matrix m*m
     """
-    return dagger(state) @ M @ state
+    return dagger(psi) @ M @ psi
 
 
-def entropy(state, measurements):
-    return H([
-        complex2real(expectation_value(state, m))
-        for m in measurements
-    ])
+def measurement(psi, M) -> float:
+    """Return the measurement <ψ|M|ψ> of a hermitian operator."""
+    return complex2real(expectation_value(psi, M))
+
+
+def as_column_vector(vec):
+    """Reshape the array to a column vector."""
+    vec = np.asarray(vec)
+    return vec.reshape((vec.size, 1))
+
+
+def projector(vec):
+    """
+    Return the projection matrix to the 1D space spanned by the given vector.
+    """
+    vec = as_column_vector(vec)
+    return vec @ dagger(vec)
+
+
+def measure_many(psi, measurements):
+    """Return expectation values for a list of operators."""
+    return [measurement(psi, m) for m in measurements]
 
 
 class Qbit:
@@ -72,17 +125,45 @@ class Qbit:
 
     @classmethod
     def rotspin(cls, direction):
+        r, theta, phi = cartesian_to_spherical(direction)
+        return cls.rotspin_angles(theta, phi)
+
+    @classmethod
+    def rotspin_slow(cls, direction):
+        """Equivalent to rotspin(), just a bit slower."""
         spinmat = np.dot(cls.sigma.T, direction).T
         # eigenvalues/-vectors of hermitian matrix, in ascending order:
         val, vec = np.linalg.eigh(spinmat)
-        spin_down_projector = vec[:,[0]] @ dagger(vec[:,[0]])
-        spin_up_projector = vec[:,[1]] @ dagger(vec[:,[1]])
-        assert np.allclose(spin_down_projector + spin_up_projector, np.eye(2))
-        return spin_down_projector
+        return (projector(vec[:,[1]]),
+                projector(vec[:,[0]]))
+
+    @classmethod
+    def rotspin_angles(cls, theta, phi):
+        """
+        Returns the eigenspace projectors for the spin matrix along an
+        arbitrary direction.
+
+        The eigenstates are:
+
+            |+> = [cos(θ/2),
+                   sin(θ/2) exp(iφ)]
+
+            |-> = [sin(θ/2),
+                   cos(θ/2) exp(-iφ) (-1)]
+
+        http://www.physicspages.com/2013/01/19/spin-12-along-an-arbitrary-direction/
+        """
+        exp_th2 = cmath.rect(1, theta/2)
+        exp_phi = cmath.rect(1, phi)
+        u = [exp_th2.real,
+             exp_th2.imag * exp_phi]
+        d = [exp_th2.imag,
+             exp_th2.real * exp_phi * -1]
+        return projector(u), projector(d)
 
     @classmethod
     def xzspin(cls, angle):
-        return cls.rotspin([sin(angle), 0, cos(angle)])
+        return cls.rotspin_angles(angle, 0)
 
 
 class CompositeQuantumSystem:
@@ -110,10 +191,130 @@ class CompositeQuantumSystem:
         """
         Generate measurements from
         """
-        return [[(self.lift(m, i),
-                  self.lift(complement(m), i))
+        return [[tuple(self.lift(mi, i) for mi in m)
                  for m in povms]
                 for i, povms in enumerate(parties)]
+
+
+class TripartiteBellScenario(CompositeQuantumSystem):
+
+    symm = 'Aa <> aA; AaBb <> BbAa; AaCc <> CcAa'
+
+    def __init__(self, system):
+        super().__init__((2, 2, 2))
+        self.cols = system.columns
+        sg = SymmetryGroup.load(self.symm, self.cols)
+        self.rows = [g[0] for g in group_by_symmetry(sg, system.matrix)]
+
+    def random(self):
+        t = np.random.uniform(0, 2*pi)
+        d = [
+            random_direction_vector(3),
+            random_direction_vector(3),
+            random_direction_vector(3),
+            random_direction_vector(3),
+        ]
+        s = random_direction_vector(8*2)
+        return np.array([t, *np.array(d).flat, *s.flat])
+
+    def unpack(self, params):
+        t = params[0]
+        d = [[params[1:4], params[4:7]],
+             [params[7:10], params[10:13]]]
+        s = params[13:]
+        angles = [[(0, 0), (t, 0)]]
+        angles += [[cartesian_to_spherical(setting)[1:]
+                    for setting in party]
+                   for party in d]
+        state = to_unit_vector(s)
+        state = np.array([complex(a, b) for a, b in zip(state[::2], state[1::2])])
+        return state, angles
+
+    def realize(self, params):
+        state, angles = self.unpack(params)
+        parties = [
+            [Qbit.rotspin_angles(*setting) for setting in party]
+            for party in angles
+        ]
+        return state, parties
+
+    def _mkcombo(self, parties, cols):
+        # measurement combinations
+        # initial:  [[(y, n) per angle] per party]        in small hilbert spaces
+        # lift:     [[(y, n) per angle] per party]        in large hilbert space
+        # select:   [[(ay, an), (by, bn)] per operator pair among different parties]
+        # product:  [[(ay,by), (ay,bn), (an,by), (an,bn)] per operator pair]
+        # matmul:   [[ay@by, ay@bn, an@by, an@bn] per operator pairing (a,b)]
+        _ = self.lift_all(parties)
+        _ = select_combinations(_, cols)
+        _ = [itertools.product(*m) for m in _]
+        _ = [[reduce(matmul, parts) for parts in m] for m in _]
+        return _
+
+    def violation(self, params, expr):
+        state, parties = self.realize(params)
+        mcombo = self._mkcombo(parties, self.cols)
+        measured = [measure_many(state, m) for m in mcombo]
+        entropies = [H(x) for x in measured]
+        return np.dot(entropies, expr)
+
+
+class Constraints:
+
+    def __init__(self, system):
+        sg = SymmetryGroup.load(system.symm, self.cols)
+        self.system = system
+        expr = np.array([self.coef.get(c, 0) for c in self.cols])
+        self.expressions = list(sg(expr))
+
+    def __call__(self, params):
+        state, parties = self.system.realize(params)
+        measured = self._measure_all(state, parties)
+        vals = (self._eval(expr, measured) for expr in self.expressions)
+        return sum(v for v in vals if v < 0)
+
+    @classmethod
+    def optimization_constraints(cls, system):
+        return {'type': 'ineq',
+                'fun': cls(system)}
+
+
+class CHSHE2(Constraints):
+
+    """H(A,B) + H(A,b) + H(a,B) - H(a,b) - H(A) - H(B) >= 0"""
+
+    cols = ('_AB', '_Ab', '_Ba', '_ab',
+            '_AC', '_Ac', '_Ca', '_ac',
+            '_BC', '_Bc', '_Cb', '_bc',
+            '_A', '_a', '_B', '_b', '_C', '_c')
+    coef = {'_AB': 1, '_Ab': 1, '_Ba': 1,
+            '_ab': -1, '_A': -1, '_B': -1}
+
+    def _measure_all(self, state, parties):
+        mcombo = self.system._mkcombo(parties, self.cols)
+        return [measure_many(state, m) for m in mcombo]
+
+    def _eval(self, expr, measured):
+        entropies = [H(x) for x in measured]
+        return np.dot(entropies, expr)
+
+
+class CHSH2(Constraints):
+
+    """E(A,B) + E(A,b) + E(a,B) - E(a,b) <= 2"""
+
+    cols = ('_AB', '_Ab', '_Ba', '_ab',
+            '_AC', '_Ac', '_Ca', '_ac',
+            '_BC', '_Bc', '_Cb', '_bc',)
+    coef = {'_AB': 1, '_Ab': 1, '_Ba': 1, '_ab': -1}
+
+    def _measure_all(self, state, parties):
+        mcombo = select_combinations(self.system.lift_all(parties), self.cols)
+        mcombo = [(a[0]-a[1]) @ (b[0]-b[1]) for a, b in mcombo]
+        return measure_many(state, mcombo)
+
+    def _eval(self, expr, correlators):
+        return 2-abs(np.dot(correlators, expr))
 
 
 # composed operations
@@ -123,7 +324,6 @@ def h(p):
 
 def H(pdist):
     """Compute entropy from a numpy array of probabilities."""
-    assert abs(sum(pdist) - 1) < 1e-10
     return sum(map(h, pdist))
 
 
@@ -133,74 +333,67 @@ def select_combinations(parties, columns):
             for colname in columns]
 
 
-def violation(state, expr, mcombo):
-    state = np.hstack((1, 0, state))
-    state = state/np.linalg.norm(state)
-    state = np.array([complex(a, b) for a, b in zip(state[::2], state[1::2])])
-    entropies = [entropy(state, m) for m in mcombo]
-    return np.dot(entropies, expr)
-
-
-def random_direction_pair():
-    d = np.random.normal(size=3)
-    d /= np.linalg.norm(d)
-    n = np.random.normal(size=2)
-    s = d[:2] @ n
-    n = np.hstack((n, -s/d[2]))
-    n /= np.linalg.norm(n)
-    return d, n
+def yaml_dump(data, stream=None, Dumper=yaml.SafeDumper, **kwds):
+    class _Dumper(Dumper):
+        pass
+    def numpy_scalar_representer(dumper, data):
+        return dumper.represent_data(np.asscalar(data))
+    def numpy_array_representer(dumper, data):
+        return dumper.represent_data([x for x in data])
+    def complex_representer(dumper, data):
+        return dumper.represent_data([data.real, data.imag])
+    _Dumper.add_multi_representer(np.generic, numpy_scalar_representer)
+    _Dumper.add_representer(np.ndarray, numpy_array_representer)
+    _Dumper.add_representer(complex, complex_representer)
+    return yaml.dump(data, stream, _Dumper, **kwds)
 
 
 def main(args=None):
 
     opts = docopt(__doc__, args)
 
-    _sys = System.load(opts['EXPRS'])
-    exprs = _sys.matrix
-    mcols = _sys.columns
-    if opts['--symmetry']:
-        sg = SymmetryGroup.load(opts['--symmetry'], mcols)
-        groups = group_by_symmetry(sg, exprs)
-        # take one representative from each category:
-        exprs = [g[0] for g in groups]
+    system = TripartiteBellScenario(System.load(opts['EXPRS']))
 
-    system = CompositeQuantumSystem((2, 2, 2))
+    ct = opts['--constraints']
+    if ct is None:
+        constr = None
+    elif ct.upper() == 'CHSHE':
+        constr = CHSHE2.optimization_constraints(system)
+    elif ct.upper() == 'CHSH':
+        constr = CHSH2.optimization_constraints(system)
+    else:
+        raise ValueError('Unknown constraints type: {}'.format(ct))
 
-    # set up measurements
-    alpha = (0, 3*pi/4, 6*pi/4)
-    #alpha = (0, 0, 0)
-    #parties = [[Qbit.xzspin(a), Qbit.xzspin(a+pi/2)] for a in alpha]
+    num_runs = int(opts['--num-runs'])
 
-    d1, n1 = random_direction_pair()
-    d2, n2 = random_direction_pair()
-    parties = [
-        [Qbit.xzspin(0), Qbit.xzspin(pi/2)],
-        [Qbit.rotspin(d1), Qbit.rotspin(n1)],
-        [Qbit.rotspin(d2), Qbit.rotspin(n2)],
-    ]
+    if opts['--output']:
+        out_file = open(opts['--output'], 'wt')
+    else:
+        out_file = sys.stdout
 
-    # measurement combinations
-    # initial:  [[a, b] per party]
-    # lift:     [[(y, n) per angle] per party]
-    # mkcombo:  [[(ay, an), (by, bn)] per operator pairing among different parties]
-    # product:  [[(ay,by), (ay,bn), (an,by), (an,bn)] per operator pairing (a,b)]
-    # matmul:   [[ay@by, ay@bn, an@by, an@bn] per operator pairing (a,b)]
-    mcombo = select_combinations(system.lift_all(parties), mcols)
-    mcombo = [itertools.product(*m) for m in mcombo]
-    mcombo = [[reduce(matmul, parts) for parts in m] for m in mcombo]
+    for _ in range(num_runs):
+        for i, expr in enumerate(system.rows):
+            result = scipy.optimize.minimize(
+                system.violation, system.random(),
+                (expr,), constraints=constr)
 
-    c = 0
-    for i in range(5000):
-        for expr in exprs:
-            state = np.random.normal(size=2*system.dim-2)
-            result = scipy.optimize.minimize(violation, state, (expr, mcombo))
-            if result.fun < -1e-11:
-                print('\n', result, sep='')
-                c += 1
-            else:
+            if result.fun > -1e-11:
                 print('.' if result.success else 'x', end='', flush=True)
+                continue
 
-    print(c, '/', len(exprs))
+            state, angles = system.unpack(result.x)
+            yaml_dump([{
+                'i': i,
+                'f': result.fun,
+                'state': state,
+                'angles': angles
+            }], out_file)
+
+            print("\n", i, expr)
+            print('\n', result.fun, sep='')
+            print('\n', result.x, sep='')
+
+    print()
 
 
 if __name__ == '__main__':
