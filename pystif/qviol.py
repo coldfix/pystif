@@ -33,6 +33,11 @@ def dagger(M):
     return M.conj().T
 
 
+def kron(*parts):
+    """Compute the repeated Kronecker product (tensor product)."""
+    return reduce(np.kron, parts)
+
+
 def cartesian_to_spherical(v):
     """
     Coordinate transformation from Cartesian to spherical.
@@ -131,7 +136,7 @@ class Qbit:
     @classmethod
     def rotspin_slow(cls, direction):
         """Equivalent to rotspin(), just a bit slower."""
-        spinmat = np.dot(cls.sigma.T, direction).T
+        spinmat = np.tensordot(direction, cls.sigma, 1)
         # eigenvalues/-vectors of hermitian matrix, in ascending order:
         val, vec = np.linalg.eigh(spinmat)
         return (projector(vec[:,[1]]),
@@ -185,7 +190,7 @@ class CompositeQuantumSystem:
         """
         l = np.eye(self.cumdim[subsys])
         r = np.eye(self.dim / self.cumdim[subsys+1])
-        return np.kron(np.kron(l, operator), r)
+        return kron(l, operator, r)
 
     def lift_all(self, parties):
         """
