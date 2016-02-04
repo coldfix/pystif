@@ -31,14 +31,10 @@ The outline of the algorithm is as follows:
         b) no: find the extremal ray that is outside the facet, go to 2.
 """
 
-import os
-import sys
 from functools import partial
 
 import numpy as np
-import numpy.random
 import scipy.spatial
-from docopt import docopt
 
 from .core.app import application
 from .core.array import scale_to_int

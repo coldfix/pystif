@@ -19,12 +19,8 @@ from functools import partial
 
 import os
 import numpy as np
-from docopt import docopt
-
-import yaml
 
 from .core.app import application
-from .core.array import scale_to_int
 from .core.io import StatusInfo
 from .core.util import VectorMemory, PointSet
 from .chm import convex_hull_method, print_status, print_qhull

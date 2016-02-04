@@ -25,7 +25,6 @@ from functools import partial
 import numpy as np
 
 from .core.app import application
-from .core.io import StatusInfo
 from .core.geom import (ConvexCone, LinearSubspace,
                         random_direction_vector)
 from .core.util import VectorMemory
