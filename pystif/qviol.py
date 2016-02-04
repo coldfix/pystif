@@ -10,10 +10,10 @@ Options:
     -n NUM, --num-runs NUM              Number of searches for each inequality [default: 10]
 """
 
-from operator import matmul, mul
+from operator import matmul
 from functools import reduce, partial
 import itertools
-from math import log2, sin, cos, pi, sqrt, acos, atan2
+from math import log2, sin, cos, pi
 import cmath
 import sys
 
@@ -24,94 +24,9 @@ import yaml
 
 from .core.symmetry import SymmetryGroup, group_by_symmetry
 from .core.io import System, _varset
-
-
-def dagger(M):
-    """
-    Return transpose conjugate.
-    """
-    return M.conj().T
-
-
-def kron(*parts):
-    """Compute the repeated Kronecker product (tensor product)."""
-    return reduce(np.kron, parts)
-
-
-def cartesian_to_spherical(v):
-    """
-    Coordinate transformation from Cartesian to spherical.
-
-    For an input vector of the form
-
-        r sin(θ) cos(φ)
-        r sin(θ) sin(φ)
-        r cos(θ)
-
-    Returns (r, theta, phi).
-    """
-    r = np.linalg.norm(v)
-    theta = acos(v[2]/r)
-    phi = atan2(v[1], v[0])
-    return (r, theta, phi)
-
-
-def to_unit_vector(v):
-    """Normalize a cartesian vector."""
-    return v / np.linalg.norm(v)
-
-
-def random_direction_angles():
-    """Return unit vector on the sphere in spherical coordinates (θ, φ)."""
-    v = np.random.normal(size=3)
-    r, theta, phi = cartesian_to_spherical(v)
-    return theta, phi
-
-
-def random_direction_vector(size):
-    """Return unit vector on the sphere in cartesian coordinates (x, y, z)."""
-    return to_unit_vector(np.random.normal(size=size))
-
-
-def complex2real(z: complex, eps=1e-13) -> float:
-    """
-    Convert a complex number to a real number.
-
-    Use this function after calculating the expectation value of a hermitian
-    operator.
-    """
-    if z.imag > eps:
-        raise ValueError("{} is not a real number.".format(z))
-    return z.real
-
-
-def expectation_value(psi, M) -> complex:
-    """
-    Return the expectation value <ψ|M|ψ>.
-
-    :param np.ndarray psi: vector m*1
-    :param np.ndarray M: matrix m*m
-    """
-    return dagger(psi) @ M @ psi
-
-
-def measurement(psi, M) -> float:
-    """Return the measurement <ψ|M|ψ> of a hermitian operator."""
-    return complex2real(expectation_value(psi, M))
-
-
-def as_column_vector(vec):
-    """Reshape the array to a column vector."""
-    vec = np.asarray(vec)
-    return vec.reshape((vec.size, 1))
-
-
-def projector(vec):
-    """
-    Return the projection matrix to the 1D space spanned by the given vector.
-    """
-    vec = as_column_vector(vec)
-    return vec @ dagger(vec)
+from .core.linalg import (projector, measurement, random_direction_vector,
+                          cartesian_to_spherical, kron, to_unit_vector,
+                          to_quantum_state)
 
 
 def measure_many(psi, measurements):
@@ -231,8 +146,7 @@ class TripartiteBellScenario(CompositeQuantumSystem):
         angles += [[cartesian_to_spherical(setting)[1:]
                     for setting in party]
                    for party in d]
-        state = to_unit_vector(s)
-        state = np.array([complex(a, b) for a, b in zip(state[::2], state[1::2])])
+        state = to_quantum_state(to_unit_vector(s).reshape(8, 2))
         return state, angles
 
     def realize(self, params):
