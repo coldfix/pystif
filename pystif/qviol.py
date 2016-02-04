@@ -2,12 +2,13 @@
 Find quantum violations for the tripartite bell scenario.
 
 Usage:
-    qviol EXPRS [-c CONSTR] [-o FILE] [-n NUM]
+    qviol EXPRS [-c CONSTR] [-o FILE] [-n NUM] [-s SUBSET]
 
 Options:
     -o FILE, --output FILE              Set output file
     -c CONSTR, --constraints CONSTR     Optimization constraints (CHSH|CHSHE)
     -n NUM, --num-runs NUM              Number of searches for each inequality [default: 10]
+    -s SUBSET, --select SUBSET          Select subset of inequalities
 """
 
 from operator import matmul
@@ -290,8 +291,16 @@ def main(args=None):
     else:
         out_file = sys.stdout
 
+    if opts['--select']:
+        select = [int(x) for x in opts['--select'].split(',')]
+    else:
+        select = range(len(system.rows))
+
     for _ in range(num_runs):
         for i, expr in enumerate(system.rows):
+            if i not in select:
+                continue
+
             result = scipy.optimize.minimize(
                 system.violation, system.random(),
                 (expr,), constraints=constr)
