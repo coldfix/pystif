@@ -25,12 +25,16 @@ __all__ = [
     'cartesian_to_spherical',
     'random_direction_angles',
     'random_direction_vector',
+    'random_quantum_state',
     'to_quantum_state',
     'complex2real',
     'expectation_value',
     'measurement',
     'as_column_vector',
     'projector',
+    'solve_quadratic_equation',
+    'hdet',
+    'ptrace',
 ]
 
 
@@ -168,6 +172,11 @@ def random_direction_vector(size):
     return to_unit_vector(np.random.normal(size=size))
 
 
+def random_quantum_state(dim):
+    """Return a random quantum state."""
+    return to_quantum_state(random_direction_vector((dim, 2)))
+
+
 def to_quantum_state(coefs):
     """Convert a sequence of coefficient tuples to a complex state vector."""
     return np.array([complex(a, b) for a, b in coefs])
@@ -212,3 +221,65 @@ def projector(vec):
     """
     vec = as_column_vector(vec)
     return vec @ dagger(vec)
+
+
+def solve_quadratic_equation(a, b, c):
+    """
+    Return the two solutions (x₊, x₋) of the quadratic equation
+    ``ax² + bx + c = 0``.
+    """
+    radix = cmath.sqrt(b**2 - 4*a*c)
+    return ((-b + radix) / (2*a),
+            (-b - radix) / (2*a))
+
+
+def hdet(a):
+    """
+    Compute the hyperdeterminant of a 2x2x2 matrix (Cayley's Hyperdeterminant).
+
+    https://en.wikipedia.org/wiki/Hyperdeterminant
+    """
+    return (
+        + a[0,0,0]**2 * a[1,1,1]**2
+        + a[0,0,1]**2 * a[1,1,0]**2
+        + a[0,1,0]**2 * a[1,0,1]**2
+        + a[1,0,0]**2 * a[0,1,1]**2
+        - 2 * a[0,0,0] * a[0,0,1] * a[1,1,0] * a[1,1,1]
+        - 2 * a[0,0,0] * a[0,1,0] * a[1,0,1] * a[1,1,1]
+        - 2 * a[0,0,0] * a[1,0,0] * a[0,1,1] * a[1,1,1]
+        - 2 * a[0,0,1] * a[0,1,0] * a[1,0,1] * a[1,1,0]
+        - 2 * a[0,0,1] * a[0,1,1] * a[1,1,0] * a[1,0,0]
+        - 2 * a[0,1,0] * a[0,1,1] * a[1,0,1] * a[1,0,0]
+        + 4 * a[0,0,0] * a[0,1,1] * a[1,0,1] * a[1,1,0]
+        + 4 * a[0,0,1] * a[0,1,0] * a[1,0,0] * a[1,1,1]
+    )
+
+
+def hdet_alt(a):
+    """
+    This is alternative formula for the hyperdeterminant of a 2x2x2 matrix
+    taken from https://en.wikipedia.org/wiki/Hyperdeterminant and implemented
+    to provide a comparison for the `hdet` function. Unfortunately, something
+    seems to be wrong with the formula (or implementation). I'm still keeping
+    it here to investigate the issue at some point.
+    """
+    eps = np.array([[0, 1], [-1, 0]])
+    b = np.einsum('il,jm,ijk,lmn', eps, eps, a, a) / 2
+    d = np.einsum('il,jm,ij,lm', eps, eps, b, b) / 2
+    return d
+
+
+def ptrace(dm, dims, *out):
+    """
+    Perform partial trace on a density matrix. Trace out all subsystems with
+    the specified indices.
+    """
+    dims = list(dims)
+    dm = dm.reshape(dims * 2)
+    for rm in sorted(out, reverse=True):
+        dm = dm.trace(axis1=rm,
+                      axis2=rm+len(dims))
+        del dims[rm]
+    dim = np.product(dims)
+    dm = dm.reshape((dim, dim))
+    return dm
