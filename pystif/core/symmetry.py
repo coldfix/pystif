@@ -77,11 +77,16 @@ class SymmetryGroup:
 
     @classmethod
     def load(cls, spec, col_names):
-        generators = [
-            VarPermutation.from_subst_rule(*gspec.split('<>'))
-            for gspec in spec.replace(" ", "").split(';')
-        ]
+        if isinstance(spec, str):
+            spec = parse_symmetries(spec)
+        generators = [VarPermutation.from_subst_rule(a, b)
+                      for a, b in spec]
         return cls(map(Permutation, evaluate_generators(generators, col_names)))
+
+
+def parse_symmetries(s):
+    from .parse import symm_list, tokenize
+    return symm_list.parse(tokenize(s))
 
 
 def NoSymmetry(vector):

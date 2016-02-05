@@ -1,4 +1,5 @@
 #:: _AB _Ab _aB _ab _AC _Ac _aC _ac _BC _Bc _bC _bc
+#>> Aa<>aA; AaBb<>BbAa; AaCc<>CcAa
   1   0   0   0   0  -1   0   0   0   1   0   0
   3   0   0  -1   1  -4   1   1  -2   2   1   1
   2   1  -2   1   1  -4   1   1   0   3  -1   0

@@ -5,7 +5,7 @@ The input file grammar looks somewhat like this:
 
     document    ::=     line ("\n"+ line)*
     line        ::=     statement? comment?
-    statement   ::=     equation | var_decl | mutual | markov
+    statement   ::=     equation | var_decl | mutual | markov | symmetries
     comment     ::=     r"#.*"
 
     equation    ::=     expression relation expression
@@ -15,6 +15,8 @@ The input file grammar looks somewhat like this:
 
     mutual      ::=     var_list ("::" var_list)+    ("|" var_list)?
     markov      ::=     var_list ("->" var_list){2+} ("|" var_list)?
+
+    symmetries  ::=     "symm" .*
 
     var_decl    ::=     "rvar" var_list
     var_list    ::=     (identifier ","?)*
@@ -219,6 +221,9 @@ class Statement:
         """Return constraint matrix defined by this statement."""
         return np.empty((0, len(col_idx)))
 
+    def symmetries(self) -> [tuple]:
+        return []
+
 
 def accumulate_parse_results(statements: [Statement]) -> ParseResult:
     """
@@ -230,7 +235,8 @@ def accumulate_parse_results(statements: [Statement]) -> ParseResult:
         for col in stmt.columns():
             col_idx.setdefault(_name(col), len(col_idx))
     result = np.vstack(stmt.constraints(col_idx) for stmt in statements)
-    return result, list_from_index(col_idx)
+    symm = flatten(stmt.symmetries() for stmt in statements)
+    return result, list_from_index(col_idx), symm
 
 
 class VarDecl(Statement):
@@ -393,6 +399,15 @@ def make_expr(expr: [Vector]):
     return sum(expr, Vector())
 
 
+class Symmetries(Statement):
+
+    def __init__(self, symm):
+        self.symm = symm
+
+    def symmetries(self):
+        return self.symm
+
+
 #----------------------------------------
 # lexer definition
 #----------------------------------------
@@ -403,7 +418,7 @@ _tokenizer = fpll.make_tokenizer([
     ('WS',          (r'[ \t]+',)),
     ('NAME',        (r'[a-zA-Z_]\w*',)),
     ('NUMBER',      (r'[-+]?\d+(\.\d+)?([eE][+\-]?\d+)?',)),
-    ('OP',          (r'[<=>]=|->|[-+*,:;()≤=≥|]',)),
+    ('OP',          (r'[<=>]=|->|<>|[-+*,:;()≤=≥|]',)),
 ])
 
 
@@ -452,6 +467,12 @@ s_term      = sign + term                           >> scale_vector
 expression  = f_term + many(s_term)                 >> collapse >> make_expr
 equation    = expression + relation + expression    >> stararg(Constraint)
 
+
+# symmetries
+symm_item   = identifier + L('<>') + identifier     >> tuple
+symm_list   = symm_item + many(colon + symm_item)   >> collapse
+symmetries  = L('symm') + symm_list                 >> Symmetries
+
 # commands
 var_decl    = L('rvar') + var_list                  >> VarDecl
 mutual      = var_g(2, L('::')) + conditional       >> stararg(MutualIndep)
@@ -461,7 +482,7 @@ empty       = v(Statement())
 # toplevel
 eol         = skip(many(some('NEWLINE'), 1))
 eof         = skip(finished)
-line        = equation | var_decl | mutual | markov | empty
+line        = equation | var_decl | mutual | markov | symmetries | empty
 document    = line + many(eol + line) + eof         >> collapse
 
 

@@ -61,22 +61,27 @@ def read_table_from_file(file):
     contents = remove_comments(file, comments.append)
     matrix = np.loadtxt(contents, ndmin=2)
     cols = []
+    symm = []
     def add_cols(s):
         cols.extend(map(_name, s.split()))
+    def add_symm(s):
+        from .symmetry import parse_symmetries
+        symm.extend(parse_symmetries(s))
     for line in comments:
         detect_prefix(line.strip(), '::', add_cols)
-    return matrix, cols or None
+        detect_prefix(line.strip(), '>>', add_symm)
+    return matrix, cols or None, symm
 
 
 def read_system(filename):
     """Read linear system from file, return tuple (matrix, colnames)."""
-    matrix, cols = _read_system(filename)
+    matrix, cols, symmetries = _read_system(filename)
     if '_' in cols:
         ccol = cols.index('_')
         if np.allclose(matrix[:,ccol], 0):
             matrix = np.delete(matrix, ccol, axis=1)
             del cols[ccol]
-    return matrix, cols
+    return matrix, cols, symmetries
 
 
 def _read_system(filename):
@@ -116,9 +121,10 @@ class System:
     IO utility for systems. Keeps track of column names.
     """
 
-    def __init__(self, matrix=None, columns=None):
+    def __init__(self, matrix=None, columns=None, symmetries=None):
         self.matrix = matrix
         self.columns = columns
+        self.symmetries = symmetries
 
     @classmethod
     def load(cls, filename=None, *, default=sys.stdin, force=True):
@@ -149,7 +155,7 @@ class System:
             columns = [self.columns[i] for i in indices]
         else:
             columns = None
-        return System(self.matrix[:,indices], columns), subdim
+        return System(self.matrix[:,indices], columns, self.symmetries), subdim
 
     def merge(self, other):
         if not self: return other
@@ -197,9 +203,11 @@ class SystemFile:
     """Sink for matrix files."""
 
     def __init__(self, filename=None, *,
-                 default=sys.stdout, append=False, columns=None):
+                 default=sys.stdout, append=False, columns=None,
+                 symmetries=None):
         self.columns = columns
         self.file_columns = columns
+        self.symm_spec = symmetries
         self._seen = VectorMemory()
         self._slice = None
         self._started = False
@@ -228,6 +236,8 @@ class SystemFile:
         if not self._started:
             if self.file_columns:
                 self._print('#::', *self.file_columns)
+            if self.symm_spec:
+                self._print('#>>', '; '.join(map('<>'.join, self.symm_spec)))
             self._started = True
         if self._slice:
             v = v[self._slice]

@@ -1,4 +1,5 @@
 #:: H(A,B,C) H(A,B,c) H(A,C,b) H(A,b,c) H(B,C,a) H(B,a,c) H(C,a,b) H(a,b,c)
+#>> Aa<>aA; AaBb<>BbAa; AaCc<>CcAa
   0   0   1  -1   0   1   0   0
   0   1   1  -2   0   0   0   1
   0   0   1   0   0   1  -1   0

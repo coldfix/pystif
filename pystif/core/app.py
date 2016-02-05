@@ -98,13 +98,22 @@ class Application:
         return SystemFile(
             self.opts['--output'],
             append=self.resume,
-            columns=self.system.columns[:self.subdim])
+            columns=self.system.columns[:self.subdim],
+            symmetries=self.symm_spec)
+
+    @cachedproperty
+    def symm_spec(self):
+        if self.opts.get('--symmetry'):
+            from .symmetry import parse_symmetries
+            return parse_symmetries(self.opts['--symmetry'])
+        return self.system.symmetries
 
     @property
     def symmetries(self):
-        if self.opts.get('--symmetry'):
+        spec = self.symm_spec
+        if spec:
             col_names = self.system.columns[:self.subdim]
-            return SymmetryGroup.load(self.opts['--symmetry'], col_names)
+            return SymmetryGroup.load(spec, col_names)
         else:
             return NoSymmetry
 

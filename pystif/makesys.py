@@ -123,12 +123,14 @@ def main(args=None):
         colnames = column_varname_labels(varnames)
         dim = len(colnames)
         equations = np.vstack(map(p_to_q, np.eye(dim)[1:]))
+        symmetries = []
         # equations = np.vstack(map(q_to_p, equations))
 
     else:
-        equations, colnames = parse_files(opts['INPUT'])
+        equations, colnames, symmetries = parse_files(opts['INPUT'])
 
-    output = SystemFile(opts['--output'], columns=colnames)
+    output = SystemFile(opts['--output'], columns=colnames,
+                        symmetries=symmetries)
     for e in equations:
         output(e)
 
