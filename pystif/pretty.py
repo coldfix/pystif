@@ -94,13 +94,17 @@ def main(args=None):
     def dump(rows):
         for row in rows:
             print_(format_human_readable(row, columns))
+
+    symmetries = opts['--symmetry']
+    if symmetries is None:
+        symmetries = system.symmetries
     if opts['--group']:
         first = True
         for g in group_permuted_terms(system.matrix, columns):
             first = not first and print_()
             dump(g)
-    elif opts['--symmetry']:
-        sg = SymmetryGroup.load(opts['--symmetry'], system.columns)
+    elif symmetries:
+        sg = SymmetryGroup.load(symmetries, system.columns)
         groups = group_by_symmetry(sg, system.matrix)
         for g in groups:
             if opts['--quiet']:
