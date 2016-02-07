@@ -3,7 +3,7 @@ import numpy as np
 
 from .array import scale_to_int, make_int_exact
 from .linalg import (matrix_imker_nice, matrix_nullspace,
-                     basis_vector, plane_normal)
+                     basis_vector, plane_normal, as_column_vector)
 from .lp import Problem
 from .util import PointSet, cached
 
@@ -188,12 +188,14 @@ class ConvexCone:
         if len(normals) == 1:
             return [scale_to_int(normals[0])]
         # Let's do some magic to get integer coefficients (this is slow…):
-        L = self.lp.get_matrix()
-        lp = Problem(                               # Find f = qL s.t.
-            L.T[self.dim:],                         # (qL)_i = 0  ∀ i > m
+        L = self.lp.get_matrix().T
+        num_cols = L.shape[1]
+        lp = Problem(
+            num_cols=num_cols,                      # Find f = qL s.t.
             lb_col=0)                               #    q_i ≥ 0  ∀ i
-        lp.add(np.ones(len(L)), 1, 1)               #   Σq_i = 1
-        lp.add(subspace.onb @ L.T[:self.dim], 0, 0, #    qLP = 0
+        lp.add(np.ones(num_cols), 1, 1)             #   Σq_i = 1
+        lp.add(L[self.dim:], 0, 0)                  # (qL)_i = 0  ∀ i > m
+        lp.add(subspace.onb @ L[:self.dim], 0, 0,   #    qLP = 0
                embed=True)
         normals = []
         orth = subspace.nullspace()
@@ -202,9 +204,9 @@ class ConvexCone:
             # direction:
             d = random_direction_vector(orth.dim)
             v = orth.back(d)
-            q = lp.minimize((L[:,:self.dim] @ v).T, embed=True)
+            q = lp.minimize(v @ L[:self.dim], embed=True)
             q = scale_to_int(q)
-            f = (L.T @ q)[:self.dim]
+            f = (L @ q)[:self.dim]
             p = make_int_exact(orth.into(f))
             new = orth.back_space(LinearSubspace.from_nullspace(p))
             # TODO: This condition should always be fulfilled by the
