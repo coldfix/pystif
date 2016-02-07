@@ -156,7 +156,7 @@ class ConvexCone:
                     return
             yield direction
 
-    def refine_to_facet(self, face):
+    def refine_to_facet(self, face, outer_point=None, eps=1e-12):
         assert self.is_face(face)
         face = self.subspace().projection(face)
         face = scale_to_int(face)
@@ -171,7 +171,9 @@ class ConvexCone:
                 direction = next(self.filter_non_singular_directions(nullspace))
             except StopIteration:
                 return face
-            face, _ = self.get_adjacent_facet(face, -direction)
+            face, subface = self.get_adjacent_facet(face, -direction)
+            if outer_point is not None and face @ outer_point > eps:
+                face, _ = self.get_adjacent_facet(face, subface)
 
     def nullspace_int(self) -> list:
         """

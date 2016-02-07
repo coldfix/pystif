@@ -44,7 +44,7 @@ def p2f(polyhedron, system, points):
         f = (L.T @ q)[:dim]
         f = scale_to_int(f)
 
-        yield polyhedron.refine_to_facet(f)
+        yield polyhedron.refine_to_facet(f, x)
 
 
 @application
