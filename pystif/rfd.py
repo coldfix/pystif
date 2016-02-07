@@ -3,7 +3,7 @@ Randomized facet discovery - search for random facets of the projection of a
 polyhedron.
 
 Usage:
-    rfd INPUT -s SUBSPACE [-o OUTPUT] [-l LIMIT] [-y SYMMETRIES] [-r NUM] [-q]... [-d DIM] [-i FILE]
+    rfd INPUT -s SUBSPACE [-o OUTPUT] [-l LIMIT] [-y SYMMETRIES] [-r NUM] [-q]... [-d DIM] [-i FILE] [-m REC]
 
 Options:
     -o OUTPUT, --output OUTPUT      Set output file for solution
@@ -17,6 +17,8 @@ Options:
     -q, --quiet                     Show less output
     -d DIM, --slice-dim DIM         Sub-slice dimension [default: 0]
     -i FILE, --info FILE            Print short summary to file (YAML)
+
+    -m REC, --recursions REC        Recoursions [default: 5]
 """
 
 import gc
@@ -158,5 +160,6 @@ def main(app):
         rss(app.system, app.polyhedron, app.symmetries, app.output, runs, slice_dim, status,
             app.info(0))
     else:
+        recursions = int(app.opts['--recursions'])
         #rfd(app.polyhedron, app.symmetries, app.output, runs, status)
-        rfd2(app.polyhedron, app.symmetries, 5, app.output, runs, status, app.info(1))
+        rfd2(app.polyhedron, app.symmetries, recursions, app.output, runs, status, app.info(1))
