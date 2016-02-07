@@ -175,6 +175,15 @@ class ConvexCone:
             if outer_point is not None and face @ outer_point > eps:
                 face, _ = self.get_adjacent_facet(face, subface)
 
+    def face_to_facets(self, face, eps=1e-12):
+        """Convert a face to a list of facets that imply the given face."""
+        lp = Problem([face], lb_row=-1)
+        while lp.minimum(face) < -eps:
+            x = lp.get_prim_solution()
+            f = self.refine_to_facet(face, x)
+            lp.add(f)
+            yield f
+
     def nullspace_int(self) -> list:
         """
         Return basis vectors of nullspace – but with integer coefficients
