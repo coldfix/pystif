@@ -41,7 +41,7 @@ def check_implies(sys_a, sys_b, name_a, name_b, *, symmetries, quiet=False):
             print("{} misses the following inequalities of {}:"
                   .format(name_a, name_b))
             for constr in missing:
-                print(format_vector(constr))
+                print(format_vector(constr[0]))
         return False
     else:
         if quiet <= 1:
