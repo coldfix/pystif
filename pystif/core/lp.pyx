@@ -412,6 +412,14 @@ cdef class Problem:
     def maximize(self, objective, *, embed=False):
         return self.optimize(objective, glp.MAX, embed=embed)
 
+    def minimum(self, objective, *, embed=False):
+        self.minimize(objective, embed=embed)
+        return self.get_objective_value()
+
+    def maximum(self, objective, *, embed=False):
+        self.maximize(objective, embed=embed)
+        return self.get_objective_value()
+
     def get_objective_value(self):
         """Get value of objective achieved in last optimization task."""
         return glp.get_obj_val(self._lp)
