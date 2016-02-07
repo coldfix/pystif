@@ -33,18 +33,20 @@ def check_implies(sys_a, sys_b, name_a, name_b, *, symmetries, quiet=False):
     # take one representative from each category:
     groups = group_by_symmetry(symmetries, sys_b.matrix)
     missing = [g for g in groups if not lp.implies(g[0])]
-    if quiet <= 1:
-        if missing:
+    if missing:
+        if quiet <= 1:
             print("{} misses {} ({} intrinsic) constraints of {}!".format(
                 name_a, sum(map(len, missing)), len(missing), name_b))
-        else:
+        if quiet == 0:
+            print("{} misses the following inequalities of {}:"
+                  .format(name_a, name_b))
+            for constr in missing:
+                print(format_vector(constr))
+        return False
+    else:
+        if quiet <= 1:
             print("{} implies {}!".format(name_a, name_b))
-    if quiet == 0:
-        print("{} misses the following inequalities of {}:"
-                .format(name_a, name_b))
-        for constr in missing:
-            print(format_vector(constr))
-    return len(missing) == 0
+        return True
 
 
 def main(args=None):
