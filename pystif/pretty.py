@@ -12,6 +12,7 @@ Options:
 
 from docopt import docopt
 
+from .core.util import VectorMemory
 from .core.io import System, print_to, default_column_labels
 from .core.symmetry import group_by_symmetry
 
@@ -33,15 +34,18 @@ def _coef(coef):
     return prefix
 
 
-def format_human_readable(constraint, columns):
-    lhs = [(_coef(c), columns[i], c > 0)
-           for i, c in enumerate(constraint)
-           if c != 0]
+def _sort_col_indices(constraint, columns):
     # len() is used as approximation for number of terms involved. For most
     # cases this should be fine.
-    lhs = sorted(lhs, key=lambda term: (term[2], len(term[1])),
-                 reverse=True)
-    lhs = ["{} {}".format(coef, col) for coef, col, _ in lhs]
+    key = lambda i: (constraint[i] > 0, abs(constraint[i]), len(columns[i]))
+    nonzero = (i for i, c in enumerate(constraint) if c != 0)
+    return sorted(nonzero, key=key, reverse=True)
+
+
+def format_human_readable(constraint, columns, indices=None):
+    if indices is None:
+        indices = _sort_col_indices(constraint, columns)
+    lhs = ["{} {}".format(_coef(constraint[i]), columns[i]) for i in indices]
     if not lhs:
         lhs = ["0"]
     return "{} ≥ 0".format(" ".join(lhs).lstrip('+ '))
@@ -55,17 +59,30 @@ def main(args=None):
     else:
         columns = default_column_labels(system.dim)
     print_ = print_to(opts['--output'])
-    def dump(rows):
+
+    def dump_with_symmetries(group):
+        vector = group[0]
+        indices = _sort_col_indices(vector, columns)
+        seen = VectorMemory()
+        for permutation in sg.permutations:
+            inverted = permutation.inverse()
+            permuted = permutation(vector)
+            if not seen(permuted):
+                print_(format_human_readable(permuted, columns,
+                                             [inverted.p[i] for i in indices]))
+
+    def dump_simple(rows):
         for row in rows:
             print_(format_human_readable(row, columns))
 
     if system.update_symmetries(opts['--symmetry']):
-        groups = group_by_symmetry(system.symmetry_group(), system.matrix)
+        sg = system.symmetry_group()
+        groups = group_by_symmetry(sg, system.matrix)
         for g in groups:
             if opts['--quiet']:
-                dump([g[0]])
+                dump_simple(print_, [g[0]])
             else:
-                dump(g)
+                dump_with_symmetries(g)
                 print_()
         lengths = list(map(len, groups))
         print_()
@@ -74,7 +91,7 @@ def main(args=None):
         print_('#   items: ', *lengths)
         print_('#   total: ', sum(lengths))
     else:
-        dump(system.matrix)
+        dump_simple(print_, system.matrix)
 
 
 if __name__ == '__main__':
