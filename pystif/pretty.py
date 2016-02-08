@@ -10,88 +10,27 @@ Options:
     -q, --quiet                     Less output in the presence of symmetries
 """
 
-from docopt import docopt
-
-from .core.util import VectorMemory
-from .core.io import System, print_to, default_column_labels
-from .core.symmetry import group_by_symmetry
+from .core.app import application
 
 
-def _fmt_float(f):
-    if round(f) == f:
-        return str(int(f))
-    return str(f)
+@application
+def main(app):
 
+    system = app.system
+    output = app.output
 
-def _coef(coef):
-    if coef < 0:
-        prefix = '-'
-        coef = -coef
-    else:
-        prefix = '+'
-    if coef != 1:
-        prefix += ' ' + _fmt_float(coef)
-    return prefix
-
-
-def _sort_col_indices(constraint, columns):
-    # len() is used as approximation for number of terms involved. For most
-    # cases this should be fine.
-    key = lambda i: (constraint[i] > 0, abs(constraint[i]), len(columns[i]))
-    nonzero = (i for i, c in enumerate(constraint) if c != 0)
-    return sorted(nonzero, key=key, reverse=True)
-
-
-def format_human_readable(constraint, columns, indices=None):
-    if indices is None:
-        indices = _sort_col_indices(constraint, columns)
-    lhs = ["{} {}".format(_coef(constraint[i]), columns[i]) for i in indices]
-    if not lhs:
-        lhs = ["0"]
-    return "{} ≥ 0".format(" ".join(lhs).lstrip('+ '))
-
-
-def main(args=None):
-    opts = docopt(__doc__, args)
-    system = System.load(opts['INPUT'])
-    if system.columns:
-        columns = system.columns
-    else:
-        columns = default_column_labels(system.dim)
-    print_ = print_to(opts['--output'])
-
-    def dump_with_symmetries(group):
-        vector = group[0]
-        indices = _sort_col_indices(vector, columns)
-        seen = VectorMemory()
-        for permutation in sg.permutations:
-            inverted = permutation.inverse()
-            permuted = permutation(vector)
-            if not seen(permuted):
-                print_(format_human_readable(permuted, columns,
-                                             [inverted.p[i] for i in indices]))
-
-    def dump_simple(rows):
-        for row in rows:
-            print_(format_human_readable(row, columns))
-
-    if system.update_symmetries(opts['--symmetry']):
-        sg = system.symmetry_group()
-        groups = group_by_symmetry(sg, system.matrix)
-        for g in groups:
-            if opts['--quiet']:
-                dump_simple(print_, [g[0]])
-            else:
-                dump_with_symmetries(g)
-                print_()
+    if system.symmetries:
+        short = app.opts['--quiet']
+        groups = output.pprint_symmetries(system.matrix, short)
         lengths = list(map(len, groups))
+        print_ = output._print
         print_()
         print_('# Number of inequalities:')
         print_('#   groups:', len(groups))
         print_('#   items: ', *lengths)
         print_('#   total: ', sum(lengths))
     else:
-        dump_simple(print_, system.matrix)
+        output.pprint(system.matrix)
 
 
 if __name__ == '__main__':

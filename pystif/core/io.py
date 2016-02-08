@@ -119,6 +119,40 @@ def _name_list(s):
     return s.split()
 
 
+def _fmt_float(f):
+    if round(f) == f:
+        return str(int(f))
+    return str(f)
+
+
+def _coef(coef):
+    if coef < 0:
+        prefix = '-'
+        coef = -coef
+    else:
+        prefix = '+'
+    if coef != 1:
+        prefix += ' ' + _fmt_float(coef)
+    return prefix
+
+
+def _sort_col_indices(constraint, columns):
+    # len() is used as approximation for number of terms involved. For most
+    # cases this should be fine.
+    key = lambda i: (constraint[i] > 0, abs(constraint[i]), len(columns[i]))
+    nonzero = (i for i, c in enumerate(constraint) if c != 0)
+    return sorted(nonzero, key=key, reverse=True)
+
+
+def format_human_readable(constraint, columns, indices=None):
+    if indices is None:
+        indices = _sort_col_indices(constraint, columns)
+    lhs = ["{} {}".format(_coef(constraint[i]), columns[i]) for i in indices]
+    if not lhs:
+        lhs = ["0"]
+    return "{} ≥ 0".format(" ".join(lhs).lstrip('+ '))
+
+
 class System:
 
     """
@@ -155,7 +189,7 @@ class System:
 
     def symmetry_group(self):
         from .symmetry import SymmetryGroup
-        return SymmetryGroup(self.symmetries, self.columns)
+        return SymmetryGroup.load(self.symmetries, self.columns)
 
     def slice(self, columns, fill=False):
         """Return reordered system. ``fill=True`` appends missing columns."""
@@ -255,6 +289,33 @@ class SystemFile:
         if self._slice:
             v = v[self._slice]
         self._print(format_vector(v))
+
+    def pprint_symmetries(self, rows, short=False):
+        from .symmetry import SymmetryGroup, group_by_symmetry
+        sg = SymmetryGroup.load(self.symm_spec, self.columns)
+        groups = group_by_symmetry(sg, rows)
+        representatives = [g[0] for g in groups]
+        if short:
+            self.pprint(representatives)
+        else:
+            for rep in representatives:
+                self._pprint_group(sg, rep)
+                self._print()
+        return groups
+
+    def _pprint_group(self, sg, rep):
+        indices = _sort_col_indices(rep, self.columns)
+        for permutation in sg.permutations:
+            inverted = permutation.inverse()
+            permuted = permutation(rep)
+            if self._seen(permuted):
+                continue
+            order = [inverted.p[i] for i in indices]
+            self._print(format_human_readable(permuted, self.columns, order))
+
+    def pprint(self, rows):
+        for row in rows:
+            self._print(format_human_readable(row, self.columns))
 
 
 def print_to(filename=None, *default_prefix,
