@@ -148,6 +148,15 @@ class System:
     def __bool__(self):
         return self.matrix is not None
 
+    def update_symmetries(self, symmetries):
+        if symmetries is not None:
+            self.symmetries = symmetries
+        return bool(self.symmetries)
+
+    def symmetry_group(self):
+        from .symmetry import SymmetryGroup
+        return SymmetryGroup(self.symmetries, self.columns)
+
     def slice(self, columns, fill=False):
         """Return reordered system. ``fill=True`` appends missing columns."""
         indices = [self._get_column_index(c) for c in columns]

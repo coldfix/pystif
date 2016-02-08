@@ -25,7 +25,7 @@ import numpy as np
 from docopt import docopt
 
 from .core.io import format_vector, System
-from .core.symmetry import SymmetryGroup, group_by_symmetry
+from .core.symmetry import group_by_symmetry
 
 
 def check_implies(sys_a, sys_b, name_a, name_b, *, symmetries, quiet=False):
@@ -55,14 +55,10 @@ def main(args=None):
     sys_b = System.load(opts['B'])
     sys_b, _ = sys_b.slice(sys_a.columns, fill=True)
 
-    symmetries = opts['--symmetry']
-    if symmetries is None:
-        symmetries = sys_a.symmetries
-
-    symm = SymmetryGroup.load(symmetries, sys_a.columns)
+    sys_a.update_symmetries(opts['--symmetry'])
 
     status = 0
-    kwd = {'quiet': opts['--quiet'], 'symmetries': symm}
+    kwd = {'quiet': opts['--quiet'], 'symmetries': sys_a.symmetry_group()}
     if not check_implies(sys_a, sys_b, 'A', 'B', **kwd):
         status |= 1
     if not opts['--one-way']:

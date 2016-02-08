@@ -13,7 +13,7 @@ Options:
 from docopt import docopt
 
 from .core.io import System, print_to, default_column_labels
-from .core.symmetry import SymmetryGroup, group_by_symmetry
+from .core.symmetry import group_by_symmetry
 
 
 def _fmt_float(f):
@@ -59,12 +59,8 @@ def main(args=None):
         for row in rows:
             print_(format_human_readable(row, columns))
 
-    symmetries = opts['--symmetry']
-    if symmetries is None:
-        symmetries = system.symmetries
-    if symmetries:
-        sg = SymmetryGroup.load(symmetries, system.columns)
-        groups = group_by_symmetry(sg, system.matrix)
+    if system.update_symmetries(opts['--symmetry']):
+        groups = group_by_symmetry(system.symmetry_group(), system.matrix)
         for g in groups:
             if opts['--quiet']:
                 dump([g[0]])
