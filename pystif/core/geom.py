@@ -2,16 +2,10 @@
 import numpy as np
 
 from .array import scale_to_int, make_int_exact
-from .linalg import (matrix_imker_nice, matrix_nullspace,
+from .linalg import (matrix_imker_nice, matrix_nullspace, random_direction_vector,
                      basis_vector, plane_normal, as_column_vector)
 from .lp import Problem
 from .util import PointSet, cached
-
-
-def random_direction_vector(dim):
-    v = np.random.normal(size=dim)
-    v /= np.linalg.norm(v)
-    return v
 
 
 class ConvexCone:
