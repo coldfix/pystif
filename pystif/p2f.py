@@ -7,7 +7,7 @@ Usage:
 Options:
     -p POINTS, --points POINTS      File with points
     -o OUTPUT, --output OUTPUT      Set output file for solution
-    -s SUB, --subspace SUB          Subspace specification (dimension or file)
+    -s SUB, --subspace SUB          Subspace specification (dimension or list)
     -l LIMIT, --limit LIMIT         Add constraints H(i)≤LIMIT for i<SUBDIM
                                     [default: 1]
     -y SYM, --symmetry SYM          Symmetry group generators
@@ -19,12 +19,18 @@ import numpy as np
 
 from .core.app import application
 from .core.lp import Problem
-from .core.linalg import as_column_vector
 from .core.io import System
 from .core.util import scale_to_int
 
 
-def p2f(polyhedron, system, points):
+def outer_points_to_facets(polyhedron, system, points):
+
+    """
+    Get facets that show that the given points are not in the interior of the
+    polytope.
+
+    All points must be either on the hull or outside of the polytope.
+    """
 
     L = system.matrix.T
     _, num_cols = L.shape
@@ -41,18 +47,12 @@ def p2f(polyhedron, system, points):
         q = scale_to_int(q)
         f = (L @ q)[:dim]               # f = qL
         f = scale_to_int(f)
-
         yield from polyhedron.face_to_facets(f)
 
 
 @application
 def main(app):
-
     points = System.load(app.opts['--points'])
     points, _ = points.slice(app.system.columns[:app.subdim])
-
-    facets = p2f(app.polyhedron, app.system, points.matrix)
-
-    for f in facets:
-        for g in app.symmetries(f):
-            app.output(g)
+    for f in p2f(app.polyhedron, app.system, points.matrix):
+        app.report_facet(f)

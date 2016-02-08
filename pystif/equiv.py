@@ -21,14 +21,24 @@ The values 2 and 3 are only used if --one-way is not in effect.
 
 import sys
 
-import numpy as np
 from docopt import docopt
 
 from .core.io import format_vector, System
 from .core.symmetry import group_by_symmetry
 
 
-def check_implies(sys_a, sys_b, name_a, name_b, *, symmetries, quiet=False):
+def check_implies(sys_a: System, sys_b: System,
+                  name_a: str, name_b: str,
+                  *, symmetries: 'SymmetryGroup', quiet=0):
+    """
+    Check if A implies B (system of linear inequalities).
+
+    The amount of output is controlled by the value of ``quiet``:
+
+        quiet=0     Full output, including the list of missing constraints
+        quiet=1     Short output, no list of constraints
+        quiet=2     No output at all
+    """
     lp = sys_a.lp()
     # take one representative from each category:
     groups = group_by_symmetry(symmetries, sys_b.matrix)
