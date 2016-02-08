@@ -26,22 +26,20 @@ from .core.util import scale_to_int
 
 def p2f(polyhedron, system, points):
 
-    L = system.matrix
-    num_rows, num_cols = L.shape
+    L = system.matrix.T
+    _, num_cols = L.shape
     dim = polyhedron.dim
 
     qlp = Problem(                      # Find f = qL s.t.
-        num_cols=num_rows,              #
+        num_cols=num_cols,              #
         lb_col=0)                       #    q_i ≥ 0  ∀ i
-    qlp.add(np.ones(num_rows), 1, 1)    #   Σq_i = 1
-    qlp.add(L.T[dim:], 0, 0)            # (qL)_i = 0  ∀ i > m
+    qlp.add(np.ones(num_cols), 1, 1)    #   Σq_i = 1
+    qlp.add(L[dim:], 0, 0)              # (qL)_i = 0  ∀ i > m
 
     for x in points:
-
-        q = qlp.minimize(x @ L.T[:dim])
+        q = qlp.minimize(x @ L[:dim])   # min qLx
         q = scale_to_int(q)
-
-        f = (L.T @ q)[:dim]
+        f = (L @ q)[:dim]               # f = qL
         f = scale_to_int(f)
 
         yield from polyhedron.face_to_facets(f)
