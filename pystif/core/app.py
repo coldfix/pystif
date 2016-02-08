@@ -9,7 +9,7 @@ import yaml
 
 from .geom import ConvexCone
 from .io import System, SystemFile, StatusInfo
-from .symmetry import SymmetryGroup, NoSymmetry
+from .symmetry import SymmetryGroup
 from .util import cachedproperty
 
 
@@ -110,12 +110,8 @@ class Application:
 
     @property
     def symmetries(self):
-        spec = self.symm_spec
-        if spec:
-            col_names = self.system.columns[:self.subdim]
-            return SymmetryGroup.load(spec, col_names)
-        else:
-            return NoSymmetry
+        col_names = self.system.columns[:self.subdim]
+        return SymmetryGroup.load(self.symm_spec, col_names)
 
     @cachedproperty
     def recursions(self):

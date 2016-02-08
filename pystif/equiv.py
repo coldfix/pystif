@@ -25,7 +25,7 @@ import numpy as np
 from docopt import docopt
 
 from .core.io import format_vector, System
-from .core.symmetry import NoSymmetry, SymmetryGroup, group_by_symmetry
+from .core.symmetry import SymmetryGroup, group_by_symmetry
 
 
 def check_implies(sys_a, sys_b, name_a, name_b, *, symmetries, quiet=False):
@@ -55,10 +55,11 @@ def main(args=None):
     sys_b = System.load(opts['B'])
     sys_b, _ = sys_b.slice(sys_a.columns, fill=True)
 
-    if opts.get('--symmetry'):
-        symm = SymmetryGroup.load(opts['--symmetry'], sys_a.columns)
-    else:
-        symm = NoSymmetry
+    symmetries = opts['--symmetry']
+    if symmetries is None:
+        symmetries = sys_a.symmetries
+
+    symm = SymmetryGroup.load(symmetries, sys_a.columns)
 
     status = 0
     kwd = {'quiet': opts['--quiet'], 'symmetries': symm}

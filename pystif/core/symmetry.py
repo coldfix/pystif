@@ -78,6 +78,8 @@ class SymmetryGroup:
 
     @classmethod
     def load(cls, spec, col_names):
+        if not spec:
+            return cls([Permutation(range(len(col_names)))])
         if isinstance(spec, str):
             spec = parse_symmetries(spec)
         generators = [VarPermutation.from_subst_rule(a, b)
@@ -88,10 +90,6 @@ class SymmetryGroup:
 def parse_symmetries(s):
     from .parse import symm_list, tokenize
     return symm_list.parse(tokenize(s))
-
-
-def NoSymmetry(vector):
-    yield vector
 
 
 def group_by_symmetry(sg, vectors):
