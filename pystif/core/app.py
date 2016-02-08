@@ -39,6 +39,8 @@ def application(func, doc=None):
     main = partial(main_func, func, doc)
     if func.__globals__['__name__'] == '__main__':
         main()
+    if func.__doc__ is None:
+        func.__doc__ = func.__globals__['__doc__'] if doc is None else doc
     return main
 
 
