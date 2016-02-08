@@ -5,6 +5,7 @@ Utilities to generate the symmetries of equations.
 import numpy as np
 
 from .util import VectorMemory, scale_to_int
+from .io import varsort
 
 
 class VarPermutation:
@@ -17,9 +18,9 @@ class VarPermutation:
         return cls(dict(zip(orig, perm)))
 
     def permute_vector(self, vector, col_names):
-        col_names = ["".join(sorted(col)) for col in col_names]
+        col_names = ["".join(varsort(col)) for col in col_names]
         def permute_colname(col):
-            return "".join(sorted(self.varmap.get(c, c) for c in col))
+            return "".join(varsort(self.varmap.get(c, c) for c in col))
         # this actually returns the inverse permutation… shouldn't be harmful
         try:
             return vector[[col_names.index(permute_colname(col))

@@ -20,9 +20,13 @@ def _varset(key):
     raise ValueError("Unknown format.")
 
 
+def varsort(varnames):
+    return sorted(varnames, key=lambda s: (s.lower(), s))
+
+
 def _name(key):
     try:
-        return 'H(' + ','.join(sorted(_varset(key))) + ')'
+        return 'H(' + ','.join(varsort(_varset(key))) + ')'
     except ValueError:
         return key
 
