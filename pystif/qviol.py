@@ -21,10 +21,9 @@ import sys
 import scipy.optimize
 import numpy as np
 from docopt import docopt
-import yaml
 
 from .core.symmetry import SymmetryGroup, group_by_symmetry
-from .core.io import System, _varset
+from .core.io import System, _varset, yaml_dump
 from .core.linalg import (projector, measurement, random_direction_vector,
                           cartesian_to_spherical, kron, to_unit_vector,
                           to_quantum_state)
@@ -251,21 +250,6 @@ def select_combinations(parties, columns):
     _sel_op = lambda p: parties[ord(p.lower())-ord('a')][p.islower()]
     return [[_sel_op(p) for p in _varset(colname)]
             for colname in columns]
-
-
-def yaml_dump(data, stream=None, Dumper=yaml.SafeDumper, **kwds):
-    class _Dumper(Dumper):
-        pass
-    def numpy_scalar_representer(dumper, data):
-        return dumper.represent_data(np.asscalar(data))
-    def numpy_array_representer(dumper, data):
-        return dumper.represent_data([x for x in data])
-    def complex_representer(dumper, data):
-        return dumper.represent_data([data.real, data.imag])
-    _Dumper.add_multi_representer(np.generic, numpy_scalar_representer)
-    _Dumper.add_representer(np.ndarray, numpy_array_representer)
-    _Dumper.add_representer(complex, complex_representer)
-    return yaml.dump(data, stream, _Dumper, **kwds)
 
 
 def main(args=None):

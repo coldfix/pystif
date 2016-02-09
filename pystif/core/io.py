@@ -4,6 +4,7 @@ import sys
 import re
 
 import numpy as np
+import yaml
 
 from .array import format_vector
 from .lp import Problem
@@ -400,3 +401,18 @@ class StatusInfo:
             self.write(" ".join(args))
         else:
             self.write("\n")
+
+
+def yaml_dump(data, stream=None, Dumper=yaml.SafeDumper, **kwds):
+    class _Dumper(Dumper):
+        pass
+    def numpy_scalar_representer(dumper, data):
+        return dumper.represent_data(np.asscalar(data))
+    def numpy_array_representer(dumper, data):
+        return dumper.represent_data([x for x in data])
+    def complex_representer(dumper, data):
+        return dumper.represent_data([data.real, data.imag])
+    _Dumper.add_multi_representer(np.generic, numpy_scalar_representer)
+    _Dumper.add_representer(np.ndarray, numpy_array_representer)
+    _Dumper.add_representer(complex, complex_representer)
+    return yaml.dump(data, stream, _Dumper, **kwds)
