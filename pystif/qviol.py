@@ -2,7 +2,10 @@
 Find quantum violations for the tripartite bell scenario.
 
 Usage:
-    qviol EXPRS [-c CONSTR] [-o FILE] [-n NUM] [-s SUBSET]
+    qviol INPUT [-c CONSTR] [-o FILE] [-n NUM] [-s SUBSET]
+
+Arguments:
+    INPUT                               File with known faces of the local cone
 
 Options:
     -o FILE, --output FILE              Set output file
@@ -20,8 +23,8 @@ import sys
 
 import scipy.optimize
 import numpy as np
-from docopt import docopt
 
+from .core.app import application
 from .core.symmetry import SymmetryGroup, group_by_symmetry
 from .core.io import System, _varset, yaml_dump
 from .core.linalg import (projector, measurement, random_direction_vector,
@@ -252,11 +255,11 @@ def select_combinations(parties, columns):
             for colname in columns]
 
 
-def main(args=None):
+@application
+def main(app):
 
-    opts = docopt(__doc__, args)
-
-    system = TripartiteBellScenario(System.load(opts['EXPRS']))
+    opts = app.opts
+    system = TripartiteBellScenario(app.system)
 
     ct = opts['--constraints']
     if ct is None:
@@ -307,7 +310,3 @@ def main(args=None):
             print('\n', result.x, sep='')
 
     print()
-
-
-if __name__ == '__main__':
-    main()
