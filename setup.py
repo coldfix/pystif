@@ -38,6 +38,7 @@ setup(
             'rfd = pystif.rfd:main',
             'p2f = pystif.p2f:main',
             'qviol = pystif.qviol:main',
+            'checkprojection = pystif.checkprojection:main',
         ]
     },
     ext_modules=cythonize([
