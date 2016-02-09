@@ -35,6 +35,7 @@ __all__ = [
     'solve_quadratic_equation',
     'hdet',
     'ptrace',
+    'ptranspose',
 ]
 
 
@@ -283,3 +284,16 @@ def ptrace(dm, dims, *out):
     dim = np.product(dims)
     dm = dm.reshape((dim, dim))
     return dm
+
+
+def ptranspose(dm, dims, subsys):
+    """
+    Return the partial transpose of a density matrix with respect to the
+    given subsystem.
+    """
+    n = len(dims)
+    d = np.product(dims)
+    dims = list(dims)
+    perm = list(range(n*2))
+    perm[subsys], perm[n+subsys] = n+subsys, subsys
+    return dm.reshape(dims * 2).transpose(tuple(perm)).reshape((d, d))

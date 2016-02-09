@@ -29,7 +29,7 @@ from .core.symmetry import SymmetryGroup, group_by_symmetry
 from .core.io import System, _varset, yaml_dump
 from .core.linalg import (projector, measurement, random_direction_vector,
                           cartesian_to_spherical, kron, to_unit_vector,
-                          to_quantum_state)
+                          to_quantum_state, ptrace, ptranspose)
 
 
 def measure_many(psi, measurements):
@@ -239,6 +239,36 @@ class CHSH2(Constraints):
         return 2-abs(np.dot(correlators, expr))
 
 
+class SEP2(Constraints):
+
+    """The 2-party subsystems are separable."""
+
+    # NOTE: this test only works if at most one party is 3 dimensional
+
+    def __init__(self, system):
+        self.system = system
+
+    def __call__(self, params):
+        state, parties = self.system.realize(params)
+        rho_abc = projector(state)
+        dims = self.system.subdim
+        rho_bc = ptrace(rho_abc, dims, 0), (dims[1], dims[2])
+        rho_ac = ptrace(rho_abc, dims, 1), (dims[0], dims[2])
+        rho_ab = ptrace(rho_abc, dims, 2), (dims[0], dims[1])
+        return sum(self._neg_entanglement(rho2, dim2)
+                   for rho2, dim2 in (rho_bc, rho_ac, rho_ab))
+
+    def _neg_entanglement(self, rho2, dim2, eps=1e-10):
+        """
+        Return something negative if the 2-party density matrix is entangled.
+
+        This works using the Peres–Horodecki criterion.
+        """
+        trans = ptranspose(rho2, dim2, 1)
+        val, vec = np.linalg.eigh(trans)
+        return sum(v for v in val if v < -eps)
+
+
 # composed operations
 def h(p):
     """Compute one term in the entropy sum."""
@@ -268,6 +298,8 @@ def main(app):
         constr = CHSHE2.optimization_constraints(system)
     elif ct.upper() == 'CHSH':
         constr = CHSH2.optimization_constraints(system)
+    elif ct.upper() == 'SEP':
+        constr = SEP2.optimization_constraints(system)
     else:
         raise ValueError('Unknown constraints type: {}'.format(ct))
 
@@ -300,6 +332,7 @@ def main(app):
             yaml_dump([{
                 'i': i,
                 'expr': expr,
+                'cols': system.cols,
                 'f': result.fun,
                 'state': state,
                 'angles': angles
