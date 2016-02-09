@@ -312,6 +312,7 @@ def main(args=None):
             state, angles = system.unpack(result.x)
             yaml_dump([{
                 'i': i,
+                'expr': expr,
                 'f': result.fun,
                 'state': state,
                 'angles': angles
