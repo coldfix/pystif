@@ -161,6 +161,26 @@ def cartesian_to_spherical(v):
     return (r, theta, phi)
 
 
+def hyperspherical_to_cartesian(angles):
+    """
+    Convert hyperspherical angles to cartesian coordinates.
+
+    Converts a vector of n angles to a (n+1) cartesian unit vector with
+    components
+
+        x₁   = cos(φ₁)
+        x₂   = sin(φ₁) cos(φ₂)
+        x₃   = sin(φ₁) sin(φ₂) cos(φ₃)
+        …
+        xₙ   = sin(φ₁) sin(φ₂) sin(φ₃) … sin(φₙ₋₁) cos(φₙ)
+        xₙ₊₁ = sin(φ₁) sin(φ₂) sin(φ₃) … sin(φₙ₋₁) sin(φₙ)
+    """
+    dim = angles.size + 1
+    c = [cos(x) for x in angles] + [1]
+    s = [1] + [sin(x) for x in angles]
+    return np.array([ci * si for ci, si in zip(c, np.cumprod(s))])
+
+
 def random_direction_angles():
     """Return unit vector on the sphere in spherical coordinates (θ, φ)."""
     v = np.random.normal(size=3)
