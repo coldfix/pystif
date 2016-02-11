@@ -26,7 +26,7 @@ import numpy as np
 
 from .core.app import application
 from .core.symmetry import SymmetryGroup, group_by_symmetry
-from .core.io import System, _varset, yaml_dump
+from .core.io import System, _varset, yaml_dump, format_human_readable
 from .core.linalg import (projector, measurement, random_direction_vector,
                           cartesian_to_spherical, kron, to_unit_vector,
                           to_quantum_state, ptrace, ptranspose)
@@ -335,15 +335,14 @@ def main(app):
             state, angles = system.unpack(result.x)
             yaml_dump([{
                 'i': i,
-                'expr': expr,
+                'coef': expr,
                 'cols': system.cols,
+                'expr': format_human_readable(expr, system.cols),
                 'f': result.fun,
                 'state': state,
                 'angles': angles
             }], out_file)
 
-            print("\n", i, expr)
-            print('\n', result.fun, sep='')
-            print('\n', result.x, sep='')
+            print('\n', i, result.fun)
 
     print()
