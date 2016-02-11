@@ -32,6 +32,10 @@ from .core.linalg import (projector, measurement, random_direction_vector,
                           to_quantum_state, ptrace, ptranspose)
 
 
+def exp_i(phi):
+    return cmath.rect(1, phi)
+
+
 def measure_many(psi, measurements):
     """Return expectation values for a list of operators."""
     return [measurement(psi, m) for m in measurements]
@@ -76,8 +80,8 @@ class Qbit:
 
         http://www.physicspages.com/2013/01/19/spin-12-along-an-arbitrary-direction/
         """
-        exp_th2 = cmath.rect(1, theta/2)
-        exp_phi = cmath.rect(1, phi)
+        exp_th2 = exp_i(theta/2)
+        exp_phi = exp_i(phi)
         u = [exp_th2.real,
              exp_th2.imag * exp_phi]
         d = [exp_th2.imag,
