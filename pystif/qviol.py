@@ -181,7 +181,7 @@ class TripartiteBellScenario(CompositeQuantumSystem):
 
     def random(self):
         # phases are absorbed into Phi_R:
-        s = random_direction_vector(self.dim)
+        s = random_direction_vector(self.dim*2)
         # 1 measurement = U(n).CT @ diag[1 … n] @ U(n)
         num_unitary_params = (sum(x**2 for x in self.subdim) + 
                               sum(x**2 for x in self.subdim[1:]))
@@ -199,8 +199,7 @@ class TripartiteBellScenario(CompositeQuantumSystem):
         #M = [dagger(u) @ D @ u for u in U]
         #M = list(zip(M[::2], M[1::2]))
 
-        assert len(l) == self.dim
-        state = to_unit_vector(l)
+        state = to_quantum_state(to_unit_vector(l).reshape(self.dim, 2))
         return state, U
 
     def realize(self, params):
