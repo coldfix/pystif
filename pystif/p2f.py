@@ -54,5 +54,5 @@ def outer_points_to_facets(polyhedron, system, points):
 def main(app):
     points = System.load(app.opts['--points'])
     points, _ = points.slice(app.system.columns[:app.subdim])
-    for f in p2f(app.polyhedron, app.system, points.matrix):
+    for f in outer_points_to_facets(app.polyhedron, app.system, points.matrix):
         app.report_facet(f)
