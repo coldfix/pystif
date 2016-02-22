@@ -53,7 +53,7 @@ def check_faces(cone, check):
 
 
 def main(args=None):
-    opts = docopt(__doc__)
+    opts = docopt(__doc__, args)
 
     system = System.load(opts['SYSTEM'])
     check = System.load(opts['CHECK'])
