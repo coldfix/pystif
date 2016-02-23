@@ -22,6 +22,8 @@ import math
 
 import numpy as np
 
+from .io import get_bits
+
 
 def _insert_zero_bit(pool, bit_index):
     """Insert a zero bit at specified position."""
@@ -86,6 +88,62 @@ def elemental_inequalities(num_vars, dtype=np.float64):
                 if K:
                     row[K] = -1
                 yield row
+
+
+def _varlist(varnames, vars):
+    return ','.join(varnames[v] for v in vars)
+
+
+class Entropy:
+
+    """Symbolic representation of a (conditional) entropy."""
+
+    def __init__(self, vars, cond=()):
+        self.vars = vars
+        self.cond = cond
+
+    def fmt(self, varnames):
+        arg = _varlist(varnames, self.vars)
+        if self.cond:
+            arg += '|' + _varlist(varnames, self.cond)
+        return 'H({})'.format(arg)
+
+
+class MutualInformation:
+
+    """Symbolic representation of a (conditional) mutual information."""
+
+    def __init__(self, *parts, cond=()):
+        self.parts = parts
+        self.cond = cond
+
+    def fmt(self, varnames):
+        arg = ':'.join(_varlist(varnames, part) for part in self.parts)
+        if self.cond:
+            arg += '|' + _varlist(varnames, self.cond)
+        return 'I({})'.format(arg)
+
+
+def elemental_forms(num_vars):
+    """Return abstract Shannon information measures."""
+    if num_vars < 1:
+        raise ValueError("Invalid number of variables: {}".format(num_vars))
+    varlist = list(range(num_vars))
+    if num_vars == 1:
+        yield Entropy(varlist)
+        return
+    sub = 2**(num_vars-2)
+    # Iterate all elemental conditional entropy positivities, i.e. those of
+    # the form H(a|A) ≥ 0 where A = {i ≠ a}:
+    for a in range(num_vars):
+        yield Entropy([a], varlist[:a] + varlist[a+1:])
+    # Iterate all elemental conditional mutual information positivities, i.e.
+    # those of the form H(a:b|K)>=0 where a,b not in K:
+    for a in range(num_vars-1):
+        for b in range(a+1, num_vars):
+            for i in range(sub):
+                K = _insert_zero_bit(_insert_zero_bit(i, a), b)
+                yield MutualInformation([a], [b], cond=get_bits(K))
 
 
 def cyclic_cca_causal_constraints_1d(width, dtype=np.float64):
