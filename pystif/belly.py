@@ -5,7 +5,10 @@ Usage:
 
 import itertools
 
+import numpy as np
+
 from .core.app import application
+from .core.util import VectorMemory
 
 
 def partitions(n: int, max_terms: int):
@@ -260,6 +263,11 @@ def iter_bell_ineqs(num_parties, num_ce):
     num_vars = 2 * num_parties
     varlist = tuple(range(num_vars))
 
+    axes = list(itertools.combinations(varlist, 2)) + [(i,) for i in varlist]
+    inv = {v: i for i, v in enumerate(axes)}
+
+    seen = VectorMemory()
+
     # Loop over all possible combinations of conditional entropies
     for part in partitions(num_ce, num_vars):
         # Every partition ``p = (p_0, p_1, ...)`` where ``Σ p_i = num_ce``
@@ -268,8 +276,12 @@ def iter_bell_ineqs(num_parties, num_ce):
         terms_hi = {varlist: num_ce}
         terms_lo = {l_del(varlist, i): -c for i, c in enumerate(part)}
         for ineq in _iter_ineqs_cmi(terms_hi, terms_lo, num_vars):
-            # TODO: keep track of all previously seen ineqs to avoid multiple
-            # re-expansion.
+            vec = np.zeros(len(axes))
+            for t, v in ineq.items():
+                vec[inv[t]] = v
+            if seen(vec):
+                continue
+            # TODO: keep track of symmetries as well
             yield from assign_parties(ineq, num_parties)
 
 
