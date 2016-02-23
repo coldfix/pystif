@@ -467,6 +467,62 @@ cdef class Problem:
             buf[row] = glp.get_row_dual(self._lp, row+1)
         return ret
 
+    property name:
+        """Problem name (will be cut off at 255 chars)."""
+        def __set__(self, name):
+            glp.set_prob_name(self._lp, _cstr(name)[:255])
+        def __get__(self):
+            return _str(glp.get_prob_name(self._lp))
+
+    property obj_name:
+        """Objective name (will be cut off at 255 chars)."""
+        def __set__(self, name):
+            glp.set_obj_name(self._lp, _cstr(name)[:255])
+        def __get__(self):
+            return _str(glp.get_obj_name(self._lp))
+
+    def get_row_name(self, int row):
+        """Get the row name (or the empty string)."""
+        self._check_row_index(row)
+        return _str(glp.get_row_name(self._lp, row))
+
+    def get_col_name(self, int col):
+        """Get the col name (or the empty string)."""
+        self._check_col_index(col)
+        return _str(glp.get_col_name(self._lp, col))
+
+    def set_row_name(self, int row, name):
+        """
+        Set the row name (will be cut off at 255 chars). Passing ``None`` or
+        an empty string erases the row name.
+        """
+        self._check_row_index(row)
+        glp.set_row_name(self._lp, row, _cstr(name)[:255])
+
+    def set_col_name(self, int col, name):
+        """
+        Set the col name (will be cut off at 255 chars). Passing ``None`` or
+        an empty string erases the col name.
+        """
+        self._check_col_index(col)
+        glp.set_col_name(self._lp, col, _cstr(name)[:255])
+
+
+cdef _str(const char* s):
+    """Decode C string to python string."""
+    if s is NULL:
+        # Returning an empty string will make the type of the parameter
+        # transparent to the inspecting code:
+        return ""
+    return s.decode('utf-8')
+
+
+cdef bytes _cstr(s):
+    """Encode python string to C string."""
+    if s is None:
+        return b""
+    return <bytes> s.encode('utf-8')
+
 
 class Minimize:
 

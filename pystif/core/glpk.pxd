@@ -116,3 +116,17 @@ cdef extern from "glpk.h":
 
     double get_col_prim "glp_get_col_prim" (Prob* prob, int col)
     double get_col_dual "glp_get_col_dual" (Prob* prob, int col)
+
+    # names
+
+    void set_prob_name "glp_set_prob_name" (Prob* P, const char* name)
+    void set_obj_name "glp_set_obj_name" (Prob* P, const char* name)
+
+    const char* get_prob_name "glp_get_prob_name" (Prob* P)
+    const char* get_obj_name "glp_get_obj_name" (Prob* P)
+
+    void set_row_name "glp_set_row_name" (Prob* P, int i, const char *name)
+    void set_col_name "glp_set_col_name" (Prob* P, int i, const char *name)
+
+    const char* get_row_name "glp_get_row_name" (Prob* P, int i)
+    const char* get_col_name "glp_get_col_name" (Prob* P, int i)
