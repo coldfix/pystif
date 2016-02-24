@@ -139,7 +139,7 @@ Expression = """
 """
 
 
-def _iter_ineqs_cmi(terms_hi: VarSet, terms_lo: VarSet, len_hi: int) -> Expression:
+def _iter_ineqs_cmi(ctx, terms_hi: VarSet, terms_lo: VarSet, len_hi: int) -> Expression:
 
     """
     This function recursively marginalizes an entropy expression of the form
@@ -157,6 +157,9 @@ def _iter_ineqs_cmi(terms_hi: VarSet, terms_lo: VarSet, len_hi: int) -> Expressi
     ``terms_hi``, ``terms_lo`` hold the coefficients of the current
     expansion state.
     """
+
+    if ctx.seen(terms_hi, terms_lo):
+        return
 
     # The expansion will stop when arriving at an expression with only Shannon
     # entropy terms with at most ``max_vars`` variables, e.g. ``max_vars=2``
@@ -209,7 +212,8 @@ def _iter_ineqs_cmi(terms_hi: VarSet, terms_lo: VarSet, len_hi: int) -> Expressi
                     d_add(new_hi, bc, 1)
                     d_add(new_lo, c, -1)
 
-            yield merged(new_hi, new_lo)
+            if not ctx.seen(new_hi, new_lo):
+                yield merged(new_hi, new_lo)
 
         return
 
@@ -247,7 +251,21 @@ def _iter_ineqs_cmi(terms_hi: VarSet, terms_lo: VarSet, len_hi: int) -> Expressi
                     d_add(new_hi, tuple(sorted(a|c)), 1)
                     d_add(new_lo, tuple(sorted(c)), -1)
 
-            yield from _iter_ineqs_cmi(new_hi, new_lo, len_hi-1)
+            yield from _iter_ineqs_cmi(ctx, new_hi, new_lo, len_hi-1)
+
+
+
+class IterContext:
+
+    def __init__(self):
+        self._seen = set()
+
+    def seen(self, hi, lo):
+        key = (frozenset(hi.items()), frozenset(lo.items()))
+        seen = key in self._seen
+        if not seen:
+            self._seen.add(key)
+        return seen
 
 
 def iter_bell_ineqs(num_parties, num_ce):
@@ -259,6 +277,8 @@ def iter_bell_ineqs(num_parties, num_ce):
         num_parties: number of variables
         num_ce: total number of conditional entropy terms
     """
+
+    ctx = IterContext()
 
     num_vars = 2 * num_parties
     varlist = tuple(range(num_vars))
@@ -275,7 +295,7 @@ def iter_bell_ineqs(num_parties, num_ce):
         # ``p_i`` times:
         terms_hi = {varlist: num_ce}
         terms_lo = {l_del(varlist, i): -c for i, c in enumerate(part)}
-        for ineq in _iter_ineqs_cmi(terms_hi, terms_lo, num_vars):
+        for ineq in _iter_ineqs_cmi(ctx, terms_hi, terms_lo, num_vars):
             vec = np.zeros(len(axes))
             for t, v in ineq.items():
                 vec[inv[t]] = v
