@@ -8,7 +8,12 @@ import itertools
 import numpy as np
 
 from .core.app import application
-from .core.io import format_human_readable, _name
+from .core.io import format_human_readable, _name, System, column_varname_labels
+from .core.lp import Problem
+from .core.symmetry import SymmetryGroup
+from .core.util import VectorMemory
+from .core.it import elemental_inequalities
+from .core.geom import ConvexCone
 
 
 def partitions(n: int, max_terms: int):
@@ -391,15 +396,14 @@ class MakeVector:
         return vec
 
 
-@application
-def main(app):
-    opts = app.opts
+def make_bell_sys(num_parties):
 
-    num_parties = int(opts['NUM_PARTIES'])
-    num_ces = [int(x) for x in opts['NUM_CE'].split(',')]
+    alphabet = "abcdefghijklmnopqrz"
+    upper = alphabet[:num_parties].upper()
+    lower = alphabet[:num_parties].lower()
 
-    parties = [(chr(ord('A')+i), chr(ord('a')+i))
-               for i in range(num_parties)]
+    varlist = upper + lower
+    parties = list(zip(upper, lower))
 
     cols = [_name({a, b})
             for p0, p1 in itertools.combinations(parties, 2)
@@ -408,10 +412,49 @@ def main(app):
              for p in parties
              for a in p]
 
+    spec = parties + list(itertools.combinations(parties, 2))
+    symm = SymmetryGroup.load(spec, cols)
+
+    system = System(
+        np.array(list(elemental_inequalities(2*num_parties)))[:,1:],
+        column_varname_labels(varlist)[1:],
+        symm)
+
+    system, subdim = system.slice(cols, fill=True)
+    system.subdim = subdim
+
+    return system
+
+
+
+@application
+def main(app):
+    opts = app.opts
+
+    num_parties = int(opts['NUM_PARTIES'])
+    num_ces = [int(x) for x in opts['NUM_CE'].split(',')]
+
+    system = make_bell_sys(num_parties)
+    cols = system.columns[:system.subdim]
     tovec = MakeVector(cols)
+    seen = VectorMemory()
+
+    polyhedron = ConvexCone.from_cone(system, system.subdim, 1)
+    lp = Problem(num_cols=len(cols))
 
     for num_ce in num_ces:
         for ineq in iter_bell_ineqs(num_parties, num_ce):
             vec = tovec(ineq)
-            fmt = format_human_readable(vec, cols)
-            print(fmt)
+            if lp.implies(vec):
+                continue
+
+            for facet in polyhedron.face_to_facets(vec):
+                if seen(facet):
+                    continue
+
+                for v in system.symmetries(facet):
+                    lp.add(v)
+                    seen(v)
+
+                fmt = format_human_readable(facet, cols)
+                print(fmt)
