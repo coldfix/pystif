@@ -5,7 +5,10 @@ Usage:
 
 import itertools
 
+import numpy as np
+
 from .core.app import application
+from .core.io import format_human_readable, _name
 
 
 def partitions(n: int, max_terms: int):
@@ -309,6 +312,11 @@ def assign_parties(terms: VarSet, num_parties: int):
             second = avail.pop(p)
             parties.append((first, second))
 
+        translate = {}
+        for i, (a, b) in enumerate(parties):
+            translate[a] = chr(ord('A')+i)
+            translate[b] = chr(ord('a')+i)
+
         mod_terms = terms.copy()
         queue = set(mod_terms)
         while queue:
@@ -330,11 +338,13 @@ def assign_parties(terms: VarSet, num_parties: int):
                     d_add(mod_terms, abc, -n)
                     d_add(mod_terms, ac, +n)
                     d_add(mod_terms, bc, +n)
-                    d_add(mod_terms, c, -n)
+                    if c:
+                        d_add(mod_terms, c, -n)
 
                     queue.add(ac)
                     queue.add(bc)
-                    queue.add(c)
+                    if c:
+                        queue.add(c)
 
                     # TODO: if we allowed for more than 3-body terms, there
                     # can be multiple possible orders to remove parties here,
@@ -344,7 +354,26 @@ def assign_parties(terms: VarSet, num_parties: int):
                     #   I(A:B|abXx)
                     break
 
-        yield mod_terms
+        #yield mod_terms
+        tr = {_name({translate[x] for x in t}): v
+              for t, v in mod_terms.items()}
+
+        yield tr
+
+
+class MakeVector:
+
+    def __init__(self, cols):
+        self.cols = cols
+        self.inv = {v: i for i, v in enumerate(cols)}
+        self.dim = len(cols)
+
+    def __call__(self, terms):
+        inv = self.inv
+        vec = np.zeros(self.dim)
+        for t, v in terms.items():
+            vec[inv[t]] = v
+        return vec
 
 
 @application
@@ -354,6 +383,20 @@ def main(app):
     num_parties = int(opts['NUM_PARTIES'])
     num_ces = [int(x) for x in opts['NUM_CE'].split(',')]
 
+    parties = [(chr(ord('A')+i), chr(ord('a')+i))
+               for i in range(num_parties)]
+
+    cols = [_name({a, b})
+            for p0, p1 in itertools.combinations(parties, 2)
+            for a, b in itertools.product(p0, p1)]
+    cols += [_name({a})
+             for p in parties
+             for a in p]
+
+    tovec = MakeVector(cols)
+
     for num_ce in num_ces:
         for ineq in iter_bell_ineqs(num_parties, num_ce):
-            print(ineq)
+            vec = tovec(ineq)
+            fmt = format_human_readable(vec, cols)
+            print(fmt)
