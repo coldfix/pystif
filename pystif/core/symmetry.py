@@ -2,20 +2,46 @@
 Utilities to generate the symmetries of equations.
 """
 
+from functools import reduce
+from operator import add
+
 import numpy as np
 
 from .util import VectorMemory, scale_to_int
 from .io import varsort
 
 
+def _all_unique(s):
+    """Check that all items of s are unique."""
+    return len(set(s)) == len(s)
+
+
 class VarPermutation:
 
     def __init__(self, varmap):
         self.varmap = varmap
+        # Complete incomplete specifications, e.g.
+        #   A <> a      ->  (Aa)
+        #   ABC <> BDC  ->  (ABD)
+        inverse = {v: k for k, v in varmap.items()}
+        for k in list(varmap):
+            if k not in inverse:
+                # k is the start of an incomplete cycle
+                f = varmap[k]
+                while f in varmap:
+                    f = varmap[f]
+                varmap[f] = k
 
     @classmethod
     def from_subst_rule(cls, orig, perm):
+        assert _all_unique(orig)
+        assert _all_unique(perm)
+        assert len(orig) == len(perm)
         return cls(dict(zip(orig, perm)))
+
+    @classmethod
+    def from_cycle_spec(cls, cycles):
+        return flatten((c, c[1:]+c[:1]) for c in cycles)
 
     def permute_vector(self, vector, col_names):
         col_names = ["".join(varsort(col)) for col in col_names]
@@ -85,6 +111,23 @@ class SymmetryGroup:
         generators = [VarPermutation.from_subst_rule(a, b)
                       for a, b in spec]
         return cls(map(Permutation, evaluate_generators(generators, col_names)))
+
+    @classmethod
+    def from_cycles(cls, cycles, col_names):
+        return cls.load(cycles_to_spec(cycles), col_names)
+
+
+def cycles_to_spec_item(cycles):
+    cycles = list(cycles)
+    if not cycles:
+        return (), ()
+    a = reduce(add, cycles)
+    b = reduce(add, (c[1:] + c[:1] for c in cycles))
+    return a, b
+
+
+def cycles_to_spec(rules):
+    return [cycles_to_spec_item(cycles) for cycles in rules]
 
 
 def parse_symmetries(s):
