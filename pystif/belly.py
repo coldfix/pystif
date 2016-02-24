@@ -4,6 +4,7 @@ Usage:
 """
 
 import itertools
+import random
 
 import numpy as np
 
@@ -14,6 +15,12 @@ from .core.symmetry import SymmetryGroup
 from .core.util import VectorMemory
 from .core.it import elemental_inequalities
 from .core.geom import ConvexCone
+
+
+def shuffled(seq):
+    l = list(seq)
+    random.shuffle(l)
+    return l
 
 
 def partitions(n: int, max_terms: int):
@@ -193,7 +200,7 @@ def _iter_ineqs_cmi(ctx, terms_hi: VarSet, terms_lo: VarSet, len_hi: int) -> Exp
             for h, n in terms_hi.items()
         ))
 
-        for rm_elems in impls:
+        for rm_elems in shuffled(impls):
 
             # We can simply forget terms_hi, since these will all be
             # compensated in the following. terms_lo must be kept since those
@@ -230,7 +237,7 @@ def _iter_ineqs_cmi(ctx, terms_hi: VarSet, terms_lo: VarSet, len_hi: int) -> Exp
     ]
 
     ctrl = ComboPartitioner(compat, terms_hi, terms_lo)
-    for part in ctrl.partitions(sum(terms_hi.values())):
+    for part in shuffled(ctrl.partitions(sum(terms_hi.values()))):
 
         impls = itertools.product(*(
             # The pair (h, l) together with one additional parameter selecting
@@ -239,7 +246,7 @@ def _iter_ineqs_cmi(ctx, terms_hi: VarSet, terms_lo: VarSet, len_hi: int) -> Exp
             for (h, l), n in zip(compat, part)
         ))
 
-        for rm_elems in impls:
+        for rm_elems in shuffled(impls):
 
             # We can ignore both terms_lo and terms_hi, since all those terms
             # will be compensated for by chosing the below CMIs:
@@ -289,7 +296,7 @@ def iter_bell_ineqs(num_parties, num_ce):
     varlist = tuple(range(num_vars))
 
     # Loop over all possible combinations of conditional entropies
-    for part in partitions(num_ce, num_vars):
+    for part in shuffled(partitions(num_ce, num_vars)):
         # Every partition ``p = (p_0, p_1, ...)`` where ``Σ p_i = num_ce``
         # means that the conditional entropy ``H(i|X) = H(iX) - H(X)`` occurs
         # ``p_i`` times:
@@ -309,7 +316,7 @@ def assign_parties(terms: VarSet, num_parties: int):
         range(2*i-1) for i in range(num_parties, 0, -1)
     ))
 
-    for aff in affiliations:
+    for aff in shuffled(affiliations):
 
         valid_assignment = True
 
