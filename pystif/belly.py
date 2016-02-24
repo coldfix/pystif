@@ -95,14 +95,14 @@ class ComboPartitioner(Partitioner):
         """
         Set value for first component to ``k`` and return a partitioner for the
         remaining components.
-        ."""
+        """
         if k == 0:
             return self.__class__(self.compat[1:], self.hi, self.lo)
         (h, l), *compat = self.compat
         hi = self.hi.copy()
         lo = self.lo.copy()
         d_add(hi, h, -k)
-        d_add(lo, l, -k)
+        d_add(lo, l, +k)
         return self.__class__(compat, hi, lo)
 
 
@@ -206,7 +206,7 @@ def _iter_ineqs_cmi(ctx, terms_hi: VarSet, terms_lo: VarSet, len_hi: int) -> Exp
                     abc = h
                     ac = l_del(abc, ib+(ib>=ia))
                     bc = l_del(abc, ia)
-                    c = l_del(ac, ia)
+                    c = l_del(bc, ib)
 
                     d_add(new_hi, ac, 1)
                     d_add(new_hi, bc, 1)
@@ -305,6 +305,9 @@ def assign_parties(terms: VarSet, num_parties: int):
     ))
 
     for aff in affiliations:
+
+        valid_assignment = True
+
         avail = list(range(2*num_parties))
         parties = []
         for p in aff:
@@ -319,13 +322,22 @@ def assign_parties(terms: VarSet, num_parties: int):
 
         mod_terms = terms.copy()
         queue = set(mod_terms)
-        while queue:
+        while queue and valid_assignment:
             t = queue.pop()
             n = mod_terms.get(t, 0)
-            if n == 0:
+            if n == 0 or len(t) <= 1:
                 continue
             for a, b in parties:
                 if a in t and b in t:
+                    if n < 0:
+                        # All Shannon information measures have a positive
+                        # coefficient for the highest order entropy term,
+                        # therefore, there is no straight-forward way to
+                        # remove a negative term by adding an information
+                        # measure:
+                        valid_assignment = False
+                        break
+
                     # This expands terms of the form H(A,a,X) via I(A:a|X).
                     # TODO: also use expansions of the form I(A:a|X).
 
@@ -353,6 +365,9 @@ def assign_parties(terms: VarSet, num_parties: int):
                     #   I(A:X|aBbx) then eliminate Bb (or vice versa) or
                     #   I(A:B|abXx)
                     break
+
+        if not valid_assignment:
+            continue
 
         #yield mod_terms
         tr = {_name({translate[x] for x in t}): v
