@@ -190,10 +190,7 @@ def _iter_ineqs_cmi(ctx, terms_hi: VarSet, terms_lo: VarSet, len_hi: int) -> Exp
     if len_hi == max_vars+1:
 
         # paremetrization for chosing the subsets for each individual term:
-        subset_choices = list(itertools.product(
-            range(len_hi),
-            range(len_hi-1)
-        ))
+        subset_choices = list(itertools.combinations(range(len_hi), 2))
 
         impls = itertools.product(*(
             itertools.combinations_with_replacement(subset_choices, n)
@@ -216,9 +213,9 @@ def _iter_ineqs_cmi(ctx, terms_hi: VarSet, terms_lo: VarSet, len_hi: int) -> Exp
                     # to compensate for the H(abc) term in terms_hi:
 
                     abc = h
-                    ac = l_del(abc, ib+(ib>=ia))
+                    ac = l_del(abc, ib)
                     bc = l_del(abc, ia)
-                    c = l_del(bc, ib)
+                    c = l_del(ac, ia)       # this works due to (ia < ib)
 
                     d_add(new_hi, ac, 1)
                     d_add(new_hi, bc, 1)
