@@ -16,7 +16,7 @@ def _varset(key):
         return set(key)
     if key.startswith('H(') and key.endswith(')'):
         return set(re.split('[ ,]', key[2:-1]))
-    if key.startswith('_') and key != '_':
+    if key.startswith('_'):
         return set(key[1:])
     raise ValueError("Unknown format.")
 

@@ -8,7 +8,7 @@ from operator import add
 import numpy as np
 
 from .util import VectorMemory, scale_to_int
-from .io import varsort
+from .io import varsort, _name, _varset
 
 
 def _all_unique(s):
@@ -43,19 +43,27 @@ class VarPermutation:
     def from_cycle_spec(cls, cycles):
         return flatten((c, c[1:]+c[:1]) for c in cycles)
 
+    def permute_colname(self, col):
+        return "".join(varsort(self.varmap.get(c, c) for c in col))
+
     def permute_vector(self, vector, col_names):
         col_names = ["".join(varsort(col)) for col in col_names]
-        def permute_colname(col):
-            return "".join(varsort(self.varmap.get(c, c) for c in col))
         # this actually returns the inverse permutation… shouldn't be harmful
         try:
-            return vector[[col_names.index(permute_colname(col))
+            return vector[[col_names.index(self.permute_colname(col))
                            for col in col_names]]
         except ValueError:
             return vector
 
+    def permute_symbolic(self, vector):
+        return {
+            _name({self.varmap.get(c, c) for c in _varset(k)}): v
+            for k, v in vector.items()
+        }
+
 
 def evaluate_generators(generators, col_names):
+    # TODO: check this function…
     queue = [tuple(range(len(col_names)))]
     seen = set()
     seen.add(queue[0])
