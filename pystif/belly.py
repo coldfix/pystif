@@ -189,19 +189,19 @@ def _iter_ineqs_cmi(ctx, terms_hi: VarSet, terms_lo: VarSet, len_hi: int) -> Exp
     # ``terms_lo`` - arbitrary subsets can be chosen from the hi terms:
     if len_hi == max_vars+1:
 
-        # paremetrization for chosing the subsets for each individual term:
+        # parametrization for choosing the subsets for each individual term:
         subset_choices = list(itertools.combinations(range(len_hi), 2))
 
         impls = itertools.product(*(
             itertools.combinations_with_replacement(subset_choices, n)
-            for h, n in terms_hi.items()
+            for n in terms_hi.values()
         ))
 
         for rm_elems in shuffled(impls):
 
             # We can simply forget terms_hi, since these will all be
             # compensated in the following. terms_lo must be kept since those
-            # terms are ignored for chosing the final expansion step.
+            # terms are ignored for choosing the final expansion step.
             new_hi = terms_lo.copy()
             new_lo = {}
 
