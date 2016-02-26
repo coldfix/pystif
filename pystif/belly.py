@@ -11,7 +11,8 @@ means that we get only the two-body marginals H(AB), H(Ab), … in the
 result expressions.
 """
 
-import itertools
+from itertools import (combinations, product,
+                       combinations_with_replacement as combinations_rep)
 import random
 
 import numpy as np
@@ -193,10 +194,10 @@ def _iter_ineqs_cmi(ctx, terms_hi: VarSet, terms_lo: VarSet,
     if len_hi == max_vars+1:
 
         # parametrization for choosing the subsets for each individual term:
-        subset_choices = list(itertools.combinations(range(len_hi), 2))
+        subset_choices = list(combinations(range(len_hi), 2))
 
-        impls = itertools.product(*(
-            itertools.combinations_with_replacement(subset_choices, n)
+        impls = product(*(
+            combinations_rep(subset_choices, n)
             for n in terms_hi.values()
         ))
 
@@ -232,17 +233,17 @@ def _iter_ineqs_cmi(ctx, terms_hi: VarSet, terms_lo: VarSet,
     # TODO: check if this structural constraint is valid
     compat = [
         (hi, lo)
-        for hi, lo in itertools.product(terms_hi, terms_lo)
+        for hi, lo in product(terms_hi, terms_lo)
         if set(lo) <= set(hi)
     ]
 
     ctrl = ComboPartitioner(compat, terms_hi, terms_lo)
     for part in shuffled(ctrl.partitions(sum(terms_hi.values()))):
 
-        impls = itertools.product(*(
+        impls = product(*(
             # The pair (h, l) together with one additional parameter selecting
             # one element to remove from l is enough to specify the CMI:
-            itertools.combinations_with_replacement(range(len(l)), n)
+            combinations_rep(range(len(l)), n)
             for (h, l), n in zip(compat, part)
         ))
 
@@ -312,7 +313,7 @@ def assign_parties(terms: VarSet, num_parties: int):
     """
     """
 
-    affiliations = itertools.product(*(
+    affiliations = product(*(
         range(2*i-1) for i in range(num_parties, 0, -1)
     ))
 
@@ -415,10 +416,10 @@ def make_bell_sys(num_parties, max_vars):
     cols = []
     for i in range(max_vars):
         cols += [_name(set(x))
-                 for p in itertools.combinations(parties, i+1)
-                 for x in itertools.product(*p)]
+                 for p in combinations(parties, i+1)
+                 for x in product(*p)]
 
-    spec = parties + list(itertools.combinations(parties, 2))
+    spec = parties + list(combinations(parties, 2))
     symm = SymmetryGroup.load(spec, cols)
 
     system = System(
