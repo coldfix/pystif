@@ -27,9 +27,12 @@ def varsort(varnames):
 
 def _name(key):
     try:
-        return 'H(' + ','.join(varsort(_varset(key))) + ')'
+        s = _varset(key)
     except ValueError:
         return key
+    if not s:
+        return '_'
+    return 'H(' + ','.join(varsort(s)) + ')'
 
 
 def detect_prefix(s, prefix, on_prefix):
