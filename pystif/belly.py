@@ -11,7 +11,7 @@ means that we get only the two-body marginals H(AB), H(Ab), … in the
 result expressions.
 """
 
-from itertools import (combinations, product,
+from itertools import (combinations, product, starmap,
                        combinations_with_replacement as combinations_rep)
 import random
 
@@ -30,6 +30,10 @@ def shuffled(seq):
     l = list(seq)
     random.shuffle(l)
     return l
+
+
+# TODO: project to 4-terms margs (or 2- or 3-terms) using first belly stage,
+# then use FME to project further?
 
 
 def partitions(n: int, max_terms: int):
@@ -68,7 +72,7 @@ def partitions(n: int, max_terms: int):
 
 class Partitioner:
 
-    def partitions(self, n: int):
+    def partitions(self):
         """
         Iterate all partitions of ``n``, i.e. all positive integer tuples that
         sum up to ``n``.
@@ -78,16 +82,17 @@ class Partitioner:
         Params:
             n: the number to be partitioned
         """
+        n = self.n
         if n == 0:
             yield ()
             return
         if self.max_n < n:
             return
         if self.max_terms == 1:
-            yield (n,)
+            yield (self.max_k,)
             return
         for k in range(min(n, self.max_k)+1):
-            for p in self.next(k).partitions(n-k):
+            for p in self.next(k).partitions():
                 yield (k, *p)
 
 
@@ -102,14 +107,14 @@ class ComboPartitioner(Partitioner):
     """
 
     def __init__(self, compat, hi, lo):
+        self.n = sum(hi.values())
         self.compat = compat
         self.hi = hi
         self.lo = lo
         self.max_terms = len(self.compat)
-        count = [min(self.hi.get(h, 0), -self.lo.get(l, 0))
-                 for h, l in self.compat]
-        self.max_k = count[0]
+        self.max_k = self.compat[0].max_k(hi, lo) if self.compat else 0
         # this is just an upper bound, but that's ok:
+        count = [corr.max_n(hi, lo) for corr in self.compat]
         self.max_n = sum(count)
 
     def next(self, k):
@@ -119,12 +124,15 @@ class ComboPartitioner(Partitioner):
         """
         if k == 0:
             return self.__class__(self.compat[1:], self.hi, self.lo)
-        (h, l), *compat = self.compat
+        head, *tail = self.compat
+        if isinstance(head, TermCombo2):
+            pass
         hi = self.hi.copy()
         lo = self.lo.copy()
-        d_add(hi, h, -k)
-        d_add(lo, l, +k)
-        return self.__class__(compat, hi, lo)
+        head.apply_partition(hi, lo, k)
+        assert all(x >= 0 for x in hi.values())
+        assert all(x <= 0 for x in lo.values())
+        return self.__class__(tail, hi, lo)
 
 
 def d_add(d, k, v):
@@ -158,6 +166,114 @@ Expression = """
     Expression = {VarSet: int} - mapping of coefficients for the Shannon
     entropy term corresponding to the given subset of random variables.
 """
+
+
+class TermCombo1:
+
+    def __init__(self, hi, lo):
+        self.len_hi = len(hi)
+        self.hi = hi
+        self.lo = lo
+        self.hs = hs = set(hi)
+        self.ls = ls = set(lo)
+        self.ok = ok = ls <= hs
+
+    def parametrization(self):
+        return range(self.len_hi-1)
+
+    def compensate(self, new_hi, new_lo, ib):
+        # We add one CMI to compensate for the hi, lo terms
+        a = self.hs - self.ls
+        b = {self.lo[ib]}
+        c = self.ls - b
+        # I(a:b|c) = H(ac) + H(bc) - H(c) - H(abc)
+        d_add(new_hi, tuple(sorted(a|c)), 1)
+        d_add(new_lo, tuple(sorted(c)), -1)
+
+    def max_n(self, hi, lo):
+        return min((
+            hi.get(self.hi, 0),
+            -lo.get(self.lo, 0),
+        ))
+
+    max_k = max_n
+
+    def apply_partition(self, hi, lo, k):
+        d_add(hi, self.hi, -k)
+        d_add(lo, self.lo, +k)
+
+
+class TermCombo2:
+
+    def __init__(self, hi, lo):
+
+        hi_comp, hi_mult = hi[0]
+        self.h = hi_comp, hi[1]
+        self.l = lo
+
+        hs = set(hi_comp)
+        self.ls = ls = set(lo[0]), set(lo[1])
+        self.len_hi = len(hs)
+        self.z = tuple(sorted(ls[0] & ls[1]))
+
+        self.ok = (
+            (len(self.z) == self.len_hi-2) and
+            (ls[0] <= hs and ls[1] <= hs) and
+            (self.h[0] != self.h[1] or hi_mult > 1)
+        )
+
+
+    def parametrization(self):
+        return combinations(range(self.len_hi), 2)
+
+    def compensate(self, new_hi, new_lo, sel):
+
+        # index of the hi term that is used for choosing the
+        # correction term:
+
+        # all terms of the CMI that is added to compensate h[i_h] except for
+        # the H(z) term are negated by terms of h[i_h], l[0], l[1]
+        d_add(new_lo, self.z, -1)
+        assert self.z
+
+        # The second CMI is parametrized by two integers:
+        ia, ib = sel
+        abc = self.h[1]
+        ac = l_del(abc, ib)
+        bc = l_del(abc, ia)
+        c = l_del(ac, ia)       # this works due to (ia < ib)
+
+        # The second CMI spawns two terms in new_lo:
+        d_add(new_hi, bc, 1)
+        d_add(new_hi, ac, 1)
+        d_add(new_lo, c, -1)
+        assert c
+
+    def max_k(self, hi, lo):
+        """Multiplicity."""
+        h = self.h
+        if h[0] == h[1]:
+            hi_min = hi.get(h[0], 0) // 2
+        else:
+            hi_min = min((
+                hi.get(h[0], 0),
+                hi.get(h[1], 0),
+            ))
+        return min((
+            hi_min,
+            -lo.get(self.l[0], 0),
+            -lo.get(self.l[1], 0),
+        ))
+
+    def max_n(self, hi, lo):
+        """Total decrease."""
+        return 2 * self.max_k(hi, lo)
+
+    def apply_partition(self, hi, lo, k):
+        d_add(hi, self.h[0], -k)
+        d_add(hi, self.h[1], -k)
+        d_add(lo, self.l[0], +k)
+        d_add(lo, self.l[1], +k)
 
 
 def _iter_ineqs_cmi(ctx, terms_hi: VarSet, terms_lo: VarSet,
@@ -230,21 +346,24 @@ def _iter_ineqs_cmi(ctx, terms_hi: VarSet, terms_lo: VarSet,
 
         return
 
-    # TODO: check if this structural constraint is valid
-    compat = [
-        (hi, lo)
-        for hi, lo in product(terms_hi, terms_lo)
-        if set(lo) <= set(hi)
-    ]
+    filter_ok = lambda seq: [x for x in seq if x.ok]
+    compat = filter_ok(starmap(TermCombo1, product(terms_hi, terms_lo)))
+    compat2 = filter_ok(starmap(TermCombo2, product(
+        product(terms_hi.items(), terms_hi),
+        combinations(terms_lo, 2)
+    )))
+    compat += compat2
 
     ctrl = ComboPartitioner(compat, terms_hi, terms_lo)
-    for part in shuffled(ctrl.partitions(sum(terms_hi.values()))):
+
+    parts = list(ctrl.partitions())
+    parts = shuffled(parts)
+
+    for part in parts:
 
         impls = product(*(
-            # The pair (h, l) together with one additional parameter selecting
-            # one element to remove from l is enough to specify the CMI:
-            combinations_rep(range(len(l)), n)
-            for (h, l), n in zip(compat, part)
+            combinations_rep(corr.parametrization(), n)
+            for corr, n in zip(compat, part)
         ))
 
         for rm_elems in shuffled(impls):
@@ -253,16 +372,9 @@ def _iter_ineqs_cmi(ctx, terms_hi: VarSet, terms_lo: VarSet,
             # will be compensated for by chosing the below CMIs:
             new_hi = {}
             new_lo = {}
-
-            for (h, l), sels in zip(compat, rm_elems):
-
-                for ib in sels:
-                    a = set(h) - set(l)
-                    b = {l[ib]}
-                    c = set(l) - b
-                    # I(a:b|c) = H(ac) + H(bc) - H(c) - H(abc)
-                    d_add(new_hi, tuple(sorted(a|c)), 1)
-                    d_add(new_lo, tuple(sorted(c)), -1)
+            for corr, sels in zip(compat, rm_elems):
+                for sel in sels:
+                    corr.compensate(new_hi, new_lo, sel)
 
             yield from _iter_ineqs_cmi(ctx, new_hi, new_lo, len_hi-1, max_vars)
 
