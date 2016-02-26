@@ -1,6 +1,14 @@
 """
 Usage:
-    belly NUM_PARTIES NUM_CE
+    belly NUM_PARTIES NUM_CE [-v MAX_VARS]
+
+Options:
+    -v MAX_VARS, --vars MAX_VARS        Term size in output [default: 2]
+
+The expansion will stop when arriving at an expression with only Shannon
+entropy terms with at most ``MAX_VARS`` variables, e.g. ``MAX_VARS=2``
+means that we get only the two-body marginals H(AB), H(Ab), … in the
+result expressions.
 """
 
 import itertools
@@ -151,7 +159,8 @@ Expression = """
 """
 
 
-def _iter_ineqs_cmi(ctx, terms_hi: VarSet, terms_lo: VarSet, len_hi: int) -> Expression:
+def _iter_ineqs_cmi(ctx, terms_hi: VarSet, terms_lo: VarSet,
+                    len_hi: int, max_vars: int) -> Expression:
 
     """
     This function recursively marginalizes an entropy expression of the form
@@ -172,12 +181,6 @@ def _iter_ineqs_cmi(ctx, terms_hi: VarSet, terms_lo: VarSet, len_hi: int) -> Exp
 
     if ctx.seen(terms_hi, terms_lo):
         return
-
-    # The expansion will stop when arriving at an expression with only Shannon
-    # entropy terms with at most ``max_vars`` variables, e.g. ``max_vars=2``
-    # means that we get only the two-body marginals H(AB), H(Ab), … in the
-    # result expressions.
-    max_vars = 2
 
     # This case be entered only for ``num_parties=1`` which is kind of
     # irrelevant, but I'll keep it for clarity anyway.
@@ -260,7 +263,7 @@ def _iter_ineqs_cmi(ctx, terms_hi: VarSet, terms_lo: VarSet, len_hi: int) -> Exp
                     d_add(new_hi, tuple(sorted(a|c)), 1)
                     d_add(new_lo, tuple(sorted(c)), -1)
 
-            yield from _iter_ineqs_cmi(ctx, new_hi, new_lo, len_hi-1)
+            yield from _iter_ineqs_cmi(ctx, new_hi, new_lo, len_hi-1, max_vars)
 
 
 
@@ -277,7 +280,7 @@ class IterContext:
         return seen
 
 
-def iter_bell_ineqs(num_parties, num_ce):
+def iter_bell_ineqs(num_parties, num_ce, max_vars):
 
     """
     Iterate inequalities with at most two-body terms.
@@ -299,7 +302,7 @@ def iter_bell_ineqs(num_parties, num_ce):
         # ``p_i`` times:
         terms_hi = {varlist: num_ce}
         terms_lo = {l_del(varlist, i): -c for i, c in enumerate(part)}
-        for ineq in _iter_ineqs_cmi(ctx, terms_hi, terms_lo, num_vars):
+        for ineq in _iter_ineqs_cmi(ctx, terms_hi, terms_lo, num_vars, max_vars):
             # TODO: keep track of symmetries as well
             yield from assign_parties(ineq, num_parties)
 
@@ -400,7 +403,7 @@ class MakeVector:
         return vec
 
 
-def make_bell_sys(num_parties):
+def make_bell_sys(num_parties, max_vars):
 
     alphabet = "abcdefghijklmnopqrz"
     upper = alphabet[:num_parties].upper()
@@ -409,12 +412,11 @@ def make_bell_sys(num_parties):
     varlist = upper + lower
     parties = list(zip(upper, lower))
 
-    cols = [_name({a, b})
-            for p0, p1 in itertools.combinations(parties, 2)
-            for a, b in itertools.product(p0, p1)]
-    cols += [_name({a})
-             for p in parties
-             for a in p]
+    cols = []
+    for i in range(max_vars):
+        cols += [_name(set(x))
+                 for p in itertools.combinations(parties, i+1)
+                 for x in itertools.product(*p)]
 
     spec = parties + list(itertools.combinations(parties, 2))
     symm = SymmetryGroup.load(spec, cols)
@@ -437,8 +439,9 @@ def main(app):
 
     num_parties = int(opts['NUM_PARTIES'])
     num_ces = [int(x) for x in opts['NUM_CE'].split(',')]
+    max_vars = int(opts['--vars'])
 
-    system = make_bell_sys(num_parties)
+    system = make_bell_sys(num_parties, max_vars)
     cols = system.columns[:system.subdim]
     tovec = MakeVector(cols)
     seen = VectorMemory()
@@ -447,7 +450,7 @@ def main(app):
     lp = Problem(num_cols=len(cols))
 
     for num_ce in num_ces:
-        for ineq in iter_bell_ineqs(num_parties, num_ce):
+        for ineq in iter_bell_ineqs(num_parties, num_ce, max_vars):
             vec = tovec(ineq)
             if lp.implies(vec):
                 continue
