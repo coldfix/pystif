@@ -396,10 +396,10 @@ def make_constant(num: float):
 
 @stararg
 def make_entropy(core: VarSet, cond: VarSet):
-    return Vector((
-        (core|cond, 1),
-        (cond, -1),
-    ))
+    v = Vector([(core|cond, 1)])
+    if cond:
+        v[cond] = -1
+    return v
 
 
 @stararg
