@@ -157,6 +157,12 @@ def format_human_readable(constraint, columns, indices=None):
     return "{} ≥ 0".format(" ".join(lhs).lstrip('+ '))
 
 
+def format_ineq(constraint, pretty=False, columns=None, indices=None):
+    if pretty:
+        return format_human_readable(constraint, columns, indices)
+    return format_vector(constraint)
+
+
 class System:
 
     """
