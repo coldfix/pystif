@@ -154,7 +154,7 @@ def format_human_readable(constraint, columns, indices=None):
     lhs = ["{} {}".format(_coef(constraint[i]), columns[i]) for i in indices]
     if not lhs:
         lhs = ["0"]
-    return "{} ≥ 0".format(" ".join(lhs).lstrip('+ '))
+    return "0 ≤ {}".format(" ".join(lhs).lstrip('+ '))
 
 
 def format_ineq(constraint, pretty=False, columns=None, indices=None):
