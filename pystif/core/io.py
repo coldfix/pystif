@@ -143,7 +143,7 @@ def _coef(coef):
 def _sort_col_indices(constraint, columns):
     # len() is used as approximation for number of terms involved. For most
     # cases this should be fine.
-    key = lambda i: (constraint[i] > 0, abs(constraint[i]), len(columns[i]))
+    key = lambda i: (constraint[i] > 0, len(columns[i]), abs(constraint[i]))
     nonzero = (i for i, c in enumerate(constraint) if c != 0)
     return sorted(nonzero, key=key, reverse=True)
 
