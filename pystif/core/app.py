@@ -101,6 +101,7 @@ class Application:
             self.opts['--output'],
             append=self.resume,
             columns=self.system.columns[:self.subdim],
+            pretty=self.pretty,
             symmetries=self.symm_spec)
 
     @cachedproperty
@@ -109,6 +110,10 @@ class Application:
             from .symmetry import parse_symmetries
             return parse_symmetries(self.opts['--symmetry'])
         return self.system.symmetries
+
+    @property
+    def pretty(self):
+        return self.opts.get('--pretty')
 
     @property
     def symmetries(self):

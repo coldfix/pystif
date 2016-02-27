@@ -266,10 +266,11 @@ class SystemFile:
 
     def __init__(self, filename=None, *,
                  default=sys.stdout, append=False, columns=None,
-                 symmetries=None):
+                 symmetries=None, pretty=False):
         self.columns = columns
         self.file_columns = columns
         self.symm_spec = symmetries
+        self.pretty = pretty
         self._seen = VectorMemory()
         self._slice = None
         self._started = False
@@ -295,15 +296,26 @@ class SystemFile:
         """Output the vector ``v``."""
         if self._seen(v):
             return
-        if not self._started:
+        self._put_header()
+        if self._slice:
+            v = v[self._slice]
+        self._print(format_ineq(v, self.pretty, self.columns))
+
+    def _put_header(self):
+        if self._started:
+            return
+        if self.pretty:
+            if self.file_columns:
+                # TODO: add 'columns' statement!
+                self._print('#::', *self.file_columns)
+            if self.symm_spec:
+                self._print('symm', '; '.join(map('<>'.join, self.symm_spec)))
+        else:
             if self.file_columns:
                 self._print('#::', *self.file_columns)
             if self.symm_spec:
                 self._print('#>>', '; '.join(map('<>'.join, self.symm_spec)))
-            self._started = True
-        if self._slice:
-            v = v[self._slice]
-        self._print(format_vector(v))
+        self._started = True
 
     def pprint_symmetries(self, rows, short=False):
         from .symmetry import SymmetryGroup, group_by_symmetry

@@ -3,7 +3,7 @@ Randomized facet discovery - search for random facets of the projection of a
 polyhedron.
 
 Usage:
-    rfd INPUT -s SUBSPACE [-o OUTPUT] [-l LIMIT] [-y SYMMETRIES] [-r NUM] [-q]... [-d DIM] [-i FILE] [-m REC]
+    rfd INPUT -s SUBSPACE [-o OUTPUT] [-l LIMIT] [-y SYMMETRIES] [-r NUM] [-q]... [-p] [-d DIM] [-i FILE] [-m REC]
 
 Options:
     -o OUTPUT, --output OUTPUT      Set output file for solution
@@ -15,6 +15,7 @@ Options:
     -y SYM, --symmetry SYM          Symmetry group generators
     -r NUM, --runs NUM              Number of runs [default: 100]
     -q, --quiet                     Show less output
+    -p, --pretty                    Pretty print output inequalities
     -d DIM, --slice-dim DIM         Sub-slice dimension [default: 0]
     -i FILE, --info FILE            Print short summary to file (YAML)
 

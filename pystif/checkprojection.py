@@ -15,7 +15,7 @@ Options:
 from docopt import docopt
 
 from .core.geom import ConvexCone
-from .core.io import format_vector, System
+from .core.io import System
 from .core.symmetry import group_by_symmetry
 
 

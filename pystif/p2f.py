@@ -2,7 +2,7 @@
 Points to facets utility.
 
 Usage:
-    p2f INPUT -p POINTS -s SUBSPACE [-o OUTPUT] [-l LIMIT] [-y SYMMETRIES] [-q]...
+    p2f INPUT -p POINTS -s SUBSPACE [-o OUTPUT] [-l LIMIT] [-y SYMMETRIES] [-q]... [-p]
 
 Options:
     -p POINTS, --points POINTS      File with points
@@ -12,6 +12,7 @@ Options:
                                     [default: 1]
     -y SYM, --symmetry SYM          Symmetry group generators
     -q, --quiet                     Show less output
+    -p, --pretty                    Pretty print output inequalities
 
 """
 

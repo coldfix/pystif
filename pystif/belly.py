@@ -18,7 +18,7 @@ import random
 import numpy as np
 
 from .core.app import application
-from .core.io import format_human_readable, _name, System, column_varname_labels
+from .core.io import _name, System, column_varname_labels
 from .core.lp import Problem
 from .core.symmetry import SymmetryGroup
 from .core.util import VectorMemory
@@ -156,7 +156,7 @@ def merged(a, b):
     return r
 
 
-# TODO: how to prove thhat a face is a facet?
+# TODO: how to prove that a face is a facet?
 #   - generate rays + check dimensionality
 #   - check minimality of its elemental form decomposition
 
@@ -379,7 +379,6 @@ def _iter_ineqs_cmi(ctx, terms_hi: VarSet, terms_lo: VarSet,
             yield from _iter_ineqs_cmi(ctx, new_hi, new_lo, len_hi-1, max_vars)
 
 
-
 class IterContext:
 
     def __init__(self):
@@ -545,7 +544,6 @@ def make_bell_sys(num_parties, max_vars):
     return system
 
 
-
 @application
 def main(app):
     opts = app.opts
@@ -554,13 +552,16 @@ def main(app):
     num_ces = [int(x) for x in opts['NUM_CE'].split(',')]
     max_vars = int(opts['--vars'])
 
-    system = make_bell_sys(num_parties, max_vars)
+    system = app.system = make_bell_sys(num_parties, max_vars)
     cols = system.columns[:system.subdim]
     tovec = MakeVector(cols)
     seen = VectorMemory()
 
     polyhedron = ConvexCone.from_cone(system, system.subdim, 1)
     lp = Problem(num_cols=len(cols))
+
+    output = self.app.output
+    output.pretty = True
 
     for num_ce in num_ces:
         for ineq in iter_bell_ineqs(num_parties, num_ce, max_vars):
@@ -576,5 +577,4 @@ def main(app):
                     lp.add(v)
                     seen(v)
 
-                fmt = format_human_readable(facet, cols)
-                print(fmt)
+                output(facet)

@@ -2,12 +2,13 @@
 Perform a simple Fourier-Motzkin-Elimination (FME) on the rows.
 
 Usage:
-    fme INPUT [-o OUTPUT] -s SUBSPACE [-q] [-d DROP] [-i FILE]
+    fme INPUT [-o OUTPUT] -s SUBSPACE [-q] [-p] [-d DROP] [-i FILE]
 
 Options:
     -o OUTPUT, --output OUTPUT      Save facets of projected cone
     -s SUB, --subspace SUB          Subspace specification (dimension or file)
     -q, --quiet                     No status output
+    -p, --pretty                    Pretty print output inequalities
     -d DROP, --drop DROP            Randomly drop DROP inequalities from the
                                     initial system before beginning the FME
                                     [default: 0]
