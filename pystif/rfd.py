@@ -69,12 +69,12 @@ class AFI2(AFI):
         return ()
 
 
-def rfd2(polyhedron, symmetries, recursions, found_cb, runs, status, info):
+def rfd2(polyhedron, symmetries, recursions, found_cb, runs, status, info, noise_level):
 
     face = np.ones(polyhedron.dim)
     seen = VectorMemory()
 
-    quiet_rank = polyhedron.dim - 1
+    quiet_rank = polyhedron.dim - noise_level
 
     afi = AFI2(polyhedron, symmetries, recursions, quiet_rank, info)
 
@@ -163,4 +163,6 @@ def main(app):
     else:
         recursions = int(app.opts['--recursions'])
         #rfd(app.polyhedron, app.symmetries, app.output, runs, status)
-        rfd2(app.polyhedron, app.symmetries, recursions, app.output, runs, status, app.info(1))
+        noise = 1 - app.quiet
+        rfd2(app.polyhedron, app.symmetries, recursions, app.output, runs, status, app.info(1),
+             noise)
