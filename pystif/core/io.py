@@ -151,10 +151,15 @@ def _sort_col_indices(constraint, columns):
 def format_human_readable(constraint, columns, indices=None):
     if indices is None:
         indices = _sort_col_indices(constraint, columns)
-    lhs = ["{} {}".format(_coef(constraint[i]), columns[i]) for i in indices]
-    if not lhs:
-        lhs = ["0"]
-    return "0 ≤ {}".format(" ".join(lhs).lstrip('+ '))
+    rhs = ["{} {}".format(_coef(constraint[i]), columns[i])
+           for i in indices if columns[i] != '_']
+    if not rhs:
+        rhs = ["0"]
+    try:
+        lhs = -constraint[columns.index('_')]
+    except ValueError:
+        lhs = 0
+    return "{} ≤ {}".format(lhs, " ".join(rhs).lstrip('+ '))
 
 
 def format_ineq(constraint, pretty=False, columns=None, indices=None):
