@@ -42,3 +42,6 @@ H(a,B,c) + H(a,B) + H(b,C) + H(b,c) + H(a,b) + H(B,C) - H(a,B,C) - H(a,b,c) - H(
 H(A,b,C) + H(a,B,c) + H(A,b,c) + H(A,B,C) + H(a,B) + H(a,b) + H(A,B) - H(a,B,C) - H(a,b,c) - H(B,c) - H(A,b) - H(A,C) - H(a) - H(B) ≥ 0
 H(A,b,c) + H(a,B) + H(a,C) + H(A,B) + H(A,C) - H(a,b,c) - H(A,B,C) - H(A) - H(C) - H(B) ≥ 0
 
+
+0 ≤ H(A,B,c) + H(A,c) + H(a,B) + H(A,b) + H(a,c) + H(a,b) - H(a,B,c) - H(a,b,c) - H(A,B) - H(a) - H(c) - H(b)
+0 ≤ H(A,c) + H(a,B) + H(A,b) + H(a,c) + H(a,b) - H(a,b,c) - H(A,B) - H(a) - H(c) - H(b)
