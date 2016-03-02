@@ -560,7 +560,7 @@ def main(app):
     polyhedron = ConvexCone.from_cone(system, system.subdim, 1)
     lp = Problem(num_cols=len(cols))
 
-    output = self.app.output
+    output = app.output
     output.pretty = True
 
     for num_ce in num_ces:
