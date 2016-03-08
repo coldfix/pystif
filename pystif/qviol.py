@@ -291,6 +291,7 @@ class CHSH2(Constraints):
 class SEP2(Constraints):
 
     """The 2-party subsystems are separable."""
+    # Peres–Horodecki criterion
 
     # NOTE: this test only works if at most one party is 3 dimensional
 
