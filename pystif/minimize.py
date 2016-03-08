@@ -2,13 +2,14 @@
 Minimize a system of inequalities.
 
 Usage:
-    minimize INPUT [-o OUTPUT] [-e] [-q]
+    minimize INPUT [-o OUTPUT] [-e] [-q] [-p]
 
 Options:
     -o OUTPUT, --output OUTPUT      Write final (minimized) system to this file
     -a, --append                    Open output file in append mode
     -e, --el-ineqs                  Extend system with elemental inequalities
     -q, --quiet                     No status output (otherwise goes to STDERR)
+    -p, --pretty                    Pretty print output inequalities
 """
 
 from docopt import docopt

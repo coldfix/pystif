@@ -2,12 +2,13 @@
 Check the equivalence of two system of equations.
 
 Usage:
-    equiv [-q...] [-1] [-y SYMMETRIES] A B
+    equiv [-q...] [-1] [-y SYMMETRIES] [-p] A B
 
 Options:
     -q, --quiet                 Less output, result is signaled via return value
     -1, --one-way               Check only if A implies B, not the other way round
     -y SYM, --symmetry SYM      Symmetry group generators
+    -p, --pretty                Pretty print missing inequalities
 
 The program's return code signifies whether the two systems are equivalent:
 
@@ -23,13 +24,13 @@ import sys
 
 from docopt import docopt
 
-from .core.io import format_vector, System
+from .core.io import format_ineq, System
 from .core.symmetry import group_by_symmetry
 
 
 def check_implies(sys_a: System, sys_b: System,
                   name_a: str, name_b: str,
-                  *, symmetries: 'SymmetryGroup', quiet=0):
+                  *, symmetries: 'SymmetryGroup', quiet=0, pretty=False):
     """
     Check if A implies B (system of linear inequalities).
 
@@ -51,7 +52,7 @@ def check_implies(sys_a: System, sys_b: System,
             print("{} misses the following inequalities of {}:"
                   .format(name_a, name_b))
             for constr in missing:
-                print(format_vector(constr[0]))
+                print(format_ineq(constr[0], pretty, sys_a.columns))
         return False
     else:
         if quiet <= 1:
@@ -68,7 +69,9 @@ def main(args=None):
     sys_a.update_symmetries(opts['--symmetry'])
 
     status = 0
-    kwd = {'quiet': opts['--quiet'], 'symmetries': sys_a.symmetry_group()}
+    kwd = {'quiet': opts['--quiet'],
+           'pretty': opts['--pretty'],
+           'symmetries': sys_a.symmetry_group()}
     if not check_implies(sys_a, sys_b, 'A', 'B', **kwd):
         status |= 1
     if not opts['--one-way']:

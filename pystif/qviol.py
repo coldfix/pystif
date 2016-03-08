@@ -2,13 +2,17 @@
 Find quantum violations for the tripartite bell scenario.
 
 Usage:
-    qviol EXPRS [-c CONSTR] [-o FILE] [-n NUM] [-s SUBSET]
+    qviol INPUT [-c CONSTR] [-o FILE] [-n NUM] [-s SUBSET] [-d DIMS]
+
+Arguments:
+    INPUT                               File with known faces of the local cone
 
 Options:
     -o FILE, --output FILE              Set output file
     -c CONSTR, --constraints CONSTR     Optimization constraints (CHSH|CHSHE)
     -n NUM, --num-runs NUM              Number of searches for each inequality [default: 10]
     -s SUBSET, --select SUBSET          Select subset of inequalities
+    -d DIMS, --dimensions DIMS          Hilbert space dimensions of subsystems [default: 222]
 """
 
 from operator import matmul
@@ -20,14 +24,23 @@ import sys
 
 import scipy.optimize
 import numpy as np
-from docopt import docopt
-import yaml
 
+from .core.app import application
 from .core.symmetry import SymmetryGroup, group_by_symmetry
-from .core.io import System, _varset
+from .core.io import System, _varset, yaml_dump, format_human_readable
 from .core.linalg import (projector, measurement, random_direction_vector,
                           cartesian_to_spherical, kron, to_unit_vector,
-                          to_quantum_state)
+                          to_quantum_state, ptrace, ptranspose, dagger,
+                          as_column_vector)
+
+
+def exp_i(phi):
+    return cmath.rect(1, phi)
+
+
+def cos_sin(phi):
+    z = exp_i(phi)
+    return z.real, z.imag
 
 
 def measure_many(psi, measurements):
@@ -74,8 +87,8 @@ class Qbit:
 
         http://www.physicspages.com/2013/01/19/spin-12-along-an-arbitrary-direction/
         """
-        exp_th2 = cmath.rect(1, theta/2)
-        exp_phi = cmath.rect(1, phi)
+        exp_th2 = exp_i(theta/2)
+        exp_phi = exp_i(phi)
         u = [exp_th2.real,
              exp_th2.imag * exp_phi]
         d = [exp_th2.imag,
@@ -117,46 +130,84 @@ class CompositeQuantumSystem:
                 for i, povms in enumerate(parties)]
 
 
+def umat_V(params, dim):
+    if dim == 1:
+        return np.eye(1)
+    elif dim == 2:
+        a = [1]
+    elif dim == 3:
+        exp_gamma = exp_i(params.pop())
+        exp_delta = exp_i(params.pop())
+        a = [exp_gamma.real,
+             exp_gamma.imag * exp_delta]
+    else:
+        raise NotImplementedError("Currently only implemented dim <= 3")
+
+    a = as_column_vector(a)
+    a_ = dagger(a)
+
+    c, s = cos_sin(params.pop())
+
+    n = dim - 1
+    I = np.eye(n)
+    L = np.array(np.bmat([
+        [I - (1 - c) * (a@a_),  s * a],
+        [-s * a_,               [[c]]],
+    ]))
+    R = np.array(np.bmat([
+        [umat_V(params, n),     np.zeros((n, 1))],
+        [np.zeros((1, n)),      np.ones((1, 1))],
+    ]))
+    return L @ R
+
+
+def unpack_unitary(params, dim):
+    phases = [exp_i(params.pop()) for _ in range(2*dim-1)]
+    Phi_L = np.diag(phases[:dim])
+    Phi_R = np.diag(phases[dim:]+[1])
+    V = umat_V(params, dim)
+    return Phi_L @ V @ Phi_R
+
+
 class TripartiteBellScenario(CompositeQuantumSystem):
 
     symm = 'Aa <> aA; AaBb <> BbAa; AaCc <> CcAa'
 
-    def __init__(self, system):
-        super().__init__((2, 2, 2))
+    def __init__(self, system, dims=(2, 2, 2)):
+        super().__init__(dims)
         self.cols = system.columns
         sg = SymmetryGroup.load(self.symm, self.cols)
         self.rows = [g[0] for g in group_by_symmetry(sg, system.matrix)]
 
     def random(self):
-        t = np.random.uniform(0, 2*pi)
-        d = [
-            random_direction_vector(3),
-            random_direction_vector(3),
-            random_direction_vector(3),
-            random_direction_vector(3),
-        ]
-        s = random_direction_vector(8*2)
-        return np.array([t, *np.array(d).flat, *s.flat])
+        # phases are absorbed into Phi_R:
+        s = random_direction_vector(self.dim*2)
+        # 1 measurement = U(n).CT @ diag[1 … n] @ U(n)
+        num_unitary_params = (sum(x**2 for x in self.subdim) + 
+                              sum(x**2 for x in self.subdim[1:]))
+        u = np.random.uniform(0, 2*pi, size=num_unitary_params)
+        return np.hstack((s, u))
 
     def unpack(self, params):
-        t = params[0]
-        d = [[params[1:4], params[4:7]],
-             [params[7:10], params[10:13]]]
-        s = params[13:]
-        angles = [[(0, 0), (t, 0)]]
-        angles += [[cartesian_to_spherical(setting)[1:]
-                    for setting in party]
-                   for party in d]
-        state = to_quantum_state(to_unit_vector(s).reshape(8, 2))
-        return state, angles
+        l = list(params)
+
+        D = np.diag(range(self.dim))
+        U = [[np.eye(self.subdim[0]),
+              unpack_unitary(l, self.subdim[0])]]
+        U += [[unpack_unitary(l, subdim) for _ in range(2)]
+              for subdim in self.subdim[1:]]
+        #M = [dagger(u) @ D @ u for u in U]
+        #M = list(zip(M[::2], M[1::2]))
+
+        state = to_quantum_state(to_unit_vector(l).reshape(self.dim, 2))
+        return state, U
 
     def realize(self, params):
-        state, angles = self.unpack(params)
-        parties = [
-            [Qbit.rotspin_angles(*setting) for setting in party]
-            for party in angles
-        ]
-        return state, parties
+        state, bases = self.unpack(params)
+        projectors = [[[projector(u) for u in basis.T]
+                       for basis in party]
+                      for party in bases]
+        return state, projectors
 
     def _mkcombo(self, parties, cols):
         # measurement combinations
@@ -237,6 +288,37 @@ class CHSH2(Constraints):
         return 2-abs(np.dot(correlators, expr))
 
 
+class SEP2(Constraints):
+
+    """The 2-party subsystems are separable."""
+    # Peres–Horodecki criterion
+
+    # NOTE: this test only works if at most one party is 3 dimensional
+
+    def __init__(self, system):
+        self.system = system
+
+    def __call__(self, params):
+        state, parties = self.system.realize(params)
+        rho_abc = projector(state)
+        dims = self.system.subdim
+        rho_bc = ptrace(rho_abc, dims, 0), (dims[1], dims[2])
+        rho_ac = ptrace(rho_abc, dims, 1), (dims[0], dims[2])
+        rho_ab = ptrace(rho_abc, dims, 2), (dims[0], dims[1])
+        return sum(self._neg_entanglement(rho2, dim2)
+                   for rho2, dim2 in (rho_bc, rho_ac, rho_ab))
+
+    def _neg_entanglement(self, rho2, dim2, eps=1e-10):
+        """
+        Return something negative if the 2-party density matrix is entangled.
+
+        This works using the Peres–Horodecki criterion.
+        """
+        trans = ptranspose(rho2, dim2, 1)
+        val, vec = np.linalg.eigh(trans)
+        return sum(v for v in val if v < -eps)
+
+
 # composed operations
 def h(p):
     """Compute one term in the entropy sum."""
@@ -253,26 +335,12 @@ def select_combinations(parties, columns):
             for colname in columns]
 
 
-def yaml_dump(data, stream=None, Dumper=yaml.SafeDumper, **kwds):
-    class _Dumper(Dumper):
-        pass
-    def numpy_scalar_representer(dumper, data):
-        return dumper.represent_data(np.asscalar(data))
-    def numpy_array_representer(dumper, data):
-        return dumper.represent_data([x for x in data])
-    def complex_representer(dumper, data):
-        return dumper.represent_data([data.real, data.imag])
-    _Dumper.add_multi_representer(np.generic, numpy_scalar_representer)
-    _Dumper.add_representer(np.ndarray, numpy_array_representer)
-    _Dumper.add_representer(complex, complex_representer)
-    return yaml.dump(data, stream, _Dumper, **kwds)
+@application
+def main(app):
 
-
-def main(args=None):
-
-    opts = docopt(__doc__, args)
-
-    system = TripartiteBellScenario(System.load(opts['EXPRS']))
+    opts = app.opts
+    dims = list(map(int, opts['--dimensions']))
+    system = TripartiteBellScenario(app.system, dims=dims)
 
     ct = opts['--constraints']
     if ct is None:
@@ -281,6 +349,8 @@ def main(args=None):
         constr = CHSHE2.optimization_constraints(system)
     elif ct.upper() == 'CHSH':
         constr = CHSH2.optimization_constraints(system)
+    elif ct.upper() == 'SEP':
+        constr = SEP2.optimization_constraints(system)
     else:
         raise ValueError('Unknown constraints type: {}'.format(ct))
 
@@ -309,20 +379,17 @@ def main(args=None):
                 print('.' if result.success else 'x', end='', flush=True)
                 continue
 
-            state, angles = system.unpack(result.x)
+            state, bases = system.unpack(result.x)
             yaml_dump([{
                 'i': i,
+                'coef': expr,
+                'cols': system.cols,
+                'expr': format_human_readable(expr, system.cols),
                 'f': result.fun,
                 'state': state,
-                'angles': angles
+                'bases': bases,
             }], out_file)
 
-            print("\n", i, expr)
-            print('\n', result.fun, sep='')
-            print('\n', result.x, sep='')
+            print('\n', i, result.fun)
 
     print()
-
-
-if __name__ == '__main__':
-    main()

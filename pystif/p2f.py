@@ -2,7 +2,7 @@
 Points to facets utility.
 
 Usage:
-    p2f INPUT -p POINTS -s SUBSPACE [-o OUTPUT] [-l LIMIT] [-y SYMMETRIES] [-q]...
+    p2f INPUT -p POINTS -s SUBSPACE [-o OUTPUT] [-l LIMIT] [-y SYMMETRIES] [-q]... [-p]
 
 Options:
     -p POINTS, --points POINTS      File with points
@@ -12,6 +12,7 @@ Options:
                                     [default: 1]
     -y SYM, --symmetry SYM          Symmetry group generators
     -q, --quiet                     Show less output
+    -p, --pretty                    Pretty print output inequalities
 
 """
 
@@ -54,5 +55,5 @@ def outer_points_to_facets(polyhedron, system, points):
 def main(app):
     points = System.load(app.opts['--points'])
     points, _ = points.slice(app.system.columns[:app.subdim])
-    for f in p2f(app.polyhedron, app.system, points.matrix):
+    for f in outer_points_to_facets(app.polyhedron, app.system, points.matrix):
         app.report_facet(f)

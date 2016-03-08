@@ -6,6 +6,7 @@ The input file grammar looks somewhat like this:
     document    ::=     line ("\n"+ line)*
     line        ::=     statement? comment?
     statement   ::=     equation | var_decl | mutual | markov | symmetries
+                                 | expansions
     comment     ::=     r"#.*"
 
     equation    ::=     expression relation expression
@@ -17,6 +18,7 @@ The input file grammar looks somewhat like this:
     markov      ::=     var_list ("->" var_list){2+} ("|" var_list)?
 
     symmetries  ::=     "symm" .*
+    expansions  ::=     "expand" .*
 
     var_decl    ::=     "rvar" var_list
     var_list    ::=     (identifier ","?)*
@@ -81,6 +83,7 @@ from funcparserlib.parser import maybe, skip, finished, pure
 from .io import column_varname_labels, _name, varsort
 from .it import elemental_inequalities
 from .vector import Vector
+from .symmetry import VarPermutation
 
 
 #----------------------------------------
@@ -224,6 +227,11 @@ class Statement:
     def symmetries(self) -> [tuple]:
         return []
 
+    def expand(self, expansions):
+        pass
+
+    expansions = None
+
 
 def accumulate_parse_results(statements: [Statement]) -> ParseResult:
     """
@@ -231,7 +239,12 @@ def accumulate_parse_results(statements: [Statement]) -> ParseResult:
     names in order.
     """
     col_idx = {}
+    expansions = None
     for stmt in statements:
+        if stmt.expansions is not None:
+            expansions = stmt.expansions
+        if expansions:
+            stmt.expand(expansions)
         for col in stmt.columns():
             col_idx.setdefault(_name(col), len(col_idx))
     result = np.vstack(stmt.constraints(col_idx) for stmt in statements)
@@ -280,6 +293,32 @@ class ConstraintList(Statement):
             for k, v in r.items():
                 res[i][col_idx[k]] = v
         return res
+
+    def expand(self, expansions):
+        seen = SymbolicMemory()
+        queue = self.rows[::-1]
+        self.rows = []
+        while queue:
+            row = queue.pop()
+            if seen(row):
+                continue
+            self.rows.append(row)
+            queue.extend(perm.permute_symbolic(row) for perm in expansions)
+
+
+class SymbolicMemory:
+
+    def __init__(self):
+        self._seen = set()
+
+    def __call__(self, vec):
+        r = frozenset(vec.items())
+        if r in self._seen:
+            return True
+        self._seen.add(r)
+        return False
+
+
 
 
 @returns(ConstraintList)
@@ -357,10 +396,10 @@ def make_constant(num: float):
 
 @stararg
 def make_entropy(core: VarSet, cond: VarSet):
-    return Vector((
-        (core|cond, 1),
-        (cond, -1),
-    ))
+    v = Vector([(core|cond, 1)])
+    if cond:
+        v[cond] = -1
+    return v
 
 
 @stararg
@@ -406,6 +445,13 @@ class Symmetries(Statement):
 
     def symmetries(self):
         return self.symm
+
+
+class Expansions(Statement):
+
+    def __init__(self, spec):
+        self.expansions = [VarPermutation.from_subst_rule(a, b)
+                           for a, b in spec]
 
 
 #----------------------------------------
@@ -472,6 +518,8 @@ equation    = expression + relation + expression    >> stararg(Constraint)
 symm_item   = identifier + L('<>') + identifier     >> tuple
 symm_list   = symm_item + many(colon + symm_item)   >> collapse
 symmetries  = L('symm') + symm_list                 >> Symmetries
+expansions  = (L('expand') + symm_list |
+               L('noexpand') + v([]))               >> Expansions
 
 # commands
 var_decl    = L('rvar') + var_list                  >> VarDecl
@@ -482,7 +530,7 @@ empty       = v(Statement())
 # toplevel
 eol         = skip(many(some('NEWLINE'), 1))
 eof         = skip(finished)
-line        = equation | var_decl | mutual | markov | symmetries | empty
+line        = equation | var_decl | mutual | markov | symmetries | expansions | empty
 document    = line + many(eol + line) + eof         >> collapse
 
 

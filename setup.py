@@ -36,6 +36,9 @@ setup(
             'minimize = pystif.minimize:main',
             'afi = pystif.afi:main',
             'rfd = pystif.rfd:main',
+            'p2f = pystif.p2f:main',
+            'qviol = pystif.qviol:main',
+            'checkprojection = pystif.checkprojection:main',
         ]
     },
     ext_modules=cythonize([

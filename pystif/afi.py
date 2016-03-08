@@ -2,7 +2,7 @@
 Project convex cone to subspace by an adjacent facet iteration method.
 
 Usage:
-    afi INPUT -s SUBSPACE [-o OUTPUT] [-l LIMIT] [-y SYMMETRIES] [-r NUM] [-q]... [-i FILE]
+    afi INPUT -s SUBSPACE [-o OUTPUT] [-l LIMIT] [-y SYMMETRIES] [-r NUM] [-q]... [-p] [-i FILE]
 
 Options:
     -o OUTPUT, --output OUTPUT      Set output file for solution
@@ -12,6 +12,7 @@ Options:
     -y SYM, --symmetry SYM          Symmetry group generators
     -r NUM, --recursions NUM        Number of AFI recursions [default: 0]
     -q, --quiet                     Show less output
+    -p, --pretty                    Pretty print output inequalities
     -i FILE, --info FILE            Print short summary to file (YAML)
 """
 
