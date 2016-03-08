@@ -54,13 +54,14 @@ class VerboseFME(FMEStatusInfo, FME):
 def main(app):
     fme = FME() if app.quiet else VerboseFME()
 
+    system = app.system
+
     random.seed()
     num_drop = int(app.opts['--drop'])
     for i in range(num_drop):
-        d = random.randrange(app.system.shape[0])
-        app.system.matrix = np.delete(app.system.matrix, d, axis=0)
+        d = random.randrange(system.shape[0])
+        system.matrix = np.delete(system.matrix, d, axis=0)
 
-    system = app.system
     app.start_timer()
     for row in fme.solve_to(system.matrix, app.subdim):
         app.output(row)
