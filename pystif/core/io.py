@@ -13,11 +13,11 @@ from .util import VectorMemory
 
 def _varset(key):
     if isinstance(key, (set,list,tuple,frozenset)):
-        return set(key)
+        return frozenset(key)
     if key.startswith('H(') and key.endswith(')'):
-        return set(re.split('[ ,]', key[2:-1]))
+        return frozenset(re.split('[ ,]', key[2:-1]))
     if key.startswith('_'):
-        return set(key[1:])
+        return frozenset(key[1:])
     raise ValueError("Unknown format.")
 
 

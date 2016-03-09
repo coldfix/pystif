@@ -44,15 +44,16 @@ class VarPermutation:
         return flatten((c, c[1:]+c[:1]) for c in cycles)
 
     def permute_colname(self, col):
-        return {self.varmap.get(v, v) for v in _varset(col)}
+        return frozenset(self.varmap.get(v, v) for v in _varset(col))
 
     def permute_vector(self, vector, col_names):
         col_names = [_varset(col) for col in col_names]
+        col_index = {n: i for i, n in enumerate(col_names)}
         # this actually returns the inverse permutation… shouldn't be harmful
         try:
-            return vector[[col_names.index(self.permute_colname(col))
+            return vector[[col_index[self.permute_colname(col)]
                            for col in col_names]]
-        except ValueError:
+        except KeyError:
             return vector
 
     def permute_symbolic(self, vector):
