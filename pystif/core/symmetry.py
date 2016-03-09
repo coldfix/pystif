@@ -8,7 +8,7 @@ from operator import add
 import numpy as np
 
 from .util import VectorMemory, scale_to_int
-from .io import varsort, _name, _varset
+from .io import _name, _varset
 
 
 def _all_unique(s):
@@ -21,8 +21,8 @@ class VarPermutation:
     def __init__(self, varmap):
         self.varmap = varmap
         # Complete incomplete specifications, e.g.
-        #   A <> a      ->  (Aa)
-        #   ABC <> BDC  ->  (ABD)
+        #   A <> a      ->  (Aa)    = Aa <> aA
+        #   ABC <> BDC  ->  (ABD)   = ABD <> BDA
         inverse = {v: k for k, v in varmap.items()}
         for k in list(varmap):
             if k not in inverse:
@@ -44,10 +44,10 @@ class VarPermutation:
         return flatten((c, c[1:]+c[:1]) for c in cycles)
 
     def permute_colname(self, col):
-        return "".join(varsort(self.varmap.get(c, c) for c in col))
+        return {self.varmap.get(v, v) for v in _varset(col)}
 
     def permute_vector(self, vector, col_names):
-        col_names = ["".join(varsort(col)) for col in col_names]
+        col_names = [_varset(col) for col in col_names]
         # this actually returns the inverse permutation… shouldn't be harmful
         try:
             return vector[[col_names.index(self.permute_colname(col))

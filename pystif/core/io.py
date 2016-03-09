@@ -12,7 +12,7 @@ from .util import VectorMemory
 
 
 def _varset(key):
-    if isinstance(key, (set,list,tuple)):
+    if isinstance(key, (set,list,tuple,frozenset)):
         return set(key)
     if key.startswith('H(') and key.endswith(')'):
         return set(re.split('[ ,]', key[2:-1]))
