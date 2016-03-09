@@ -54,7 +54,10 @@ class VarPermutation:
             return vector[[col_index[self.permute_colname(col)]
                            for col in col_names]]
         except KeyError:
-            return vector
+            raise ValueError(
+                "The permutation {} replaces a column that is not included in the list"
+                " of column names {}."
+                .format(self.varmap, col_names))
 
     def permute_symbolic(self, vector):
         return {
@@ -72,7 +75,10 @@ def evaluate_generators(generators, col_names):
         cur_el = queue.pop()
         yield cur_el
         for gen in generators:
-            next_el = tuple(gen.permute_vector(np.array(cur_el), col_names))
+            try:
+                next_el = tuple(gen.permute_vector(np.array(cur_el), col_names))
+            except ValueError:
+                continue
             if next_el not in seen:
                 seen.add(next_el)
                 queue.append(next_el)
