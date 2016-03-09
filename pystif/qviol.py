@@ -9,7 +9,7 @@ Arguments:
 
 Options:
     -o FILE, --output FILE              Set output file
-    -c CONSTR, --constraints CONSTR     Optimization constraints (CHSH|CHSHE)
+    -c CONSTR, --constraints CONSTR     Optimization constraints (CHSH|CHSHE|SEP|CGLMP)
     -n NUM, --num-runs NUM              Number of searches for each inequality [default: 10]
     -s SUBSET, --select SUBSET          Select subset of inequalities
     -d DIMS, --dimensions DIMS          Hilbert space dimensions of subsystems [default: 222]
@@ -17,7 +17,7 @@ Options:
 
 from operator import matmul
 from functools import reduce, partial
-import itertools
+from itertools import product
 from math import log2, sin, cos, pi
 import cmath
 import sys
@@ -218,7 +218,7 @@ class TripartiteBellScenario(CompositeQuantumSystem):
         # matmul:   [[ay@by, ay@bn, an@by, an@bn] per operator pairing (a,b)]
         _ = self.lift_all(parties)
         _ = select_combinations(_, cols)
-        _ = [itertools.product(*m) for m in _]
+        _ = [product(*m) for m in _]
         _ = [[reduce(matmul, parts) for parts in m] for m in _]
         return _
 
@@ -288,6 +288,76 @@ class CHSH2(Constraints):
         return 2-abs(np.dot(correlators, expr))
 
 
+class CGLMP2(Constraints):
+
+    """
+    Evaluate the CGLMP constraint `I_d ≤ 2` for d outcomes.
+
+    The constraint is defined by:
+
+        I_d = sum_{k=0}^{[d/2]-1} (
+                (P(A1=B1+k) + P(B1=A2+1+k) + P(A2=B2+k) + P(B2=A1+k))
+                - (P(A1=B1-1-k) + P(B1=A2-k) + P(A2=B2-1-k) + P(B2=A1-1-k))
+            )
+
+    """
+
+    cols = ('_AB', '_Ab', '_aB', '_ab',
+            '_AC', '_Ac', '_aC', '_ac',
+            '_BC', '_Bc', '_bC', '_bc',)
+
+    def _gen_template_expression(self, d):
+        # Get the expression for AaBb
+        AB, Ab, aB, ab = 0, 1, 2, 3
+        expr = np.zeros((12, d, d))
+        for k in range(d//2):
+            # multiplied by (d-1) to avoid floats:
+            v = 1 - 2*k/(d-1)
+            for i in range(d):
+                # positive terms
+                expr[AB,i,(i-k)%d] += v     # P(A1=B1+k)    = P(B1=A1-k)
+                expr[aB,i,(i+1+k)%d] += v   # P(B1=A2+k+1)  = P(B1=A2+k+1)
+                expr[ab,i,(i-k)%d] += v     # P(A2=B2+k)    = P(B2=A2-k)
+                expr[Ab,i,(i+k)%d] += v     # P(B2=A1+k)    = P(B2=A1+k)
+                # negative terms
+                expr[AB,i,(i+k+1)%d] -= v   # P(A1=B1-k-1)  = P(B1=A1+k+1)
+                expr[aB,i,(i-k)%d] -= v     # P(B1=A2-k)    = P(B1=A2-k)
+                expr[ab,i,(i+k+1)%d] -= v   # P(A2=B2-k-1)  = P(B2=A2+k+1)
+                expr[Ab,i,(i-k-1)%d] -= v   # P(B2=A1-k-1)  = P(B2=A1-k-1)
+        return np.array(expr.flat)
+
+    def __init__(self, system, d=3):
+        self.system = system
+        self.d = d
+
+        var_names = np.arange(3*2*d).reshape((3*2, d))
+        var_names = [list(n) for n in var_names]
+
+        col_names = [frozenset(var_names["AaBbCc".index(v)][k]
+                               for v, k in zip(c[1:], ab))
+                     for c in self.cols
+                     for ab in product(range(d), range(d))]
+
+        spec = [(var_names[0]+var_names[1], var_names[1]+var_names[0]),
+                (var_names[0]+var_names[1], var_names[2]+var_names[3]),
+                (var_names[0]+var_names[1], var_names[4]+var_names[5])]
+
+        sg = SymmetryGroup.load(spec, col_names)
+
+        self.expressions = list(sg(self._gen_template_expression(d)))
+
+    def _measure_all(self, state, parties):
+        mcombo = select_combinations(self.system.lift_all(parties), self.cols)
+        mcombo = [x @ y
+                  for a, b in mcombo
+                  for x, y in product(a, b)]
+        return measure_many(state, mcombo)
+
+    def _eval(self, expr, probabilities):
+        # Recall that we scaled the constraint by the factor (d-1)
+        return 2 - abs(np.dot(probabilities, expr))
+
+
 class SEP2(Constraints):
 
     """The 2-party subsystems are separable."""
@@ -342,17 +412,19 @@ def main(app):
     dims = list(map(int, opts['--dimensions']))
     system = TripartiteBellScenario(app.system, dims=dims)
 
+    constraint_classes = {
+        'CHSHE': CHSHE2,
+        'CHSH': CHSH2,
+        'SEP': SEP2,
+        'CGLMP': CGLMP2,
+    }
+
     ct = opts['--constraints']
     if ct is None:
         constr = None
-    elif ct.upper() == 'CHSHE':
-        constr = CHSHE2.optimization_constraints(system)
-    elif ct.upper() == 'CHSH':
-        constr = CHSH2.optimization_constraints(system)
-    elif ct.upper() == 'SEP':
-        constr = SEP2.optimization_constraints(system)
     else:
-        raise ValueError('Unknown constraints type: {}'.format(ct))
+        cls = constraint_classes[ct.upper()]
+        constr = cls.optimization_constraints(system)
 
     num_runs = int(opts['--num-runs'])
 
