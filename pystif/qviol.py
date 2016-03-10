@@ -50,58 +50,6 @@ def measure_many(psi, measurements):
     return [measurement(psi, m) for m in measurements]
 
 
-class Qbit:
-
-    dim = 2
-
-    sigma_x = np.array([[0,   1], [ 1, 0]])
-    sigma_y = np.array([[0, -1j], [1j, 0]])
-    sigma_z = np.array([[1,   0], [0, -1]])
-    sigma = np.array((sigma_x, sigma_y, sigma_z))
-
-    @classmethod
-    def rotspin(cls, direction):
-        r, theta, phi = cartesian_to_spherical(direction)
-        return cls.rotspin_angles(theta, phi)
-
-    @classmethod
-    def rotspin_slow(cls, direction):
-        """Equivalent to rotspin(), just a bit slower."""
-        spinmat = np.tensordot(direction, cls.sigma, 1)
-        # eigenvalues/-vectors of hermitian matrix, in ascending order:
-        val, vec = np.linalg.eigh(spinmat)
-        return (projector(vec[:,[1]]),
-                projector(vec[:,[0]]))
-
-    @classmethod
-    def rotspin_angles(cls, theta, phi):
-        """
-        Returns the eigenspace projectors for the spin matrix along an
-        arbitrary direction.
-
-        The eigenstates are:
-
-            |+> = [cos(θ/2),
-                   sin(θ/2) exp(iφ)]
-
-            |-> = [sin(θ/2),
-                   cos(θ/2) exp(-iφ) (-1)]
-
-        http://www.physicspages.com/2013/01/19/spin-12-along-an-arbitrary-direction/
-        """
-        exp_th2 = exp_i(theta/2)
-        exp_phi = exp_i(phi)
-        u = [exp_th2.real,
-             exp_th2.imag * exp_phi]
-        d = [exp_th2.imag,
-             exp_th2.real * exp_phi * -1]
-        return projector(u), projector(d)
-
-    @classmethod
-    def xzspin(cls, angle):
-        return cls.rotspin_angles(angle, 0)
-
-
 class CompositeQuantumSystem:
 
     def __init__(self, subdim):
