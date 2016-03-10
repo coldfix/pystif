@@ -2,7 +2,7 @@
 Find quantum violations for the tripartite bell scenario.
 
 Usage:
-    qviol INPUT [-c CONSTR] [-o FILE] [-n NUM] [-s SUBSET] [-d DIMS]
+    qviol INPUT [-c CONSTR] [-o FILE] [-n NUM] [-d DIMS]
 
 Arguments:
     INPUT                               File with known faces of the local cone
@@ -11,7 +11,6 @@ Options:
     -o FILE, --output FILE              Set output file
     -c CONSTR, --constraints CONSTR     Optimization constraints (CHSH|CHSHE|SEP|CGLMP)
     -n NUM, --num-runs NUM              Number of searches for each inequality [default: 10]
-    -s SUBSET, --select SUBSET          Select subset of inequalities
     -d DIMS, --dimensions DIMS          Hilbert space dimensions of subsystems [default: 222]
 """
 
@@ -393,15 +392,8 @@ def main(app):
     else:
         out_file = sys.stdout
 
-    if opts['--select']:
-        select = [int(x) for x in opts['--select'].split(',')]
-    else:
-        select = range(len(system.rows))
-
     for _ in range(num_runs):
         for i, expr in enumerate(system.rows):
-            if i not in select:
-                continue
 
             result = scipy.optimize.minimize(
                 system.violation, system.random(),
