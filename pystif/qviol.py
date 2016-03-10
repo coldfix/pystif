@@ -37,10 +37,12 @@ from .core.linalg import (projector, measurement, random_direction_vector,
 
 
 def exp_i(phi):
+    """Return the complex unit vector ``exp(iφ)``."""
     return cmath.rect(1, phi)
 
 
 def cos_sin(phi):
+    """Return ``(cos(φ), sin(φ))``."""
     z = exp_i(phi)
     return z.real, z.imag
 
@@ -81,6 +83,22 @@ class CompositeQuantumSystem:
 
 
 def umat_V(params, dim):
+    """
+    Create a unitary matrix using `(n-1)²` real parameters from the given
+    parameter list.
+
+    Any unitary matrix `X` can be expressed as a product of three unitaries:
+
+        X = L V R
+
+    where L and R are diagonal matrices responsible for phase transformations.
+    This function returns the non-diagonal matrix V in the middle.
+
+    This is an implementation of the parametrization described in:
+
+        C. Jarlskog. A recursive parametrization of unitary matrices. Journal
+        of Mathematical Physics, 46(10), 2005.
+    """
     if dim == 1:
         return np.eye(1)
     elif dim == 2:
@@ -112,6 +130,10 @@ def umat_V(params, dim):
 
 
 def unpack_unitary(params, dim):
+    """
+    Create a `dim` dimensional unitary matrix using (popping) `dim²` real
+    parameters from the given parameter list.
+    """
     phases = [exp_i(params.pop()) for _ in range(2*dim-1)]
     Phi_L = np.diag(phases[:dim])
     Phi_R = np.diag(phases[dim:]+[1])
@@ -133,7 +155,7 @@ class TripartiteBellScenario(CompositeQuantumSystem):
         # phases are absorbed into Phi_R:
         s = random_direction_vector(self.dim*2)
         # 1 measurement = U(n).CT @ diag[1 … n] @ U(n)
-        num_unitary_params = (sum(x**2 for x in self.subdim) + 
+        num_unitary_params = (sum(x**2 for x in self.subdim) +
                               sum(x**2 for x in self.subdim[1:]))
         u = np.random.uniform(0, 2*pi, size=num_unitary_params)
         return np.hstack((s, u))
