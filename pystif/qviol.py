@@ -380,7 +380,7 @@ class SEP2(Constraints):
         return sum(self._neg_entanglement(rho2, dim2)
                    for rho2, dim2 in (rho_bc, rho_ac, rho_ab))
 
-    def _neg_entanglement(self, rho2, dim2, eps=1e-10):
+    def _neg_entanglement(self, rho2, dim2):
         """
         Return something negative if the 2-party density matrix is entangled.
 
@@ -388,7 +388,7 @@ class SEP2(Constraints):
         """
         trans = ptranspose(rho2, dim2, 1)
         val, vec = np.linalg.eigh(trans)
-        return sum(v for v in val if v < -eps)
+        return sum(v for v in val if v < 0)
 
 
 # composed operations
