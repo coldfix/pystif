@@ -354,6 +354,16 @@ def select_combinations(parties, columns):
             for colname in columns]
 
 
+def load_summary(filename):
+    with open(filename) as f:
+        data = yaml.safe_load(f)
+    results = data['results'] or ()
+    indices = sorted({r['i_row'] for r in results})
+    rows = [data['rows'][i] for i in indices]
+    cols = data['cols']
+    return indices, rows, cols
+
+
 @application
 def main(app):
 
@@ -361,13 +371,8 @@ def main(app):
     dims = list(map(int, opts['--dimensions']))
 
     if opts['INPUT'].lower().endswith('.yml'):
-        with open(opts['INPUT']) as f:
-            data = yaml.safe_load(f)
-        if not data:
-            return
-        cols = data[0]['cols']
-        coef = {tuple(r['coef']) for r in data}
-        app.system = System(np.array(list(coef)), cols)
+        indices, rows, cols = load_summary(opts['INPUT'])
+        app.system = System(np.array(rows), cols)
 
     system = TripartiteBellScenario(app.system, dims=dims)
 
@@ -392,6 +397,17 @@ def main(app):
     else:
         out_file = sys.stdout
 
+    yaml_dump({
+        'rows': system.rows,
+        'cols': system.cols,
+        'expr': [
+            format_human_readable(expr, system.cols)
+            for expr in system.rows
+        ],
+        'constr': opts['--constraints'],
+    }, out_file)
+    print("results:", file=out_file, flush=True)
+
     for _, (i, expr) in product(range(num_runs), enumerate(system.rows)):
 
         result = scipy.optimize.minimize(
@@ -410,13 +426,11 @@ def main(app):
         else:
             state, bases = system.unpack(result.x)
             yaml_dump([{
-                'i': i,
-                'coef': expr,
-                'cols': system.cols,
-                'expr': format_human_readable(expr, system.cols),
-                'f': result.fun,
+                'i_row': i,
+                'f_objective': result.fun,
+                'f_constraints': fconstr,
+                'opt_params': result.x,
                 'state': state,
-                'fconstr': fconstr,
                 'bases': bases,
             }], out_file)
 
