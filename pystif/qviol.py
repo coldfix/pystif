@@ -407,8 +407,18 @@ def main(app):
                 system.violation, system.random(),
                 (expr,), constraints=constr)
 
+            fconstr = constr['fun'](result.x) if constr else 0
+
+            if not result.success:
+                print('x', end='', flush=True)
+                continue
+
             if result.fun > -1e-11:
-                print('.' if result.success else 'x', end='', flush=True)
+                print('.', end='', flush=True)
+                continue
+
+            if fconstr < 0:
+                print('o', end='', flush=True)
                 continue
 
             state, bases = system.unpack(result.x)
@@ -419,9 +429,10 @@ def main(app):
                 'expr': format_human_readable(expr, system.cols),
                 'f': result.fun,
                 'state': state,
+                'fconstr': fconstr,
                 'bases': bases,
             }], out_file)
 
-            print('\n', i, result.fun)
+            print('\n', i, result.fun, fconstr)
 
     print()
