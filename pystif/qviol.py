@@ -392,27 +392,22 @@ def main(app):
     else:
         out_file = sys.stdout
 
-    for _ in range(num_runs):
-        for i, expr in enumerate(system.rows):
+    for _, (i, expr) in product(range(num_runs), enumerate(system.rows)):
 
-            result = scipy.optimize.minimize(
-                system.violation, system.random(),
-                (expr,), constraints=constr)
+        result = scipy.optimize.minimize(
+            system.violation, system.random(),
+            (expr,), constraints=constr)
 
-            fconstr = constr['fun'](result.x) if constr else 0
+        fconstr = constr['fun'](result.x) if constr else 0
 
-            if not result.success:
-                print('x', end='', flush=True)
-                continue
+        if not result.success:
+            print('x', end='', flush=True)
+        elif result.fun > -1e-11:
+            print('.', end='', flush=True)
+        elif fconstr < 0:
+            print('o', end='', flush=True)
 
-            if result.fun > -1e-11:
-                print('.', end='', flush=True)
-                continue
-
-            if fconstr < 0:
-                print('o', end='', flush=True)
-                continue
-
+        else:
             state, bases = system.unpack(result.x)
             yaml_dump([{
                 'i': i,
