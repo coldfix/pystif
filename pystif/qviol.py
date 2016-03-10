@@ -24,10 +24,12 @@ import sys
 
 import scipy.optimize
 import numpy as np
+import yaml
 
 from .core.app import application
 from .core.symmetry import SymmetryGroup, group_by_symmetry
-from .core.io import System, _varset, yaml_dump, format_human_readable
+from .core.io import (System, _varset, yaml_dump, format_human_readable,
+                      read_system_from_file)
 from .core.linalg import (projector, measurement, random_direction_vector,
                           cartesian_to_spherical, kron, to_unit_vector,
                           to_quantum_state, ptrace, ptranspose, dagger,
@@ -410,6 +412,16 @@ def main(app):
 
     opts = app.opts
     dims = list(map(int, opts['--dimensions']))
+
+    if opts['INPUT'].lower().endswith('.yml'):
+        with open(opts['INPUT']) as f:
+            data = yaml.safe_load(f)
+        if not data:
+            return
+        cols = data[0]['cols']
+        coef = {tuple(r['coef']) for r in data}
+        app.system = System(np.array(list(coef)), cols)
+
     system = TripartiteBellScenario(app.system, dims=dims)
 
     constraint_classes = {
