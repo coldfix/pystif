@@ -142,7 +142,7 @@ class TripartiteBellScenario(CompositeQuantumSystem):
         l = list(params)
 
         D = np.diag(range(self.dim))
-        U = [[np.eye(self.subdim[0]),
+        U = [[np.eye(self.subdim[0], dtype=complex),
               unpack_unitary(l, self.subdim[0])]]
         U += [[unpack_unitary(l, subdim) for _ in range(2)]
               for subdim in self.subdim[1:]]
