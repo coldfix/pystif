@@ -3,6 +3,7 @@ Find quantum violations for the tripartite bell scenario.
 
 Usage:
     qviol INPUT [-c CONSTR] [-o FILE] [-n NUM] [-d DIMS]
+    qviol summary INPUT
 
 Arguments:
     INPUT                               File with known faces of the local cone
@@ -364,11 +365,21 @@ def load_summary(filename):
     return indices, rows, cols
 
 
+def show_summary(opts):
+    indices, rows, cols = load_summary(opts['INPUT'])
+    print("rows:", ",".join(map(str, indices)))
+    for r in rows:
+        print(format_human_readable(r, cols))
+
+
 @application
 def main(app):
 
     opts = app.opts
     dims = list(map(int, opts['--dimensions']))
+    if opts['summary']:
+        show_summary(opts)
+        return
 
     if opts['INPUT'].lower().endswith('.yml'):
         indices, rows, cols = load_summary(opts['INPUT'])
