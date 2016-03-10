@@ -372,6 +372,19 @@ def show_summary(opts):
         print(format_human_readable(r, cols))
 
 
+def get_constraints_obj(constraints_name, system):
+    constraint_classes = {
+        'CHSHE': CHSHE2,
+        'CHSH': CHSH2,
+        'SEP': SEP2,
+        'CGLMP': CGLMP2,
+    }
+    if constraints_name is None:
+        return None
+    cls = constraint_classes[constraints_name.upper()]
+    return cls.optimization_constraints(system)
+
+
 @application
 def main(app):
 
@@ -386,20 +399,7 @@ def main(app):
         app.system = System(np.array(rows), cols)
 
     system = TripartiteBellScenario(app.system, dims=dims)
-
-    constraint_classes = {
-        'CHSHE': CHSHE2,
-        'CHSH': CHSH2,
-        'SEP': SEP2,
-        'CGLMP': CGLMP2,
-    }
-
-    ct = opts['--constraints']
-    if ct is None:
-        constr = None
-    else:
-        cls = constraint_classes[ct.upper()]
-        constr = cls.optimization_constraints(system)
+    constr = get_constraints_obj(opts['--constraints'], system)
 
     num_runs = int(opts['--num-runs'])
 
