@@ -191,8 +191,7 @@ class Constraints:
     def __call__(self, params):
         state, parties = self.system.realize(params)
         measured = self._measure_all(state, parties)
-        vals = (self._eval(expr, measured) for expr in self.expressions)
-        return sum(v for v in vals if v < 0)
+        return [self._eval(expr, measured) for expr in self.expressions]
 
     @classmethod
     def optimization_constraints(cls, system):
@@ -274,7 +273,7 @@ class CGLMP2(Constraints):
                 expr[aB,i,(i-k)%d] -= v     # P(B1=A2-k)    = P(B1=A2-k)
                 expr[ab,i,(i+k+1)%d] -= v   # P(A2=B2-k-1)  = P(B2=A2+k+1)
                 expr[Ab,i,(i-k-1)%d] -= v   # P(B2=A1-k-1)  = P(B2=A1-k-1)
-        return np.array(expr.flat)
+        return expr.flatten()
 
     def __init__(self, system, d=3):
         self.system = system
@@ -325,8 +324,9 @@ class SEP2(Constraints):
         rho_bc = ptrace(rho_abc, dims, 0), (dims[1], dims[2])
         rho_ac = ptrace(rho_abc, dims, 1), (dims[0], dims[2])
         rho_ab = ptrace(rho_abc, dims, 2), (dims[0], dims[1])
-        return sum(self._neg_entanglement(rho2, dim2)
-                   for rho2, dim2 in (rho_bc, rho_ac, rho_ab))
+        vals = [self._neg_entanglement(rho2, dim2)
+                for rho2, dim2 in (rho_bc, rho_ac, rho_ab)]
+        return np.array(vals).flatten()
 
     def _neg_entanglement(self, rho2, dim2):
         """
@@ -336,7 +336,7 @@ class SEP2(Constraints):
         """
         trans = ptranspose(rho2, dim2, 1)
         val, vec = np.linalg.eigh(trans)
-        return sum(v for v in val if v < 0)
+        return val
 
 
 # composed operations
@@ -425,13 +425,13 @@ def main(app):
             system.violation, system.random(),
             (expr,), constraints=constr)
 
-        fconstr = constr['fun'](result.x) if constr else 0
+        fconstr = constr['fun'](result.x) if constr else []
 
         if not result.success:
             print('x', end='', flush=True)
         elif result.fun > -1e-11:
             print('.', end='', flush=True)
-        elif fconstr < 0:
+        elif any(c < 0 for c in fconstr):
             print('o', end='', flush=True)
 
         else:
