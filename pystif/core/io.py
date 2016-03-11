@@ -2,6 +2,7 @@ from functools import partial
 from os import path
 import sys
 import re
+from collections import OrderedDict
 
 import numpy as np
 import yaml
@@ -438,7 +439,24 @@ def yaml_dump(data, stream=None, Dumper=yaml.SafeDumper, **kwds):
         return dumper.represent_data([x for x in data])
     def complex_representer(dumper, data):
         return dumper.represent_data([data.real, data.imag])
+    def odict_representer(dumper, data):
+        return dumper.represent_mapping(
+            yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
+            data.items())
+    _Dumper.add_representer(OrderedDict, odict_representer)
     _Dumper.add_multi_representer(np.generic, numpy_scalar_representer)
     _Dumper.add_representer(np.ndarray, numpy_array_representer)
     _Dumper.add_representer(complex, complex_representer)
     return yaml.dump(data, stream, _Dumper, **kwds)
+
+
+def yaml_load(stream, Loader=yaml.SafeLoader, object_pairs_hook=OrderedDict):
+    class OrderedLoader(Loader):
+        pass
+    def construct_mapping(loader, node):
+        loader.flatten_mapping(node)
+        return object_pairs_hook(loader.construct_pairs(node))
+    OrderedLoader.add_constructor(
+        yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG,
+        construct_mapping)
+    return yaml.load(stream, OrderedLoader)
