@@ -204,16 +204,15 @@ class TripartiteBellScenario(CompositeQuantumSystem):
 
 class Constraints:
 
+    """Base class for optimization constraints."""
+
     def __init__(self, system):
-        sg = SymmetryGroup.load(system.symm, self.cols)
         self.system = system
-        expr = np.array([self.coef.get(c, 0) for c in self.cols])
-        self.expressions = list(sg(expr))
 
     def __call__(self, params):
+        """Compute constraint functions from packed parameter list."""
         state, parties = self.system.realize(params)
-        measured = self._measure_all(state, parties)
-        return [self._eval(expr, measured) for expr in self.expressions]
+        return self.evaluate_all_constraints(state, parties)
 
     @classmethod
     def optimization_constraints(cls, system):
@@ -221,45 +220,72 @@ class Constraints:
                 'fun': cls(system)}
 
 
-class CHSHE2(Constraints):
+class LinearConstraints(Constraints):
+
+    """Base class for constraints that are linear expressions on some vector."""
+
+    def __init__(self, system):
+        self.system = system
+        self.matrix = np.array(list(self.get_matrix()))
+
+    def evaluate_all_constraints(self, state, parties):
+        vector = self.get_data_vector(state, parties)
+        values = self.matrix @ vector
+        return self.condition(values)
+
+    def get_matrix(self):
+        sg = self.get_symmetry_group()
+        expr = self.expr
+        if isinstance(expr, dict):
+            expr = np.array([expr.get(c, 0) for c in self.cols])
+        return sg(expr)
+
+    def get_symmetry_group(self):
+        return SymmetryGroup.load(self.system.symm, self.cols)
+
+
+class CHSHE2(LinearConstraints):
 
     """H(A,B) + H(A,b) + H(a,B) - H(a,b) - H(A) - H(B) >= 0"""
 
-    cols = ('_AB', '_Ab', '_Ba', '_ab',
-            '_AC', '_Ac', '_Ca', '_ac',
-            '_BC', '_Bc', '_Cb', '_bc',
+    cols = ('_AB', '_Ab', '_aB', '_ab',
+            '_AC', '_Ac', '_aC', '_ac',
+            '_BC', '_Bc', '_bC', '_bc',
             '_A', '_a', '_B', '_b', '_C', '_c')
-    coef = {'_AB': 1, '_Ab': 1, '_Ba': 1,
+    expr = {'_AB': 1, '_Ab': 1, '_aB': 1,
             '_ab': -1, '_A': -1, '_B': -1}
 
-    def _measure_all(self, state, parties):
+    def get_data_vector(self, state, parties):
+        """Return the entropies `H(X,Y)`, `H(X)`."""
         mcombo = self.system._mkcombo(parties, self.cols)
-        return [measure_many(state, m) for m in mcombo]
+        return [H(measure_many(state, m)) for m in mcombo]
 
-    def _eval(self, expr, measured):
-        entropies = [H(x) for x in measured]
-        return np.dot(entropies, expr)
+    def condition(self, x):
+        """Return a negative value if `x >= 0` is not satisfied."""
+        return x
 
 
-class CHSH2(Constraints):
+class CHSH2(LinearConstraints):
 
     """E(A,B) + E(A,b) + E(a,B) - E(a,b) <= 2"""
 
-    cols = ('_AB', '_Ab', '_Ba', '_ab',
-            '_AC', '_Ac', '_Ca', '_ac',
-            '_BC', '_Bc', '_Cb', '_bc',)
-    coef = {'_AB': 1, '_Ab': 1, '_Ba': 1, '_ab': -1}
+    cols = ('_AB', '_Ab', '_aB', '_ab',
+            '_AC', '_Ac', '_aC', '_ac',
+            '_BC', '_Bc', '_bC', '_bc',)
+    expr = {'_AB': 1, '_Ab': 1, '_aB': 1, '_ab': -1}
 
-    def _measure_all(self, state, parties):
+    def get_data_vector(self, state, parties):
+        """Return the correlators `E(X,Y) = <XY>`."""
         mcombo = select_combinations(self.system.lift_all(parties), self.cols)
         mcombo = [(a[0]-a[1]) @ (b[0]-b[1]) for a, b in mcombo]
         return measure_many(state, mcombo)
 
-    def _eval(self, expr, correlators):
-        return 2-abs(np.dot(correlators, expr))
+    def condition(self, x):
+        """Return negative value if `|x| <= 2` is not satisfied."""
+        return 2 - abs(x)
 
 
-class CGLMP2(Constraints):
+class CGLMP2(LinearConstraints):
 
     """
     Evaluate the CGLMP constraint `I_d ≤ 2` for d outcomes.
@@ -270,14 +296,19 @@ class CGLMP2(Constraints):
                 (P(A1=B1+k) + P(B1=A2+1+k) + P(A2=B2+k) + P(B2=A1+k))
                 - (P(A1=B1-1-k) + P(B1=A2-k) + P(A2=B2-1-k) + P(B2=A1-1-k))
             )
-
     """
 
     cols = ('_AB', '_Ab', '_aB', '_ab',
             '_AC', '_Ac', '_aC', '_ac',
             '_BC', '_Bc', '_bC', '_bc',)
 
-    def _gen_template_expression(self, d):
+    def __init__(self, system, d=3):
+        self.d = d
+        super().__init__(system)
+
+    @property
+    def expr(self):
+        d = self.d
         # Get the expression for AaBb
         AB, Ab, aB, ab = 0, 1, 2, 3
         expr = np.zeros((12, d, d))
@@ -297,36 +328,33 @@ class CGLMP2(Constraints):
                 expr[Ab,i,(i-k-1)%d] -= v   # P(B2=A1-k-1)  = P(B2=A1-k-1)
         return expr.flatten()
 
-    def __init__(self, system, d=3):
-        self.system = system
-        self.d = d
-
+    def get_symmetry_group(self):
+        d = self.d
         var_names = np.arange(3*2*d).reshape((3*2, d))
         var_names = [list(n) for n in var_names]
-
         col_names = [frozenset(var_names["AaBbCc".index(v)][k]
                                for v, k in zip(c[1:], ab))
                      for c in self.cols
                      for ab in product(range(d), range(d))]
-
         spec = [(var_names[0]+var_names[1], var_names[1]+var_names[0]),
                 (var_names[0]+var_names[1], var_names[2]+var_names[3]),
                 (var_names[0]+var_names[1], var_names[4]+var_names[5])]
+        return SymmetryGroup.load(spec, col_names)
 
-        sg = SymmetryGroup.load(spec, col_names)
-
-        self.expressions = list(sg(self._gen_template_expression(d)))
-
-    def _measure_all(self, state, parties):
+    def get_data_vector(self, state, parties):
+        """
+        Return probabilities for each combination of outcomes of
+        simultaneously allowed measurements.
+        """
         mcombo = select_combinations(self.system.lift_all(parties), self.cols)
         mcombo = [x @ y
                   for a, b in mcombo
                   for x, y in product(a, b)]
         return measure_many(state, mcombo)
 
-    def _eval(self, expr, probabilities):
-        # Recall that we scaled the constraint by the factor (d-1)
-        return 2 - abs(np.dot(probabilities, expr))
+    def condition(self, x):
+        """Return negative value if `|x| <= 2` is not satisfied."""
+        return 2 - abs(x)
 
 
 class SEP2(Constraints):
@@ -339,8 +367,7 @@ class SEP2(Constraints):
     def __init__(self, system):
         self.system = system
 
-    def __call__(self, params):
-        state, parties = self.system.realize(params)
+    def evaluate_all_constraints(self, state, parties):
         rho_abc = projector(state)
         dims = self.system.subdim
         rho_bc = ptrace(rho_abc, dims, 0), (dims[1], dims[2])
@@ -449,14 +476,16 @@ def main(app):
 
         fconstr = constr['fun'](result.x) if constr else []
 
+        i = str(i).ljust(2)
         if not result.success:
-            print('x', end='', flush=True)
+            print(i, 'x', result.message)
         elif result.fun > -1e-11:
-            print('.', end='', flush=True)
-        elif any(c < 0 for c in fconstr):
-            print('o', end='', flush=True)
-
+            print(i, '.', result.fun, fconstr)
+        elif any(x < 0 for x in fconstr):
+            print(i, 'o', result.fun, fconstr)
         else:
+            print(i, 'y', result.fun, fconstr)
+
             state, bases = system.unpack(result.x)
             yaml_dump([{
                 'i_row': i,
@@ -466,7 +495,5 @@ def main(app):
                 'state': state,
                 'bases': bases,
             }], out_file)
-
-            print('\n', i, result.fun, fconstr)
 
     print()
