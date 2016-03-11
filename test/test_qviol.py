@@ -47,15 +47,15 @@ class CGLMP2_specialized(pystif.qviol.CGLMP2):
                 for x, y in product(*(repl[v] for v in ab[1:]))]
         sg = SymmetryGroup.load(spec, cols)
 
-        self.expressions = list(sg(np.array(expr.flat)))
+        self.matrix = list(sg(np.array(expr.flat)))
 
 
 class TestQviol(unittest.TestCase):
 
     def test_CGLMP_constraints_generation(self):
 
-        I3_explicit = CGLMP2_specialized(None).expressions
-        I3_generic = pystif.qviol.CGLMP2(None).expressions
+        I3_explicit = CGLMP2_specialized(None).matrix
+        I3_generic = pystif.qviol.CGLMP2(None).matrix
 
         self.maxDiff = None
         self.assertCountEqual(
