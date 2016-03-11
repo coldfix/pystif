@@ -495,5 +495,6 @@ def main(app):
                 'state': state,
                 'bases': bases,
             }], out_file)
+            out_file.flush()
 
-    print()
+        sys.stdout.flush()
