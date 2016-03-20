@@ -62,9 +62,14 @@ def scale_to_plane(points, plane_normal, threshold=1e-10):
     # Drop zeros and raise exception on negative normal part:
     points = [p for p in points
               if _strictly_positive_along(p, p@plane_normal, threshold)]
+    # the ONB that spans the plane
+    orth_basis = plane_basis(plane_normal)
+    basis_change = np.vstack((orth_basis, plane_normal))
     # Scale points to be on the plane (scale by their normal part):
     points = points / (points @ plane_normal)[:,None]
-    return points, plane_normal
+    # Get only the components in the plane:
+    points = points @ orth_basis.T
+    return points, basis_change
 
 
 def convex_hull_method(polyhedron, rays,
@@ -91,9 +96,9 @@ def convex_hull_method(polyhedron, rays,
     if project_to_plane:
         # rescale points and project them to the plane x₀+x₁+… = 1
         plane_normal = subspace.into(np.ones(subspace.onb.shape[1]))
-        points, plane_normal = scale_to_plane(points, plane_normal)
-
-    points = np.vstack((np.zeros(subspace.dim), points))
+        points, basis_change = scale_to_plane(points, plane_normal)
+    else:
+        points = np.vstack((np.zeros(subspace.dim), points))
 
     qinfo(len(points))
     hull = scipy.spatial.ConvexHull(points, incremental=True)
@@ -105,15 +110,23 @@ def convex_hull_method(polyhedron, rays,
         faces = hull.equations
         total = faces.shape[0]
         for i, face in enumerate(faces):
-            if abs(face[-1]) > 1e-5:
-                continue
+            if not project_to_plane:
+                if abs(face[-1]) > 1e-5:
+                    continue
             status_info(i, total, yes)
+
+            if project_to_plane:
+                # fetch points from their projection on the x₀+x₁+… = 1 plane
+                # into the embedding space
+                face = face @ basis_change
+            else:
+                face = face[:-1]
 
             # The following is an empirical minus sign. I didn't find anything
             # on the qhull documentation as to how the equations are oriented,
             # but apparently points x inside the convex hull are described by
             # ``face ∙ (x,1) ≤ 0``
-            face = -face[:-1]
+            face = -face
             face = subspace.back(face)
             face = scale_to_int(face)
 
@@ -131,7 +144,7 @@ def convex_hull_method(polyhedron, rays,
                 report_ray(ray)
                 point = subspace.into(ray)
                 if project_to_plane:
-                    point /= point @ plane_normal
+                    point = (point @ basis_change.T)[:-1]
                 new_points.append(point)
 
         if new_points:
