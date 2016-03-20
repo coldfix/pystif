@@ -8,7 +8,7 @@ from operator import add
 import numpy as np
 
 from .util import VectorMemory, scale_to_int
-from .io import varsort, _name, _varset
+from .io import _name, _varset
 
 
 def _all_unique(s):
@@ -21,8 +21,8 @@ class VarPermutation:
     def __init__(self, varmap):
         self.varmap = varmap
         # Complete incomplete specifications, e.g.
-        #   A <> a      ->  (Aa)
-        #   ABC <> BDC  ->  (ABD)
+        #   A <> a      ->  (Aa)    = Aa <> aA
+        #   ABC <> BDC  ->  (ABD)   = ABD <> BDA
         inverse = {v: k for k, v in varmap.items()}
         for k in list(varmap):
             if k not in inverse:
@@ -44,16 +44,20 @@ class VarPermutation:
         return flatten((c, c[1:]+c[:1]) for c in cycles)
 
     def permute_colname(self, col):
-        return "".join(varsort(self.varmap.get(c, c) for c in col))
+        return frozenset(self.varmap.get(v, v) for v in _varset(col))
 
     def permute_vector(self, vector, col_names):
-        col_names = ["".join(varsort(col)) for col in col_names]
+        col_names = [_varset(col) for col in col_names]
+        col_index = {n: i for i, n in enumerate(col_names)}
         # this actually returns the inverse permutation… shouldn't be harmful
         try:
-            return vector[[col_names.index(self.permute_colname(col))
+            return vector[[col_index[self.permute_colname(col)]
                            for col in col_names]]
-        except ValueError:
-            return vector
+        except KeyError:
+            raise ValueError(
+                "The permutation {} replaces a column that is not included in the list"
+                " of column names {}."
+                .format(self.varmap, col_names))
 
     def permute_symbolic(self, vector):
         return {
@@ -71,7 +75,10 @@ def evaluate_generators(generators, col_names):
         cur_el = queue.pop()
         yield cur_el
         for gen in generators:
-            next_el = tuple(gen.permute_vector(np.array(cur_el), col_names))
+            try:
+                next_el = tuple(gen.permute_vector(np.array(cur_el), col_names))
+            except ValueError:
+                continue
             if next_el not in seen:
                 seen.add(next_el)
                 queue.append(next_el)

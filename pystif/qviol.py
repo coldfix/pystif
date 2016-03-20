@@ -2,32 +2,34 @@
 Find quantum violations for the tripartite bell scenario.
 
 Usage:
-    qviol INPUT [-c CONSTR] [-o FILE] [-n NUM] [-s SUBSET] [-d DIMS]
+    qviol INPUT [-c CONSTR] [-o FILE] [-n NUM] [-d DIMS]
+    qviol summary INPUT
 
 Arguments:
     INPUT                               File with known faces of the local cone
 
 Options:
     -o FILE, --output FILE              Set output file
-    -c CONSTR, --constraints CONSTR     Optimization constraints (CHSH|CHSHE)
+    -c CONSTR, --constraints CONSTR     Optimization constraints (CHSH|CHSHE|SEP|CGLMP)
     -n NUM, --num-runs NUM              Number of searches for each inequality [default: 10]
-    -s SUBSET, --select SUBSET          Select subset of inequalities
     -d DIMS, --dimensions DIMS          Hilbert space dimensions of subsystems [default: 222]
 """
 
 from operator import matmul
 from functools import reduce, partial
-import itertools
+from itertools import product
 from math import log2, sin, cos, pi
 import cmath
 import sys
 
 import scipy.optimize
 import numpy as np
+import yaml
 
 from .core.app import application
 from .core.symmetry import SymmetryGroup, group_by_symmetry
-from .core.io import System, _varset, yaml_dump, format_human_readable
+from .core.io import (System, _varset, yaml_dump, format_human_readable,
+                      read_system_from_file)
 from .core.linalg import (projector, measurement, random_direction_vector,
                           cartesian_to_spherical, kron, to_unit_vector,
                           to_quantum_state, ptrace, ptranspose, dagger,
@@ -35,10 +37,12 @@ from .core.linalg import (projector, measurement, random_direction_vector,
 
 
 def exp_i(phi):
+    """Return the complex unit vector ``exp(iφ)``."""
     return cmath.rect(1, phi)
 
 
 def cos_sin(phi):
+    """Return ``(cos(φ), sin(φ))``."""
     z = exp_i(phi)
     return z.real, z.imag
 
@@ -46,58 +50,6 @@ def cos_sin(phi):
 def measure_many(psi, measurements):
     """Return expectation values for a list of operators."""
     return [measurement(psi, m) for m in measurements]
-
-
-class Qbit:
-
-    dim = 2
-
-    sigma_x = np.array([[0,   1], [ 1, 0]])
-    sigma_y = np.array([[0, -1j], [1j, 0]])
-    sigma_z = np.array([[1,   0], [0, -1]])
-    sigma = np.array((sigma_x, sigma_y, sigma_z))
-
-    @classmethod
-    def rotspin(cls, direction):
-        r, theta, phi = cartesian_to_spherical(direction)
-        return cls.rotspin_angles(theta, phi)
-
-    @classmethod
-    def rotspin_slow(cls, direction):
-        """Equivalent to rotspin(), just a bit slower."""
-        spinmat = np.tensordot(direction, cls.sigma, 1)
-        # eigenvalues/-vectors of hermitian matrix, in ascending order:
-        val, vec = np.linalg.eigh(spinmat)
-        return (projector(vec[:,[1]]),
-                projector(vec[:,[0]]))
-
-    @classmethod
-    def rotspin_angles(cls, theta, phi):
-        """
-        Returns the eigenspace projectors for the spin matrix along an
-        arbitrary direction.
-
-        The eigenstates are:
-
-            |+> = [cos(θ/2),
-                   sin(θ/2) exp(iφ)]
-
-            |-> = [sin(θ/2),
-                   cos(θ/2) exp(-iφ) (-1)]
-
-        http://www.physicspages.com/2013/01/19/spin-12-along-an-arbitrary-direction/
-        """
-        exp_th2 = exp_i(theta/2)
-        exp_phi = exp_i(phi)
-        u = [exp_th2.real,
-             exp_th2.imag * exp_phi]
-        d = [exp_th2.imag,
-             exp_th2.real * exp_phi * -1]
-        return projector(u), projector(d)
-
-    @classmethod
-    def xzspin(cls, angle):
-        return cls.rotspin_angles(angle, 0)
 
 
 class CompositeQuantumSystem:
@@ -131,6 +83,22 @@ class CompositeQuantumSystem:
 
 
 def umat_V(params, dim):
+    """
+    Create a unitary matrix using `(n-1)²` real parameters from the given
+    parameter list.
+
+    Any unitary matrix `X` can be expressed as a product of three unitaries:
+
+        X = L V R
+
+    where L and R are diagonal matrices responsible for phase transformations.
+    This function returns the non-diagonal matrix V in the middle.
+
+    This is an implementation of the parametrization described in:
+
+        C. Jarlskog. A recursive parametrization of unitary matrices. Journal
+        of Mathematical Physics, 46(10), 2005.
+    """
     if dim == 1:
         return np.eye(1)
     elif dim == 2:
@@ -162,6 +130,10 @@ def umat_V(params, dim):
 
 
 def unpack_unitary(params, dim):
+    """
+    Create a `dim` dimensional unitary matrix using (popping) `dim²` real
+    parameters from the given parameter list.
+    """
     phases = [exp_i(params.pop()) for _ in range(2*dim-1)]
     Phi_L = np.diag(phases[:dim])
     Phi_R = np.diag(phases[dim:]+[1])
@@ -183,7 +155,7 @@ class TripartiteBellScenario(CompositeQuantumSystem):
         # phases are absorbed into Phi_R:
         s = random_direction_vector(self.dim*2)
         # 1 measurement = U(n).CT @ diag[1 … n] @ U(n)
-        num_unitary_params = (sum(x**2 for x in self.subdim) + 
+        num_unitary_params = (sum(x**2 for x in self.subdim) +
                               sum(x**2 for x in self.subdim[1:]))
         u = np.random.uniform(0, 2*pi, size=num_unitary_params)
         return np.hstack((s, u))
@@ -192,7 +164,7 @@ class TripartiteBellScenario(CompositeQuantumSystem):
         l = list(params)
 
         D = np.diag(range(self.dim))
-        U = [[np.eye(self.subdim[0]),
+        U = [[np.eye(self.subdim[0], dtype=complex),
               unpack_unitary(l, self.subdim[0])]]
         U += [[unpack_unitary(l, subdim) for _ in range(2)]
               for subdim in self.subdim[1:]]
@@ -218,7 +190,7 @@ class TripartiteBellScenario(CompositeQuantumSystem):
         # matmul:   [[ay@by, ay@bn, an@by, an@bn] per operator pairing (a,b)]
         _ = self.lift_all(parties)
         _ = select_combinations(_, cols)
-        _ = [itertools.product(*m) for m in _]
+        _ = [product(*m) for m in _]
         _ = [[reduce(matmul, parts) for parts in m] for m in _]
         return _
 
@@ -232,17 +204,15 @@ class TripartiteBellScenario(CompositeQuantumSystem):
 
 class Constraints:
 
+    """Base class for optimization constraints."""
+
     def __init__(self, system):
-        sg = SymmetryGroup.load(system.symm, self.cols)
         self.system = system
-        expr = np.array([self.coef.get(c, 0) for c in self.cols])
-        self.expressions = list(sg(expr))
 
     def __call__(self, params):
+        """Compute constraint functions from packed parameter list."""
         state, parties = self.system.realize(params)
-        measured = self._measure_all(state, parties)
-        vals = (self._eval(expr, measured) for expr in self.expressions)
-        return sum(v for v in vals if v < 0)
+        return self.evaluate_all_constraints(state, parties)
 
     @classmethod
     def optimization_constraints(cls, system):
@@ -250,42 +220,141 @@ class Constraints:
                 'fun': cls(system)}
 
 
-class CHSHE2(Constraints):
+class LinearConstraints(Constraints):
+
+    """Base class for constraints that are linear expressions on some vector."""
+
+    def __init__(self, system):
+        self.system = system
+        self.matrix = np.array(list(self.get_matrix()))
+
+    def evaluate_all_constraints(self, state, parties):
+        vector = self.get_data_vector(state, parties)
+        values = self.matrix @ vector
+        return self.condition(values)
+
+    def get_matrix(self):
+        sg = self.get_symmetry_group()
+        expr = self.expr
+        if isinstance(expr, dict):
+            expr = np.array([expr.get(c, 0) for c in self.cols])
+        return sg(expr)
+
+    def get_symmetry_group(self):
+        return SymmetryGroup.load(self.system.symm, self.cols)
+
+
+class CHSHE2(LinearConstraints):
 
     """H(A,B) + H(A,b) + H(a,B) - H(a,b) - H(A) - H(B) >= 0"""
 
-    cols = ('_AB', '_Ab', '_Ba', '_ab',
-            '_AC', '_Ac', '_Ca', '_ac',
-            '_BC', '_Bc', '_Cb', '_bc',
+    cols = ('_AB', '_Ab', '_aB', '_ab',
+            '_AC', '_Ac', '_aC', '_ac',
+            '_BC', '_Bc', '_bC', '_bc',
             '_A', '_a', '_B', '_b', '_C', '_c')
-    coef = {'_AB': 1, '_Ab': 1, '_Ba': 1,
+    expr = {'_AB': 1, '_Ab': 1, '_aB': 1,
             '_ab': -1, '_A': -1, '_B': -1}
 
-    def _measure_all(self, state, parties):
+    def get_data_vector(self, state, parties):
+        """Return the entropies `H(X,Y)`, `H(X)`."""
         mcombo = self.system._mkcombo(parties, self.cols)
-        return [measure_many(state, m) for m in mcombo]
+        return [H(measure_many(state, m)) for m in mcombo]
 
-    def _eval(self, expr, measured):
-        entropies = [H(x) for x in measured]
-        return np.dot(entropies, expr)
+    def condition(self, x):
+        """Return a negative value if `x >= 0` is not satisfied."""
+        return x
 
 
-class CHSH2(Constraints):
+class CHSH2(LinearConstraints):
 
     """E(A,B) + E(A,b) + E(a,B) - E(a,b) <= 2"""
 
-    cols = ('_AB', '_Ab', '_Ba', '_ab',
-            '_AC', '_Ac', '_Ca', '_ac',
-            '_BC', '_Bc', '_Cb', '_bc',)
-    coef = {'_AB': 1, '_Ab': 1, '_Ba': 1, '_ab': -1}
+    cols = ('_AB', '_Ab', '_aB', '_ab',
+            '_AC', '_Ac', '_aC', '_ac',
+            '_BC', '_Bc', '_bC', '_bc',)
+    expr = {'_AB': 1, '_Ab': 1, '_aB': 1, '_ab': -1}
 
-    def _measure_all(self, state, parties):
+    def get_data_vector(self, state, parties):
+        """Return the correlators `E(X,Y) = <XY>`."""
         mcombo = select_combinations(self.system.lift_all(parties), self.cols)
         mcombo = [(a[0]-a[1]) @ (b[0]-b[1]) for a, b in mcombo]
         return measure_many(state, mcombo)
 
-    def _eval(self, expr, correlators):
-        return 2-abs(np.dot(correlators, expr))
+    def condition(self, x):
+        """Return negative value if `|x| <= 2` is not satisfied."""
+        return 2 - abs(x)
+
+
+class CGLMP2(LinearConstraints):
+
+    """
+    Evaluate the CGLMP constraint `I_d ≤ 2` for d outcomes.
+
+    The constraint is defined by:
+
+        I_d = sum_{k=0}^{[d/2]-1} (
+                (P(A1=B1+k) + P(B1=A2+1+k) + P(A2=B2+k) + P(B2=A1+k))
+                - (P(A1=B1-1-k) + P(B1=A2-k) + P(A2=B2-1-k) + P(B2=A1-1-k))
+            )
+    """
+
+    cols = ('_AB', '_Ab', '_aB', '_ab',
+            '_AC', '_Ac', '_aC', '_ac',
+            '_BC', '_Bc', '_bC', '_bc',)
+
+    def __init__(self, system, d=3):
+        self.d = d
+        super().__init__(system)
+
+    @property
+    def expr(self):
+        d = self.d
+        # Get the expression for AaBb
+        AB, Ab, aB, ab = 0, 1, 2, 3
+        expr = np.zeros((12, d, d))
+        for k in range(d//2):
+            # multiplied by (d-1) to avoid floats:
+            v = 1 - 2*k/(d-1)
+            for i in range(d):
+                # positive terms
+                expr[AB,i,(i-k)%d] += v     # P(A1=B1+k)    = P(B1=A1-k)
+                expr[aB,i,(i+1+k)%d] += v   # P(B1=A2+k+1)  = P(B1=A2+k+1)
+                expr[ab,i,(i-k)%d] += v     # P(A2=B2+k)    = P(B2=A2-k)
+                expr[Ab,i,(i+k)%d] += v     # P(B2=A1+k)    = P(B2=A1+k)
+                # negative terms
+                expr[AB,i,(i+k+1)%d] -= v   # P(A1=B1-k-1)  = P(B1=A1+k+1)
+                expr[aB,i,(i-k)%d] -= v     # P(B1=A2-k)    = P(B1=A2-k)
+                expr[ab,i,(i+k+1)%d] -= v   # P(A2=B2-k-1)  = P(B2=A2+k+1)
+                expr[Ab,i,(i-k-1)%d] -= v   # P(B2=A1-k-1)  = P(B2=A1-k-1)
+        return expr.flatten()
+
+    def get_symmetry_group(self):
+        d = self.d
+        var_names = np.arange(3*2*d).reshape((3*2, d))
+        var_names = [list(n) for n in var_names]
+        col_names = [frozenset(var_names["AaBbCc".index(v)][k]
+                               for v, k in zip(c[1:], ab))
+                     for c in self.cols
+                     for ab in product(range(d), range(d))]
+        spec = [(var_names[0]+var_names[1], var_names[1]+var_names[0]),
+                (var_names[0]+var_names[1], var_names[2]+var_names[3]),
+                (var_names[0]+var_names[1], var_names[4]+var_names[5])]
+        return SymmetryGroup.load(spec, col_names)
+
+    def get_data_vector(self, state, parties):
+        """
+        Return probabilities for each combination of outcomes of
+        simultaneously allowed measurements.
+        """
+        mcombo = select_combinations(self.system.lift_all(parties), self.cols)
+        mcombo = [x @ y
+                  for a, b in mcombo
+                  for x, y in product(a, b)]
+        return measure_many(state, mcombo)
+
+    def condition(self, x):
+        """Return negative value if `|x| <= 2` is not satisfied."""
+        return 2 - abs(x)
 
 
 class SEP2(Constraints):
@@ -298,17 +367,17 @@ class SEP2(Constraints):
     def __init__(self, system):
         self.system = system
 
-    def __call__(self, params):
-        state, parties = self.system.realize(params)
+    def evaluate_all_constraints(self, state, parties):
         rho_abc = projector(state)
         dims = self.system.subdim
         rho_bc = ptrace(rho_abc, dims, 0), (dims[1], dims[2])
         rho_ac = ptrace(rho_abc, dims, 1), (dims[0], dims[2])
         rho_ab = ptrace(rho_abc, dims, 2), (dims[0], dims[1])
-        return sum(self._neg_entanglement(rho2, dim2)
-                   for rho2, dim2 in (rho_bc, rho_ac, rho_ab))
+        vals = [self._neg_entanglement(rho2, dim2)
+                for rho2, dim2 in (rho_bc, rho_ac, rho_ab)]
+        return np.array(vals).flatten()
 
-    def _neg_entanglement(self, rho2, dim2, eps=1e-10):
+    def _neg_entanglement(self, rho2, dim2):
         """
         Return something negative if the 2-party density matrix is entangled.
 
@@ -316,7 +385,7 @@ class SEP2(Constraints):
         """
         trans = ptranspose(rho2, dim2, 1)
         val, vec = np.linalg.eigh(trans)
-        return sum(v for v in val if v < -eps)
+        return val
 
 
 # composed operations
@@ -335,24 +404,51 @@ def select_combinations(parties, columns):
             for colname in columns]
 
 
+def load_summary(filename):
+    with open(filename) as f:
+        data = yaml.safe_load(f)
+    results = data['results'] or ()
+    indices = sorted({r['i_row'] for r in results})
+    rows = [data['rows'][i] for i in indices]
+    cols = data['cols']
+    return indices, rows, cols
+
+
+def show_summary(opts):
+    indices, rows, cols = load_summary(opts['INPUT'])
+    print("rows:", ",".join(map(str, indices)))
+    for r in rows:
+        print(format_human_readable(r, cols))
+
+
+def get_constraints_obj(constraints_name, system):
+    constraint_classes = {
+        'CHSHE': CHSHE2,
+        'CHSH': CHSH2,
+        'SEP': SEP2,
+        'CGLMP': CGLMP2,
+    }
+    if constraints_name is None:
+        return None
+    cls = constraint_classes[constraints_name.upper()]
+    return cls.optimization_constraints(system)
+
+
 @application
 def main(app):
 
     opts = app.opts
     dims = list(map(int, opts['--dimensions']))
-    system = TripartiteBellScenario(app.system, dims=dims)
+    if opts['summary']:
+        show_summary(opts)
+        return
 
-    ct = opts['--constraints']
-    if ct is None:
-        constr = None
-    elif ct.upper() == 'CHSHE':
-        constr = CHSHE2.optimization_constraints(system)
-    elif ct.upper() == 'CHSH':
-        constr = CHSH2.optimization_constraints(system)
-    elif ct.upper() == 'SEP':
-        constr = SEP2.optimization_constraints(system)
-    else:
-        raise ValueError('Unknown constraints type: {}'.format(ct))
+    if opts['INPUT'].lower().endswith('.yml'):
+        indices, rows, cols = load_summary(opts['INPUT'])
+        app.system = System(np.array(rows), cols)
+
+    system = TripartiteBellScenario(app.system, dims=dims)
+    constr = get_constraints_obj(opts['--constraints'], system)
 
     num_runs = int(opts['--num-runs'])
 
@@ -361,35 +457,44 @@ def main(app):
     else:
         out_file = sys.stdout
 
-    if opts['--select']:
-        select = [int(x) for x in opts['--select'].split(',')]
-    else:
-        select = range(len(system.rows))
+    yaml_dump({
+        'rows': system.rows,
+        'cols': system.cols,
+        'expr': [
+            format_human_readable(expr, system.cols)
+            for expr in system.rows
+        ],
+        'constr': opts['--constraints'],
+    }, out_file)
+    print("results:", file=out_file, flush=True)
 
-    for _ in range(num_runs):
-        for i, expr in enumerate(system.rows):
-            if i not in select:
-                continue
+    for _, (i, expr) in product(range(num_runs), enumerate(system.rows)):
 
-            result = scipy.optimize.minimize(
-                system.violation, system.random(),
-                (expr,), constraints=constr)
+        result = scipy.optimize.minimize(
+            system.violation, system.random(),
+            (expr,), constraints=constr)
 
-            if result.fun > -1e-11:
-                print('.' if result.success else 'x', end='', flush=True)
-                continue
+        fconstr = constr['fun'](result.x) if constr else []
+
+        i = str(i).ljust(2)
+        if not result.success:
+            print(i, 'x', result.message)
+        elif result.fun > -1e-11:
+            print(i, '.', result.fun, fconstr)
+        elif any(x < 0 for x in fconstr):
+            print(i, 'o', result.fun, fconstr)
+        else:
+            print(i, 'y', result.fun, fconstr)
 
             state, bases = system.unpack(result.x)
             yaml_dump([{
-                'i': i,
-                'coef': expr,
-                'cols': system.cols,
-                'expr': format_human_readable(expr, system.cols),
-                'f': result.fun,
+                'i_row': i,
+                'f_objective': result.fun,
+                'f_constraints': fconstr,
+                'opt_params': result.x,
                 'state': state,
                 'bases': bases,
             }], out_file)
+            out_file.flush()
 
-            print('\n', i, result.fun)
-
-    print()
+        sys.stdout.flush()
