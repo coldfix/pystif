@@ -48,28 +48,28 @@ def convex_hull_method(polyhedron, rays,
                        report_ray, report_yes,
                        status_info, qinfo):
 
-    result = []
-
-    points = np.copy(rays)
-
-    # Now make sure the dataset lives in a full dimensional subspace
-    subspace = LinearSubspace.from_rowspace(points)
-
-    for face in polyhedron.nullspace_int():
-        report_yes(face)
-        report_yes(-face)
-
-    # initial hull
-    points = subspace.into(points)
-    points = np.vstack((np.zeros(subspace.dim), points))
-    qinfo(len(points))
-    hull = scipy.spatial.ConvexHull(points, incremental=True)
-
+    # Setup cache to avoid multiple computation:
     yes = 0
     seen = VectorMemory()
     seen_ray = VectorMemory()
     for ray in rays:
         seen_ray(ray)
+
+    # Report the trivial facets:
+    for face in polyhedron.nullspace_int():
+        report_yes(face)
+        report_yes(-face)
+
+    # Make sure the dataset lives in a full dimensional subspace
+    subspace = LinearSubspace.from_rowspace(rays)
+    points = subspace.into(rays)
+
+    points = np.vstack((np.zeros(subspace.dim), points))
+
+    qinfo(len(points))
+    hull = scipy.spatial.ConvexHull(points, incremental=True)
+
+    result = []
 
     while True:
         new_points = []
