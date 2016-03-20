@@ -2,7 +2,7 @@
 Find projection of a convex cone to a lower dimensional subspace.
 
 Usage:
-    chm INPUT -s SUBSPACE [-o OUTPUT] [-x XRAYS] [-l LIMIT] [-r] [-q] [-p] [-i FILE]
+    chm INPUT -s SUBSPACE [-o OUTPUT] [-x XRAYS] [-l LIMIT] [-r] [-q] [-p] [-i FILE] [-P]
 
 Options:
     -o OUTPUT, --output OUTPUT      Save facets of projected cone
@@ -15,6 +15,8 @@ Options:
     -q, --quiet                     Less status output
     -p, --pretty                    Pretty print output inequalities
     -i FILE, --info FILE            Print short summary to file (YAML)
+    -P, --plane                     Perform convex hull in the (1,1,…,1)∙x=0
+                                    plane. This may be a performance gain.
 
 Note:
     * output files may be specified as '-' to use STDIN/STDOUT
@@ -42,11 +44,33 @@ from .core.array import scale_to_int
 from .core.io import SystemFile
 from .core.geom import LinearSubspace
 from .core.util import VectorMemory
+from .core.linalg import plane_basis
+
+
+def _strictly_positive_along(point, normal_part, threshold=1e-10):
+    if normal_part < -threshold:
+        raise ValueError("Point with negative component: {}!".format(point))
+    if normal_part < +threshold:
+        if any(np.abs(point) > threshold):
+            raise ValueError("Point in normal space: {}!".format(point))
+        return False
+    return True
+
+
+def scale_to_plane(points, plane_normal, threshold=1e-10):
+    plane_normal = plane_normal / np.linalg.norm(plane_normal)
+    # Drop zeros and raise exception on negative normal part:
+    points = [p for p in points
+              if _strictly_positive_along(p, p@plane_normal, threshold)]
+    # Scale points to be on the plane (scale by their normal part):
+    points = points / (points @ plane_normal)[:,None]
+    return points, plane_normal
 
 
 def convex_hull_method(polyhedron, rays,
                        report_ray, report_yes,
-                       status_info, qinfo):
+                       status_info, qinfo,
+                       project_to_plane=False):
 
     # Setup cache to avoid multiple computation:
     yes = 0
@@ -63,6 +87,11 @@ def convex_hull_method(polyhedron, rays,
     # Make sure the dataset lives in a full dimensional subspace
     subspace = LinearSubspace.from_rowspace(rays)
     points = subspace.into(rays)
+
+    if project_to_plane:
+        # rescale points and project them to the plane x₀+x₁+… = 1
+        plane_normal = subspace.into(np.ones(subspace.onb.shape[1]))
+        points, plane_normal = scale_to_plane(points, plane_normal)
 
     points = np.vstack((np.zeros(subspace.dim), points))
 
@@ -100,7 +129,10 @@ def convex_hull_method(polyhedron, rays,
                 if seen_ray(ray):
                     continue
                 report_ray(ray)
-                new_points.append(subspace.into(ray))
+                point = subspace.into(ray)
+                if project_to_plane:
+                    point /= point @ plane_normal
+                new_points.append(point)
 
         if new_points:
             status_info(total, total, yes)
@@ -147,4 +179,5 @@ def main(app):
                  partial(print_qhull, info))
 
     app.start_timer()
-    convex_hull_method(app.polyhedron, rays, *callbacks)
+    convex_hull_method(app.polyhedron, rays, *callbacks,
+                       project_to_plane=app.opts['--plane'])

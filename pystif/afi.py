@@ -2,7 +2,7 @@
 Project convex cone to subspace by an adjacent facet iteration method.
 
 Usage:
-    afi INPUT -s SUBSPACE [-o OUTPUT] [-l LIMIT] [-y SYMMETRIES] [-r NUM] [-q]... [-p] [-i FILE]
+    afi INPUT -s SUBSPACE [-o OUTPUT] [-l LIMIT] [-y SYMMETRIES] [-r NUM] [-q]... [-p] [-i FILE] [-P]
 
 Options:
     -o OUTPUT, --output OUTPUT      Set output file for solution
@@ -14,6 +14,8 @@ Options:
     -q, --quiet                     Show less output
     -p, --pretty                    Pretty print output inequalities
     -i FILE, --info FILE            Print short summary to file (YAML)
+    -P, --plane                     Perform convex hull in the (1,1,…,1)∙x=0
+                                    plane. This may be a performance gain.
 """
 
 from functools import partial
@@ -119,7 +121,8 @@ class AFI:
     Performs AFI (Adjacent Facet Iteration) and stores the result.
     """
 
-    def __init__(self, polyhedron, symmetries, recursions, quiet_rank, info):
+    def __init__(self, polyhedron, symmetries, recursions, quiet_rank, info,
+                 project=False):
         self.polyhedron = polyhedron
         self.symmetries = symmetries
         self.recursions = recursions
@@ -132,6 +135,7 @@ class AFI:
         # for info summary:
         self._vertices = PointSet()
         self._num_chm = 0
+        self._project = project
 
     def solve(self):
         """Iterate over facet normal vectors of the overall polyhedron."""
@@ -181,7 +185,8 @@ class AFI:
                      partial(print_status, sub_info),
                      partial(print_qhull, sub_info))
         poly = body.polyhedron
-        ineqs, _ = convex_hull_method(poly, poly.basis(), *callbacks)
+        ineqs, _ = convex_hull_method(poly, poly.basis(), *callbacks,
+                                      self._project)
         for ineq in ineqs:
             yield self.get_subface_instance(body, ineq), ineq
         body.solved = True
@@ -331,7 +336,8 @@ def main(app):
     quiet_rank = app.subdim-2 if app.quiet else 0
     info = app.info(1)
     app.start_timer()
-    afi = AFI(app.polyhedron, app.symmetries, app.recursions, quiet_rank, info)
+    afi = AFI(app.polyhedron, app.symmetries, app.recursions, quiet_rank, info,
+              app.opts['--plane'])
     for facet in afi.solve():
         app.output(facet)
     info()
