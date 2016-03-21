@@ -109,7 +109,10 @@ def single_pass(task, method, *cmd_args):
             *cmd_args
         ]
         print("\nCommand: {}".format(argv), file=log)
+        start = time.time()
         proc = subprocess.run(argv, stdout=log, stderr=err)
+        end = time.time()
+        delta = end - start
         print("\nFinished in: {} seconds".format(delta), file=log)
     if proc.returncode != 0:
         return None
