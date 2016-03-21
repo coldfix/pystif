@@ -33,6 +33,7 @@ The outline of the algorithm is as follows:
 """
 
 from functools import partial
+import random
 
 import numpy as np
 import scipy.spatial
@@ -106,7 +107,15 @@ def convex_hull_method(polyhedron, rays,
             status_info(total, total, yes)
             points = np.vstack((points, new_points))
             qinfo(len(points))
-            hull.add_points(new_points, restart=True)
+            try:
+                hull.add_points(new_points, restart=True)
+            except scipy.spatial.qhull.QhullError:
+                # try to recover Qhull errors that randomly occur by shuffling
+                # the input:
+                points = list(points)
+                random.shuffle(points)
+                points = np.array(points)
+                hull = scipy.spatial.ConvexHull(points, incremental=True)
         else:
             break
 
