@@ -1,0 +1,6 @@
+cols: ['H(A,B,C)', 'H(A,B,c)', 'H(A,b,C)', 'H(A,b,c)', 'H(a,B,C)', 'H(a,B,c)', 'H(a,b,C)',
+  'H(a,b,c)']
+constr: CGLMP
+expr: []
+rows: []
+results:
