@@ -24,6 +24,7 @@ import numpy as np
 from .core.app import application
 from .core.io import StatusInfo
 from .core.util import VectorMemory, PointSet
+from .core.linalg import matrix_rank
 from .chm import convex_hull_method, print_status, print_qhull
 
 
@@ -284,10 +285,25 @@ class AFI:
 
     def summary(self):
         # TODO: make this work in the presence of symmetries!
-        # TODO: some non-vertices counted?
-        facets = self.whole.subfaces
+        facets = [f for f in self.whole.subfaces if f.visited]
         ridges = set()
-        vertices = self._vertices
+        facetv = VectorMemory()
+        for f in facets:
+            symmetries = list(self.symmetries(self.whole.normals[f]))
+            f.multiplicity = len(symmetries)
+            facetv.add(*symmetries)
+        facetv = np.array(list(facetv.seen))
+        dim = self.full_rank-1
+        def is_vertex(v):
+            active = [f for f in facetv if np.isclose(f @ v, 0)]
+            return (len(active) >= dim and
+                    matrix_rank(active) >= dim)
+        vertices = VectorMemory()
+        for v in self._vertices:
+            v = np.array(v)
+            if is_vertex(v):
+                vertices.add(*list(self.symmetries(v)))
+        vertices = np.array(list(vertices.seen))
         for f in facets:
             for r in f.subfaces:
                 if r in ridges:
