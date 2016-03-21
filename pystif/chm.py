@@ -45,82 +45,110 @@ from .core.geom import LinearSubspace
 from .core.util import VectorMemory
 
 
+def ConvexHull(points, *, retries=5):
+    """
+    Wrapper for scipy.spatial.ConvexHull. The wrapper catches the occasional
+    QhullError and tries to recover multiple times.
+    """
+    points = list(points)
+    # Compute the convex hull. If it fails, try to recover a few times by
+    # mixing up the input:
+    for i in range(retries):
+        try:
+            return scipy.spatial.ConvexHull(points)
+        except scipy.spatial.qhull.QhullError:
+            random.shuffle(points)
+    # one last time - but this time let exceptions through:
+    return scipy.spatial.ConvexHull(points)
+
+
+class CHM:
+
+    """
+    Driver for the CHM algorithm.
+    """
+
+    def __init__(self, rays, qinfo, *, retries=5):
+        self.qinfo = qinfo
+        self.retries = retries
+        # Setup cache to avoid multiple computation:
+        self.seen_face = VectorMemory()
+        self.seen_ray = VectorMemory()
+        self.seen_ray.add(*rays)
+        # Make sure the dataset lives in a full dimensional subspace
+        self.subspace = LinearSubspace.from_rowspace(rays)
+        self.all_rays = []
+        self.new_rays = [np.zeros(self.subspace.dim)]
+        self.new_rays.extend(self.subspace.into(rays))
+
+    def add(self, ray):
+        """Add another ray to the list of extreme rays."""
+        if self.seen_ray(ray):
+            return False
+        self.new_rays.append(self.subspace.into(ray))
+        return True
+
+    def compute(self):
+        """Compute the convex hull with the newly added points."""
+        # Prepend new rays, such that the set of the first few items is always
+        # different. This may be important to avoid running repeatedly into
+        # the same QhullError while retaining the list order:
+        self.all_rays = self.new_rays + self.all_rays
+        self.new_rays = []
+        self.qinfo(len(self.all_rays))
+        return ConvexHull(self.all_rays, retries=self.retries)
+
+    def filter(self, qhull_equations):
+        for face in qhull_equations:
+            # Filter non-conal faces
+            if abs(face[-1]) > 1e-5:
+                continue
+            # The following is an empirical minus sign. I didn't find anything
+            # on the qhull documentation as to how the equations are oriented,
+            # but apparently points x inside the convex hull are described by
+            # ``face ∙ (x,1) ≤ 0``
+            face = -face[:-1]
+            face = self.subspace.back(face)
+            face = scale_to_int(face)
+            if not self.seen_face(face):
+                yield face
+
+
 def convex_hull_method(polyhedron, rays,
                        report_ray, report_yes,
                        status_info, qinfo):
 
-    # Setup cache to avoid multiple computation:
-    yes = 0
-    seen = VectorMemory()
-    seen_ray = VectorMemory()
-    for ray in rays:
-        seen_ray(ray)
+    # List of (non-trivial) facets
+    result = []
 
     # Report the trivial facets:
     for face in polyhedron.nullspace_int():
         report_yes(face)
         report_yes(-face)
 
-    # Make sure the dataset lives in a full dimensional subspace
-    subspace = LinearSubspace.from_rowspace(rays)
-    points = subspace.into(rays)
+    chm = CHM(rays, qinfo)
 
-    points = np.vstack((np.zeros(subspace.dim), points))
+    while chm.new_rays:
+        hull = chm.compute()
+        total = len(hull.equations)
+        status_info(0, total, len(result))
 
-    qinfo(len(points))
-    hull = scipy.spatial.ConvexHull(points, incremental=True)
-
-    result = []
-
-    while True:
-        new_points = []
-        faces = hull.equations
-        total = faces.shape[0]
-        for i, face in enumerate(faces):
-            if abs(face[-1]) > 1e-5:
-                continue
-            status_info(i, total, yes)
-
-            # The following is an empirical minus sign. I didn't find anything
-            # on the qhull documentation as to how the equations are oriented,
-            # but apparently points x inside the convex hull are described by
-            # ``face ∙ (x,1) ≤ 0``
-            face = -face[:-1]
-            face = subspace.back(face)
-            face = scale_to_int(face)
-
-            if seen(face):
-                continue
+        for i, face in enumerate(chm.filter(hull.equations)):
+            status_info(i, total, len(result))
 
             if polyhedron.is_face(face):
-                yes += 1
+                # found facet:
                 report_yes(face)
                 result.append(face)
             else:
+                # not valid - search a violating extreme point:
                 ray = polyhedron.search(face)
-                if seen_ray(ray):
-                    continue
-                report_ray(ray)
-                new_points.append(subspace.into(ray))
+                if chm.add(ray):
+                    report_ray(ray)
 
-        if new_points:
-            status_info(total, total, yes)
-            points = np.vstack((points, new_points))
-            qinfo(len(points))
-            try:
-                hull.add_points(new_points, restart=True)
-            except scipy.spatial.qhull.QhullError:
-                # try to recover Qhull errors that randomly occur by shuffling
-                # the input:
-                points = list(points)
-                random.shuffle(points)
-                points = np.array(points)
-                hull = scipy.spatial.ConvexHull(points, incremental=True)
-        else:
-            break
+        status_info(total, total, len(result))
 
-    status_info(total, total, yes)
-    return result, subspace
+    return result, chm.subspace
 
 
 def print_status(print_, i, total, yes):
