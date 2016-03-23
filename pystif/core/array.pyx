@@ -82,11 +82,11 @@ def scale_to_min(v, double threshold=1e-10):
     return v/min
 
 
-def scale_to_int(v, double threshold=1e-10, int max_factor=1000):
+def scale_to_int(v, double threshold=1e-7, int max_factor=1000):
     """Scale v such that it has only integer components."""
     v = scale_to_min(v, threshold)
     cdef double c, mc, r, d, f
-    cdef int m = 1
+    cdef long m = 1
     for c in double_view(v):
         mc = m*c
         r = round(mc)
