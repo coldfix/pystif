@@ -130,11 +130,11 @@ class Application:
             self.report_facet(-face)
 
     @cachedproperty
-    def quiet(self):
-        return self.opts['--quiet']
+    def verbosity(self):
+        return self.opts['--verbose'] - self.opts['--quiet']
 
     def info(self, level=0):
-        if self.quiet > level:
+        if level + self.verbosity < 0:
             return StatusInfo(open(os.devnull, 'w'))
         else:
             return StatusInfo()

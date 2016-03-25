@@ -3,7 +3,7 @@ Randomized facet discovery - search for random facets of the projection of a
 polyhedron.
 
 Usage:
-    rfd INPUT -s SUBSPACE [-o OUTPUT] [-l LIMIT] [-y SYMMETRIES] [-r NUM] [-q]... [-p] [-d DIM] [-i FILE] [-m REC]
+    rfd INPUT -s SUBSPACE [-o OUTPUT] [-l LIMIT] [-y SYMMETRIES] [-n NUM] [-q]... [-v]... [-p] [-d DIM] [-i FILE] [-r NUM]
 
 Options:
     -o OUTPUT, --output OUTPUT      Set output file for solution
@@ -13,13 +13,14 @@ Options:
     -f FACES, --faces FACES         File with known faces of the projected
                                     polyhedron
     -y SYM, --symmetry SYM          Symmetry group generators
-    -r NUM, --runs NUM              Number of runs [default: 100]
+    -n NUM, --num-runs NUM          Number of runs [default: 100]
     -q, --quiet                     Show less output
+    -v, --verbose                   Show more output
     -p, --pretty                    Pretty print output inequalities
     -d DIM, --slice-dim DIM         Sub-slice dimension [default: 0]
     -i FILE, --info FILE            Print short summary to file (YAML)
 
-    -m REC, --recursions REC        Recoursions [default: 5]
+    -r NUM, --recursions NUM        Recursions [default: 5]
 """
 
 import gc
@@ -69,14 +70,12 @@ class AFI2(AFI):
         return ()
 
 
-def rfd2(polyhedron, symmetries, recursions, found_cb, runs, status, info, noise_level):
+def rfd2(polyhedron, symmetries, recursions, found_cb, runs, status, info, verbosity):
 
     face = np.ones(polyhedron.dim)
     seen = VectorMemory()
 
-    quiet_rank = polyhedron.dim - noise_level
-
-    afi = AFI2(polyhedron, symmetries, recursions, quiet_rank, info)
+    afi = AFI2(polyhedron, symmetries, recursions, info, verbosity)
 
     for i in range(runs):
         status(i, runs, seen)
@@ -141,7 +140,7 @@ def rss(system, polyhedron, symmetries, found_cb, runs, slice_dim, status, sub_i
 
 
 def rfd_status(info, i, total, seen):
-    info("RFD iteration {}/{}, discovered facets: {}".format(
+    info("RFD iteration {}/{}, discovered facets: {}\n".format(
         str(i).rjust(len(str(total))),
         total,
         len(seen),
@@ -150,9 +149,9 @@ def rfd_status(info, i, total, seen):
 
 @application
 def main(app):
-    runs = int(app.opts['--runs'])
+    runs = int(app.opts['--num-runs'])
     slice_dim = int(app.opts['--slice-dim'])
-    status = partial(rfd_status, app.info(1))
+    status = partial(rfd_status, app.info(2))
 
     app.report_nullspace()
 
@@ -163,6 +162,6 @@ def main(app):
     else:
         recursions = int(app.opts['--recursions'])
         #rfd(app.polyhedron, app.symmetries, app.output, runs, status)
-        noise = 1 - app.quiet
-        rfd2(app.polyhedron, app.symmetries, recursions, app.output, runs, status, app.info(1),
-             noise)
+        app.verbosity += 1
+        rfd2(app.polyhedron, app.symmetries, recursions, app.output, runs, status, app.info,
+             app.verbosity)

@@ -2,7 +2,7 @@
 Project convex cone to subspace by an adjacent facet iteration method.
 
 Usage:
-    afi INPUT -s SUBSPACE [-o OUTPUT] [-l LIMIT] [-y SYMMETRIES] [-r NUM] [-q]... [-p] [-i FILE]
+    afi INPUT -s SUBSPACE [-o OUTPUT] [-l LIMIT] [-y SYMMETRIES] [-r NUM] [-q]... [-v]... [-p] [-i FILE]
 
 Options:
     -o OUTPUT, --output OUTPUT      Set output file for solution
@@ -10,8 +10,9 @@ Options:
     -l LIMIT, --limit LIMIT         Add constraints H(i)≤LIMIT for i<SUBDIM
                                     [default: 1]
     -y SYM, --symmetry SYM          Symmetry group generators
-    -r NUM, --recursions NUM        Number of AFI recursions [default: 0]
+    -r NUM, --recursions NUM        Number of AFI recursions [default: 1]
     -q, --quiet                     Show less output
+    -v, --verbose                   Show more output
     -p, --pretty                    Pretty print output inequalities
     -i FILE, --info FILE            Print short summary to file (YAML)
 """
@@ -22,8 +23,8 @@ import os
 import numpy as np
 
 from .core.app import application
-from .core.io import StatusInfo
 from .core.util import VectorMemory, PointSet
+from .core.linalg import matrix_rank
 from .chm import convex_hull_method, print_status, print_qhull
 
 
@@ -119,13 +120,14 @@ class AFI:
     Performs AFI (Adjacent Facet Iteration) and stores the result.
     """
 
-    def __init__(self, polyhedron, symmetries, recursions, quiet_rank, info):
+    def __init__(self, polyhedron, symmetries, recursions, info, verbosity):
         self.polyhedron = polyhedron
         self.symmetries = symmetries
         self.recursions = recursions
-        self.quiet_rank = quiet_rank
+        self._verbosity = verbosity
+        self._info_file = info
         self.full_rank = polyhedron.rank()
-        self._info = info
+        self._info = info()
         self.whole = Face(polyhedron)
         self.faces = [[] for i in range(self.full_rank)]
         self.faces[-1].append(self.whole)
@@ -172,16 +174,14 @@ class AFI:
     def _chm(self, body):
         """Iterate over all subfaces of an arbitrary face using CHM."""
         self._num_chm += 1
-        if body.rank <= self.quiet_rank:
-            sub_info = StatusInfo(open(os.devnull, 'w'))
-        else:
-            sub_info = self._info
+        sub_info = self._info_file(body.rank - self.full_rank)
         callbacks = (self._vertices.add,
                      lambda facet: None,
                      partial(print_status, sub_info),
                      partial(print_qhull, sub_info))
         poly = body.polyhedron
-        ineqs, _ = convex_hull_method(poly, poly.basis(), *callbacks)
+        ineqs, _ = convex_hull_method(poly, poly.basis(), *callbacks,
+                                      symmetries=self.symmetries)
         for ineq in ineqs:
             yield self.get_subface_instance(body, ineq), ineq
         body.solved = True
@@ -214,13 +214,13 @@ class AFI:
         """
         if face.solved:
             return self.init_face(face)
-        rank = face.rank-1
-        self.info(rank, "Search rank {} facet", rank)
+        rank = face.rank
+        self.info(rank, "Search facet of {}D face", rank)
         # TODO: obtain chain of subfaces of dimensions 1 to N in single sweep
         guess = np.ones(self.polyhedron.dim)
         normal = face.polyhedron.refine_to_facet(guess)
         facet = self.get_subface_instance(face, normal)
-        self.info(rank, "Search rank {} facet [done]\n", rank)
+        self.info(rank, "Search facet of {}D face [done]\n", rank)
         return facet, normal
 
     def get_adjacent_face(self, sup, face, sub):
@@ -272,7 +272,7 @@ class AFI:
         return subface
 
     def info(self, rank, text, *args, **kwargs):
-        if rank >= self.quiet_rank:
+        if rank - self.full_rank + self._verbosity >= 0:
             self._info(text.format(*args, **kwargs))
 
     def status_info(self, queue, equations, i, rank):
@@ -284,10 +284,25 @@ class AFI:
 
     def summary(self):
         # TODO: make this work in the presence of symmetries!
-        # TODO: some non-vertices counted?
-        facets = self.whole.subfaces
+        facets = [f for f in self.whole.subfaces if f.visited]
         ridges = set()
-        vertices = self._vertices
+        facetv = VectorMemory()
+        for f in facets:
+            symmetries = list(self.symmetries(self.whole.normals[f]))
+            f.multiplicity = len(symmetries)
+            facetv.add(*symmetries)
+        facetv = np.array(list(facetv.seen))
+        dim = self.full_rank-1
+        def is_vertex(v):
+            active = [f for f in facetv if np.isclose(f @ v, 0)]
+            return (len(active) >= dim and
+                    matrix_rank(active) >= dim)
+        vertices = VectorMemory()
+        for v in self._vertices:
+            v = np.array(v)
+            if is_vertex(v):
+                vertices.add(*list(self.symmetries(v)))
+        vertices = np.array(list(vertices.seen))
         for f in facets:
             for r in f.subfaces:
                 if r in ridges:
@@ -328,11 +343,11 @@ def is_face_identical(a, b):
 @application
 def main(app):
     app.report_nullspace()
-    quiet_rank = app.subdim-2 if app.quiet else 0
-    info = app.info(1)
     app.start_timer()
-    afi = AFI(app.polyhedron, app.symmetries, app.recursions, quiet_rank, info)
+    app.verbosity += 1
+    afi = AFI(app.polyhedron, app.symmetries, app.recursions, app.info,
+              app.verbosity)
     for facet in afi.solve():
         app.output(facet)
-    info()
+    afi.info(afi.full_rank, "")
     app.summary = afi.summary

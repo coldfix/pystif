@@ -102,11 +102,13 @@ def plane_basis(v):
     """
     Get the (orthonormal) basis vectors making up the orthogonal complement of
     the plane defined by v∙x = 0.
+
+    The basis vectors are returned as row vectors.
     """
     v = np.atleast_2d(v)
     a = np.hstack((v.T , np.eye(v.shape[1])))
     q, r = np.linalg.qr(a)
-    return q[:,1:]
+    return q[:,1:].T
 
 
 def plane_normal(v):

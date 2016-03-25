@@ -18,11 +18,11 @@ symm="Aa <> aA; AaBb <> BbAa"
 # use different elimination methods:
 time chm init.txt -s "$subs" -o fin-chm.txt
 time fme init.txt -s "$subs" -o fin-fme.txt
-time afi init.txt -s "$subs" -o fin-afi.txt -q -r1
-time afi init.txt -s "$subs" -o fin-sym.txt -q -r1  -y "$symm"
+time afi init.txt -s "$subs" -o fin-afi.txt -q
+time afi init.txt -s "$subs" -o fin-sym.txt -q -y "$symm"
 
-time rfd init.txt -s "$subs" -o fin-rfd.txt -q -y "$symm"
-time rfd init.txt -s "$subs" -o fin-rfd.txt -q -y "$symm" -d 7
+time rfd init.txt -s "$subs" -o fin-rfd.txt -qq -y "$symm"
+time rfd init.txt -s "$subs" -o fin-rfd.txt -qq -y "$symm" -d 7
 
 # consistency check
 equiv init.txt $data/init-bell2x2.txt
