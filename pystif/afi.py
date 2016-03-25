@@ -10,7 +10,7 @@ Options:
     -l LIMIT, --limit LIMIT         Add constraints H(i)≤LIMIT for i<SUBDIM
                                     [default: 1]
     -y SYM, --symmetry SYM          Symmetry group generators
-    -r NUM, --recursions NUM        Number of AFI recursions [default: 0]
+    -r NUM, --recursions NUM        Number of AFI recursions [default: 1]
     -q, --quiet                     Show less output
     -v, --verbose                   Show more output
     -p, --pretty                    Pretty print output inequalities
