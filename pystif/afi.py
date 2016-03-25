@@ -182,7 +182,8 @@ class AFI:
                      partial(print_status, sub_info),
                      partial(print_qhull, sub_info))
         poly = body.polyhedron
-        ineqs, _ = convex_hull_method(poly, poly.basis(), *callbacks)
+        ineqs, _ = convex_hull_method(poly, poly.basis(), *callbacks,
+                                      symmetries=self.symmetries)
         for ineq in ineqs:
             yield self.get_subface_instance(body, ineq), ineq
         body.solved = True

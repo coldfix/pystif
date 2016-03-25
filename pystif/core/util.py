@@ -100,6 +100,10 @@ class VectorMemory:
     def __init__(self):
         self.seen = set()
 
+    def __contains__(self, v):
+        v = tuple(scale_to_int(v))
+        return v in self.seen
+
     def __call__(self, v):
         v = tuple(scale_to_int(v))
         if v in self.seen:

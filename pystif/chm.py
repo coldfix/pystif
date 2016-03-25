@@ -62,30 +62,37 @@ def ConvexHull(points, *, retries=5):
     return scipy.spatial.ConvexHull(points)
 
 
+def NoSymmetry(v):
+    return [v]
+
+
 class CHM:
 
     """
     Driver for the CHM algorithm.
     """
 
-    def __init__(self, rays, qinfo, *, retries=5):
+    def __init__(self, rays, qinfo, *, retries=5, symmetries=None):
         self.qinfo = qinfo
         self.retries = retries
+        self.symmetries = symmetries or NoSymmetry
         # Setup cache to avoid multiple computation:
         self.seen_face = VectorMemory()
         self.seen_ray = VectorMemory()
-        self.seen_ray.add(*rays)
         # Make sure the dataset lives in a full dimensional subspace
         self.subspace = LinearSubspace.from_rowspace(rays)
         self.all_rays = []
         self.new_rays = [np.zeros(self.subspace.dim)]
-        self.new_rays.extend(self.subspace.into(rays))
+        for r in rays:
+            self.add(r)
 
     def add(self, ray):
         """Add another ray to the list of extreme rays."""
-        if self.seen_ray(ray):
+        if ray in self.seen_ray:
             return False
-        self.new_rays.append(self.subspace.into(ray))
+        for r in self.symmetries(ray):
+            if self.subspace.contains(r) and not self.seen_ray(r):
+                self.new_rays.append(self.subspace.into(r))
         return True
 
     def compute(self):
@@ -116,7 +123,8 @@ class CHM:
 
 def convex_hull_method(polyhedron, rays,
                        report_ray, report_yes,
-                       status_info, qinfo):
+                       status_info, qinfo,
+                       *, symmetries=None):
 
     # List of (non-trivial) facets
     result = []
@@ -126,7 +134,7 @@ def convex_hull_method(polyhedron, rays,
         report_yes(face)
         report_yes(-face)
 
-    chm = CHM(rays, qinfo)
+    chm = CHM(rays, qinfo, symmetries=symmetries)
 
     while chm.new_rays:
         hull = chm.compute()
@@ -184,4 +192,5 @@ def main(app):
                  partial(print_qhull, info))
 
     app.start_timer()
-    convex_hull_method(app.polyhedron, rays, *callbacks)
+    convex_hull_method(app.polyhedron, rays, *callbacks,
+                       symmetries=app.symmetries)

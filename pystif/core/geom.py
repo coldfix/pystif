@@ -337,3 +337,7 @@ class LinearSubspace:
             self.normals,
             normals,
         )))
+
+    def contains(self, point):
+        """Check if a point is element of the subspace."""
+        return np.allclose(point @ self.normals.T, 0)
