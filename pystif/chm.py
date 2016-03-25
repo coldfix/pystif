@@ -2,7 +2,7 @@
 Find projection of a convex cone to a lower dimensional subspace.
 
 Usage:
-    chm INPUT -s SUBSPACE [-o OUTPUT] [-x XRAYS] [-l LIMIT] [-r] [-q] [-p] [-i FILE]
+    chm INPUT -s SUBSPACE [-o OUTPUT] [-x XRAYS] [-l LIMIT] [-r] [-q]... [-v]... [-p] [-i FILE]
 
 Options:
     -o OUTPUT, --output OUTPUT      Save facets of projected cone
@@ -13,6 +13,7 @@ Options:
     -r, --resume                    Resume using previously computed rays
                                     (must be fully dimensional!)
     -q, --quiet                     Less status output
+    -v, --verbose                   Show more output
     -p, --pretty                    Pretty print output inequalities
     -i FILE, --info FILE            Print short summary to file (YAML)
 
@@ -102,7 +103,7 @@ class CHM:
         # the same QhullError while retaining the list order:
         self.all_rays = self.new_rays + self.all_rays
         self.new_rays = []
-        self.qinfo(len(self.all_rays))
+        self.qinfo(len(self.all_rays), self.subspace.dim)
         return ConvexHull(self.all_rays, retries=self.retries)
 
     def filter(self, qhull_equations):
@@ -162,14 +163,14 @@ def convex_hull_method(polyhedron, rays,
 def print_status(print_, i, total, yes):
     """Print status."""
     l = len(str(total))
-    print_("CHM Progress: {}/{} ({} facets)"
+    print_("  -> checking hull {}/{} ({} facets)"
            .format(str(i).rjust(l), total, yes))
     if i == total:
         print_()
 
 
-def print_qhull(print_, num_points):
-    print_("  > qhull on {} rays\n".format(num_points))
+def print_qhull(print_, num_points, dim):
+    print_("CHM: computing {}D hull of {} rays…\n".format(dim, num_points))
 
 
 @application

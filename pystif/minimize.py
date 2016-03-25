@@ -2,13 +2,14 @@
 Minimize a system of inequalities.
 
 Usage:
-    minimize INPUT [-o OUTPUT] [-e] [-q] [-p]
+    minimize INPUT [-o OUTPUT] [-e] [-q]... [-v]... [-p]
 
 Options:
     -o OUTPUT, --output OUTPUT      Write final (minimized) system to this file
     -a, --append                    Open output file in append mode
     -e, --el-ineqs                  Extend system with elemental inequalities
     -q, --quiet                     No status output (otherwise goes to STDERR)
+    -v, --verbose                   Show more output
     -p, --pretty                    Pretty print output inequalities
 """
 
@@ -43,6 +44,6 @@ class VerboseMinimize(MinimizeStatusInfo, Minimize):
 
 @application
 def main(app):
-    m = Minimize() if app.quiet else VerboseMinimize()
+    m = Minimize() if app.verbosity >= 0 else VerboseMinimize()
     for row in m.minimize(app.system.matrix):
         app.output(row)
