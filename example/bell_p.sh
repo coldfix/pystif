@@ -20,7 +20,7 @@ symm="Aa <> aA; AaBb <> BbAa; BbCc <> CcBb"
 makesys -b "A a B b C c" -o init.txt
 
 # methods other than AFI are too slow...
-time afi init.txt -s "$subs" -o fin-sym.txt -q -y "$symm"
+time afi init.txt -s "$subs" -o fin-sym.txt -y "$symm" -r 2 -v
 
 # consistency check
 equiv init.txt $data/init-bell3x2s.txt
