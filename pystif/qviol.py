@@ -408,7 +408,7 @@ def load_summary(filename):
     with open(filename) as f:
         data = yaml.safe_load(f)
     results = data['results'] or ()
-    indices = sorted({r['i_row'] for r in results})
+    indices = sorted({int(r['i_row']) for r in results})
     rows = [data['rows'][i] for i in indices]
     cols = data['cols']
     return indices, rows, cols
@@ -488,7 +488,7 @@ def main(app):
 
             state, bases = system.unpack(result.x)
             yaml_dump([{
-                'i_row': i,
+                'i_row': int(i),
                 'f_objective': result.fun,
                 'f_constraints': fconstr,
                 'opt_params': result.x,
