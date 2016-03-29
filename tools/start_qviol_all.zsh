@@ -7,11 +7,10 @@ data=example/data
 
 function start_qviol() {
     conedim=$1
-    suffix=$2
-    subdims=$3
-    constrs=(${@:4})
+    subdims=$2
+    constrs=(${@:3})
 
-    facets=$data/final-bell3x2-$conedim$suffix.txt
+    facets=$data/final-bell3x2-$conedim.txt
     prefix=$data/qviol-bell3x2-$conedim-$subdims
     noconstr=$prefix-none.yml
 
@@ -24,17 +23,16 @@ function start_qviol() {
     done
 }
 
-start_qviol 26D -p2f 333 CHSHE CGLMP
-start_qviol 26D -p2f 222 CHSHE CHSH SEP
+if [[ -n $@ ]]; then
+    dims=($@)
+else
+    dims=(26D 18D 14D 12D 08D)
+fi
 
-start_qviol 18D -rfd 333 CHSHE CGLMP
-start_qviol 18D -rfd 222 CHSHE CHSH SEP
-
-start_qviol 12D '' 333 CHSHE CGLMP
-start_qviol 12D '' 222 CHSHE CHSH SEP
-
-start_qviol 08D '' 333 CHSHE CGLMP
-start_qviol 08D '' 222 CHSHE CHSH SEP
+for dim in $dims; do
+    start_qviol $dim 333 CHSHE CGLMP
+    start_qviol $dim 222 CHSHE CHSH SEP
+done
 
 # ts qviol $data/final-bell3x2-08D.txt -d 222 -o $data/qviol-bell3x2-08D-222-none.yml
 # ts qviol $data/final-bell3x2-08D.txt -d 333 -o $data/qviol-bell3x2-08D-333-none.yml
