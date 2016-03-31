@@ -416,7 +416,7 @@ def load_summary(filename):
 
 def show_summary(opts):
     indices, rows, cols = load_summary(opts['INPUT'])
-    print("rows:", ",".join(map(str, indices)))
+    print(len(rows), "rows:", ",".join(map(str, indices)))
     for r in rows:
         print(format_human_readable(r, cols))
 
