@@ -1,6 +1,6 @@
 cols: ['H(A,B)', 'H(A,b)', 'H(a,B)', 'H(a,b)', 'H(A,C)', 'H(A,c)', 'H(a,C)', 'H(a,c)',
   'H(B,C)', 'H(B,c)', 'H(b,C)', 'H(b,c)']
-constr: SEP
+constr: PPT
 expr: ["0 \u2264 3 H(A,B) + 2 H(B,c) + H(A,C) + H(a,C) + H(a,c) + H(b,C) + H(b,c)\
     \ - 4 H(A,c) - 2 H(B,C) - H(a,b)", "0 \u2264 2 H(A,B) + 2 H(B,c) + H(A,C) + H(a,C)\
     \ + H(a,c) - 3 H(A,c) - H(a,B) - H(B,C)", "0 \u2264 H(A,B) + H(a,B) + H(a,b) +\
