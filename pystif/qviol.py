@@ -150,6 +150,10 @@ class TripartiteBellScenario(CompositeQuantumSystem):
         self.cols = system.columns
         sg = SymmetryGroup.load(self.symm, self.cols)
         self.rows = [g[0] for g in group_by_symmetry(sg, system.matrix)]
+        # If 'mixing' is enabled the parameter list is extended by an
+        # additional mixing probability with the unit matrix. This induces
+        # states to be returned as density matrices rather than vectors:
+        self.mixing = False
 
     def random(self):
         # phases are absorbed into Phi_R:
@@ -158,10 +162,15 @@ class TripartiteBellScenario(CompositeQuantumSystem):
         num_unitary_params = (sum(x**2 for x in self.subdim) +
                               sum(x**2 for x in self.subdim[1:]))
         u = np.random.uniform(0, 2*pi, size=num_unitary_params)
+        if self.mixing:
+            return np.hstack((s, u, 0))
         return np.hstack((s, u))
 
     def unpack(self, params):
         l = list(params)
+
+        if self.mixing:
+            p_mix = l.pop()
 
         D = np.diag(range(self.dim))
         U = [[np.eye(self.subdim[0], dtype=complex),
@@ -172,6 +181,11 @@ class TripartiteBellScenario(CompositeQuantumSystem):
         #M = list(zip(M[::2], M[1::2]))
 
         state = to_quantum_state(to_unit_vector(l).reshape(self.dim, 2))
+
+        if self.mixing:
+            state = ((1-p_mix) * projector(state) +
+                     p_mix * np.eye(self.dim) / self.dim)
+
         return state, U
 
     def realize(self, params):
@@ -479,6 +493,7 @@ def main(app):
 
     for _, (i, expr) in product(range(num_runs), enumerate(system.rows)):
 
+        system.mixing = False
         result = scipy.optimize.minimize(
             system.violation, system.random(),
             (expr,), constraints=constr)
@@ -514,12 +529,15 @@ def main(app):
             def retain_objective(params):
                 return -(system.violation(params, expr) - 0.8 * objective)
 
+            system.mixing = True
             result = scipy.optimize.minimize(
-                constraint_violation, params,
-                constraints={
-                    'type': 'ineq',
-                    'fun': retain_objective,
-                })
+                constraint_violation, np.hstack((params, 0.001)),
+                constraints=[
+                    {'type': 'ineq', 'fun': retain_objective},
+                    # Constraint the mixing probability 0 ≤ p ≤ 1:
+                    {'type': 'ineq', 'fun': lambda params: params[-1]},
+                    {'type': 'ineq', 'fun': lambda params: 1-params[-1]},
+                ])
 
             params = result.x
             objective = system.violation(params, expr)

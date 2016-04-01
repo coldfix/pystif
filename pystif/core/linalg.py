@@ -224,6 +224,10 @@ def expectation_value(psi, M) -> complex:
     :param np.ndarray psi: vector m*1
     :param np.ndarray M: matrix m*m
     """
+    # Density matrix:
+    if psi.ndim == 2:
+        return np.trace(psi @ M)
+    # State vector:
     return dagger(psi) @ M @ psi
 
 
@@ -242,6 +246,9 @@ def projector(vec):
     """
     Return the projection matrix to the 1D space spanned by the given vector.
     """
+    # Nothing to do:
+    if vec.ndim == 2:
+        return vec
     vec = as_column_vector(vec)
     return vec @ dagger(vec)
 
