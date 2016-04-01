@@ -3,8 +3,8 @@
 # git commit:   822334c6e6da110acee4cebc4d07601c6f3265a2
 # running time:  7.442s wall, 7.270s user + 0.090s system = 7.360s CPU (98.9%)
 
-#:: _ H(a) H(b) H(a,b) H(c) H(a,c) H(b,c) H(a,b,c) H(d) H(a,d) H(b,d) H(a,b,d) H(c,d) H(a,c,d) H(b,c,d) H(a,b,c,d)
-#>> abcd<>bcda; abcd<>dcba
+#:: _ H(A) H(B) H(A,B) H(C) H(A,C) H(B,C) H(A,B,C) H(D) H(A,D) H(B,D) H(A,B,D) H(C,D) H(A,C,D) H(B,C,D) H(A,B,C,D)
+#>> ABCD<>BCDA; ABCD<>DCBA
 
 # Elimination order:
 #     18  20  19  19  21  22  21  22  27  28
