@@ -4,7 +4,7 @@ A simple vector class for representing sparse vectors on a dynamic domain.
 
 from collections import abc
 
-from .io import _name
+from .util import _name
 
 
 __all__ = [

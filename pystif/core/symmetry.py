@@ -7,8 +7,7 @@ from operator import add
 
 import numpy as np
 
-from .util import VectorMemory, scale_to_int
-from .io import _name, _varset
+from .util import VectorMemory, scale_to_int, _name, _varset
 
 
 def _all_unique(s):

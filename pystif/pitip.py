@@ -11,7 +11,7 @@ Options:
 import numpy as np
 
 from .core.app import application
-from .core.io import System, format_human_readable, varsort, column_varname_labels
+from .core.io import System, format_human_readable, column_varname_labels
 from .core.it import elemental_inequalities, elemental_forms
 
 

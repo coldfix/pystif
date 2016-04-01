@@ -18,10 +18,10 @@ import random
 import numpy as np
 
 from .core.app import application
-from .core.io import _name, System, column_varname_labels
+from .core.io import System, column_varname_labels
 from .core.lp import Problem
 from .core.symmetry import SymmetryGroup
-from .core.util import VectorMemory
+from .core.util import VectorMemory, _name
 from .core.it import elemental_inequalities
 from .core.geom import ConvexCone
 

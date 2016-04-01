@@ -80,7 +80,8 @@ import funcparserlib.lexer as fpll
 import funcparserlib.parser as fplp
 from funcparserlib.parser import maybe, skip, finished, pure
 
-from .io import column_varname_labels, _name, varsort
+from .util import _name, varsort
+from .io import column_varname_labels
 from .it import elemental_inequalities
 from .vector import Vector
 from .symmetry import VarPermutation
