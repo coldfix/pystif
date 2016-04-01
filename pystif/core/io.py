@@ -1,7 +1,6 @@
 from functools import partial
 from os import path
 import sys
-import re
 from collections import OrderedDict
 
 import numpy as np
@@ -9,31 +8,8 @@ import yaml
 
 from .array import format_vector
 from .lp import Problem
-from .util import VectorMemory
-
-
-def _varset(key):
-    if isinstance(key, (set,list,tuple,frozenset)):
-        return frozenset(key)
-    if key.startswith('H(') and key.endswith(')'):
-        return frozenset(re.split('[ ,]', key[2:-1]))
-    if key.startswith('_'):
-        return frozenset(key[1:])
-    raise ValueError("Unknown format.")
-
-
-def varsort(varnames):
-    return sorted(varnames, key=lambda s: (s.lower(), s))
-
-
-def _name(key):
-    try:
-        s = _varset(key)
-    except ValueError:
-        return key
-    if not s:
-        return '_'
-    return 'H(' + ','.join(varsort(s)) + ')'
+from .util import VectorMemory, _name
+from .symmetry import parse_symmetries, SymmetryGroup, group_by_symmetry
 
 
 def detect_prefix(s, prefix, on_prefix):
@@ -65,20 +41,36 @@ def read_system_from_file(file):
     return parse_text("\n".join(lines))
 
 
+def expand_symmetries(matrix, cols, symm):
+    if not symm:
+        return matrix
+    sg = SymmetryGroup.load(symm, cols)
+    seen = VectorMemory()
+    return np.array([v for r in matrix for v in sg(r)
+                     if not seen(v)])
+
+
 def read_table_from_file(file):
     comments = []
     contents = remove_comments(file, comments.append)
     matrix = np.loadtxt(contents, ndmin=2)
     cols = []
     symm = []
+    subs = []
     def add_cols(s):
         cols.extend(map(_name, s.split()))
     def add_symm(s):
-        from .symmetry import parse_symmetries
         symm.extend(parse_symmetries(s))
+    def add_subs(s):
+        spec = parse_symmetries(s)
+        symm.extend(spec)
+        subs.extend(spec)
     for line in comments:
-        detect_prefix(line.strip(), '::', add_cols)
-        detect_prefix(line.strip(), '>>', add_symm)
+        l = line.strip()
+        detect_prefix(l, '::', add_cols)
+        detect_prefix(l, '>>', add_symm)
+        detect_prefix(l, '~~', add_subs)
+    matrix = expand_symmetries(matrix, cols, subs)
     return matrix, cols or None, symm
 
 
@@ -204,7 +196,6 @@ class System:
         return bool(self.symmetries)
 
     def symmetry_group(self):
-        from .symmetry import SymmetryGroup
         return SymmetryGroup.load(self.symmetries, self.columns)
 
     def slice(self, columns, fill=False):
@@ -319,7 +310,6 @@ class SystemFile:
         self._started = True
 
     def pprint_symmetries(self, rows, short=False):
-        from .symmetry import SymmetryGroup, group_by_symmetry
         sg = SymmetryGroup.load(self.symm_spec, self.columns)
         groups = group_by_symmetry(sg, rows)
         representatives = [g[0] for g in groups]

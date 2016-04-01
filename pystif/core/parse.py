@@ -80,7 +80,8 @@ import funcparserlib.lexer as fpll
 import funcparserlib.parser as fplp
 from funcparserlib.parser import maybe, skip, finished, pure
 
-from .io import column_varname_labels, _name, varsort
+from .util import _name
+from .io import column_varname_labels
 from .it import elemental_inequalities
 from .vector import Vector
 from .symmetry import VarPermutation
@@ -261,7 +262,7 @@ class VarDecl(Statement):
     """
 
     def __init__(self, varnames: [str]):
-        self.varnames = varsort(varnames)
+        self.varnames = list(varnames)
         self.num_vars = len(varnames)
 
     def columns(self):
@@ -495,12 +496,13 @@ def var_g(n, sep=colon):
     # n: minimum number of parts
     if n == 0:
         return var_g(1) | v([])
-    return var_list + many(sep + var_list, n-1)   >> collapse
+    return var_set + many(sep + var_set, n-1)   >> collapse
 
 # information measures
-var_list    = many(identifier + Lo(','))            >> set
-conditional = L('|') + var_list | v(set())
-entropy     = L('H(') + var_list + conditional + L(')')     >> make_entropy
+var_list    = many(identifier + Lo(','))            >> list
+var_set     = var_list                              >> set
+conditional = L('|') + var_set | v(set())
+entropy     = L('H(') + var_set  + conditional + L(')')     >> make_entropy
 mutual_info = L('I(') + var_g(2) + conditional + L(')')     >> make_mut_inf
 
 # (in-)equalities

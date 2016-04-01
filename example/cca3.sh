@@ -16,7 +16,7 @@ time minimize $here/cca3.txt -o min.txt
 time chm min.txt -s 7 -o fin-chm.txt
 time fme min.txt -s 7 -o fin-fme.txt
 time afi min.txt -s 7 -o fin-afi.txt -q
-time afi min.txt -s 7 -o fin-sym.txt -q -y "ABCDEF <> BCAEFD"
+time afi min.txt -s 7 -o fin-sym.txt -q -y "ABCabc <> BCAbca; ABCabc <> CBAcba"
 
 # consistency check
 equiv min.txt $here/cca3.txt

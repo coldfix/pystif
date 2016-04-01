@@ -10,7 +10,7 @@ Arguments:
 
 Options:
     -o FILE, --output FILE              Set output file
-    -c CONSTR, --constraints CONSTR     Optimization constraints (CHSH|CHSHE|SEP|CGLMP)
+    -c CONSTR, --constraints CONSTR     Optimization constraints (CHSH|CHSHE|PPT|CGLMP)
     -n NUM, --num-runs NUM              Number of searches for each inequality [default: 10]
     -d DIMS, --dimensions DIMS          Hilbert space dimensions of subsystems [default: 222]
 """
@@ -28,7 +28,8 @@ import yaml
 
 from .core.app import application
 from .core.symmetry import SymmetryGroup, group_by_symmetry
-from .core.io import (System, _varset, yaml_dump, format_human_readable,
+from .core.util import _varset
+from .core.io import (System, yaml_dump, format_human_readable,
                       read_system_from_file)
 from .core.linalg import (projector, measurement, random_direction_vector,
                           cartesian_to_spherical, kron, to_unit_vector,
@@ -150,6 +151,10 @@ class TripartiteBellScenario(CompositeQuantumSystem):
         self.cols = system.columns
         sg = SymmetryGroup.load(self.symm, self.cols)
         self.rows = [g[0] for g in group_by_symmetry(sg, system.matrix)]
+        # If 'mixing' is enabled the parameter list is extended by an
+        # additional mixing probability with the unit matrix. This induces
+        # states to be returned as density matrices rather than vectors:
+        self.mixing = False
 
     def random(self):
         # phases are absorbed into Phi_R:
@@ -158,10 +163,15 @@ class TripartiteBellScenario(CompositeQuantumSystem):
         num_unitary_params = (sum(x**2 for x in self.subdim) +
                               sum(x**2 for x in self.subdim[1:]))
         u = np.random.uniform(0, 2*pi, size=num_unitary_params)
+        if self.mixing:
+            return np.hstack((s, u, 0))
         return np.hstack((s, u))
 
     def unpack(self, params):
         l = list(params)
+
+        if self.mixing:
+            p_mix = l.pop()
 
         D = np.diag(range(self.dim))
         U = [[np.eye(self.subdim[0], dtype=complex),
@@ -172,6 +182,11 @@ class TripartiteBellScenario(CompositeQuantumSystem):
         #M = list(zip(M[::2], M[1::2]))
 
         state = to_quantum_state(to_unit_vector(l).reshape(self.dim, 2))
+
+        if self.mixing:
+            state = ((1-p_mix) * projector(state) +
+                     p_mix * np.eye(self.dim) / self.dim)
+
         return state, U
 
     def realize(self, params):
@@ -213,11 +228,6 @@ class Constraints:
         """Compute constraint functions from packed parameter list."""
         state, parties = self.system.realize(params)
         return self.evaluate_all_constraints(state, parties)
-
-    @classmethod
-    def optimization_constraints(cls, system):
-        return {'type': 'ineq',
-                'fun': cls(system)}
 
 
 class LinearConstraints(Constraints):
@@ -357,7 +367,7 @@ class CGLMP2(LinearConstraints):
         return 2 - abs(x)
 
 
-class SEP2(Constraints):
+class PPT2(Constraints):
 
     """The 2-party subsystems are separable."""
     # Peres–Horodecki criterion
@@ -366,6 +376,14 @@ class SEP2(Constraints):
 
     def __init__(self, system):
         self.system = system
+
+    def __call__(self, params):
+        """Compute constraint functions from packed parameter list."""
+        state, parties = self.system.realize(params)
+        constr = self.evaluate_all_constraints(state, parties)
+        neg = sum(x for x in constr if x < 0)
+        pos = sum(x for x in constr if x > 0)
+        return [neg if neg < 0 else pos]
 
     def evaluate_all_constraints(self, state, parties):
         rho_abc = projector(state)
@@ -408,7 +426,7 @@ def load_summary(filename):
     with open(filename) as f:
         data = yaml.safe_load(f)
     results = data['results'] or ()
-    indices = sorted({r['i_row'] for r in results})
+    indices = sorted({int(r['i_row']) for r in results})
     rows = [data['rows'][i] for i in indices]
     cols = data['cols']
     return indices, rows, cols
@@ -416,7 +434,7 @@ def load_summary(filename):
 
 def show_summary(opts):
     indices, rows, cols = load_summary(opts['INPUT'])
-    print("rows:", ",".join(map(str, indices)))
+    print(len(rows), "rows:", ",".join(map(str, indices)))
     for r in rows:
         print(format_human_readable(r, cols))
 
@@ -425,13 +443,13 @@ def get_constraints_obj(constraints_name, system):
     constraint_classes = {
         'CHSHE': CHSHE2,
         'CHSH': CHSH2,
-        'SEP': SEP2,
+        'PPT': PPT2,
         'CGLMP': CGLMP2,
     }
     if constraints_name is None:
-        return None
+        return []
     cls = constraint_classes[constraints_name.upper()]
-    return cls.optimization_constraints(system)
+    return cls(system)
 
 
 @application
@@ -470,30 +488,76 @@ def main(app):
 
     for _, (i, expr) in product(range(num_runs), enumerate(system.rows)):
 
+        system.mixing = False
         result = scipy.optimize.minimize(
             system.violation, system.random(),
-            (expr,), constraints=constr)
+            (expr,),
+            constraints=constr and [
+                {'type': 'ineq', 'fun': constr},
+            ])
 
-        fconstr = constr['fun'](result.x) if constr else []
+        objective = result.fun
+        params = result.x
+        state, parties = system.realize(params)
+        fconstr = constr and constr.evaluate_all_constraints(state, parties)
+        success = False
+        reoptimize = False
 
         i = str(i).ljust(2)
-        if not result.success:
-            print(i, 'x', result.message)
-        elif result.fun > -1e-11:
-            print(i, '.', result.fun, fconstr)
-        elif any(x < 0 for x in fconstr):
-            print(i, 'o', result.fun, fconstr)
-        else:
-            print(i, 'y', result.fun, fconstr)
 
-            state, bases = system.unpack(result.x)
+        if not result.success:
+            print(i, 'error', result.message)
+        elif objective > -1e-11:
+            print(i, 'no violation', objective, fconstr)
+        elif any(x < 0 for x in fconstr):
+            print(i, 'unsatisfied constraint', objective, fconstr)
+            reoptimize = objective / min(fconstr) > 100
+        else:
+            success = True
+
+        if reoptimize:
+            print(i, 'reoptimization...')
+
+            def constraint_violation(params):
+                return -sum(constr(params))
+
+            def retain_objective(params):
+                return -(system.violation(params, expr) - 0.5 * objective)
+
+            system.mixing = True
+            result = scipy.optimize.minimize(
+                constraint_violation, np.hstack((params, 0.001)),
+                constraints=[
+                    {'type': 'ineq', 'fun': retain_objective},
+                    # Constraint the mixing probability 0 ≤ p ≤ 1:
+                    {'type': 'ineq', 'fun': lambda params: params[-1]},
+                    {'type': 'ineq', 'fun': lambda params: 1-params[-1]},
+                ])
+
+            params = result.x
+            objective = system.violation(params, expr)
+            state, parties = system.realize(params)
+            fconstr = constr.evaluate_all_constraints(state, parties)
+
+            if not result.success:
+                print(i, '  -> error', result.message)
+            elif any(x < 0 for x in fconstr):
+                print(i, '  -> still unsatisfied', objective, fconstr)
+            else:
+                success = True
+
+        if success:
+            print(i, 'success', objective, fconstr)
+
+            state, bases = system.unpack(params)
             yaml_dump([{
-                'i_row': i,
-                'f_objective': result.fun,
+                'i_row': int(i),
+                'f_objective': objective,
                 'f_constraints': fconstr,
-                'opt_params': result.x,
+                'opt_params': params,
                 'state': state,
                 'bases': bases,
+                'reoptimize': reoptimize,
             }], out_file)
             out_file.flush()
 

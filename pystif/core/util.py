@@ -2,9 +2,34 @@
 Misc utilities.
 """
 
+import re
 from functools import wraps
 
 from .array import scale_to_int
+
+
+def _varset(key):
+    if isinstance(key, (set,list,tuple,frozenset)):
+        return frozenset(key)
+    if key.startswith('H(') and key.endswith(')'):
+        return frozenset(re.split('[ ,]', key[2:-1]))
+    if key.startswith('_'):
+        return frozenset(key[1:])
+    raise ValueError("Unknown format.")
+
+
+def varsort(varnames):
+    return sorted(varnames, key=lambda s: (s.lower(), s))
+
+
+def _name(key):
+    try:
+        s = _varset(key)
+    except ValueError:
+        return key
+    if not s:
+        return '_'
+    return 'H(' + ','.join(varsort(s)) + ')'
 
 
 def safe_call(fn, *args, **kw):
