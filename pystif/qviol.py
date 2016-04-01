@@ -478,13 +478,13 @@ def main(app):
 
         i = str(i).ljust(2)
         if not result.success:
-            print(i, 'x', result.message)
+            print(i, 'error', result.message)
         elif result.fun > -1e-11:
-            print(i, '.', result.fun, fconstr)
+            print(i, 'no violation', result.fun, fconstr)
         elif any(x < 0 for x in fconstr):
-            print(i, 'o', result.fun, fconstr)
+            print(i, 'unfulfilled constraint', result.fun, fconstr)
         else:
-            print(i, 'y', result.fun, fconstr)
+            print(i, 'success', result.fun, fconstr)
 
             state, bases = system.unpack(result.x)
             yaml_dump([{
