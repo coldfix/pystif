@@ -357,7 +357,7 @@ class CGLMP2(LinearConstraints):
         return 2 - abs(x)
 
 
-class SEP2(Constraints):
+class PPT2(Constraints):
 
     """The 2-party subsystems are separable."""
     # Peres–Horodecki criterion
@@ -366,6 +366,14 @@ class SEP2(Constraints):
 
     def __init__(self, system):
         self.system = system
+
+    def __call__(self, params):
+        """Compute constraint functions from packed parameter list."""
+        state, parties = self.system.realize(params)
+        constr = self.evaluate_all_constraints(state, parties)
+        neg = sum(x for x in constr if x < 0)
+        pos = sum(x for x in constr if x > 0)
+        return [neg if neg < 0 else pos]
 
     def evaluate_all_constraints(self, state, parties):
         rho_abc = projector(state)
@@ -425,7 +433,8 @@ def get_constraints_obj(constraints_name, system):
     constraint_classes = {
         'CHSHE': CHSHE2,
         'CHSH': CHSH2,
-        'SEP': SEP2,
+        'SEP': PPT2,
+        'PPT': PPT2,
         'CGLMP': CGLMP2,
     }
     if constraints_name is None:
@@ -474,24 +483,68 @@ def main(app):
             system.violation, system.random(),
             (expr,), constraints=constr)
 
-        fconstr = constr['fun'](result.x) if constr else []
+        objective = result.fun
+        params = result.x
+        state, parties = system.realize(params)
+        if constr:
+            fconstr = constr['fun'].evaluate_all_constraints(state, parties)
+        else:
+            fconstr = []
+        success = False
+        reoptimize = False
 
         i = str(i).ljust(2)
+
         if not result.success:
             print(i, 'error', result.message)
-        elif result.fun > -1e-11:
-            print(i, 'no violation', result.fun, fconstr)
+        elif objective > -1e-11:
+            print(i, 'no violation', objective, fconstr)
         elif any(x < 0 for x in fconstr):
-            print(i, 'unfulfilled constraint', result.fun, fconstr)
+            print(i, 'unsatisfied constraint', objective, fconstr)
+            reoptimize = objective / min(fconstr) > 1000
         else:
-            print(i, 'success', result.fun, fconstr)
+            success = True
 
-            state, bases = system.unpack(result.x)
+        if reoptimize:
+            print(i, 'reoptimization...')
+
+            def constraint_violation(params):
+                return -sum(constr['fun'](params))
+
+            def retain_objective(params):
+                return -(system.violation(params, expr) - 0.8 * objective)
+
+            result = scipy.optimize.minimize(
+                constraint_violation, params,
+                constraints={
+                    'type': 'ineq',
+                    'fun': retain_objective,
+                })
+
+            params = result.x
+            objective = system.violation(params, expr)
+            state, parties = system.realize(params)
+            if constr:
+                fconstr = constr['fun'].evaluate_all_constraints(state, parties)
+            else:
+                fconstr = []
+
+            if not result.success:
+                print(i, '  -> error', result.message)
+            elif any(x < 0 for x in fconstr):
+                print(i, '  -> still unsatisfied', objective, fconstr)
+            else:
+                success = True
+
+        if success:
+            print(i, 'success', objective, fconstr)
+
+            state, bases = system.unpack(params)
             yaml_dump([{
                 'i_row': int(i),
-                'f_objective': result.fun,
+                'f_objective': objective,
                 'f_constraints': fconstr,
-                'opt_params': result.x,
+                'opt_params': params,
                 'state': state,
                 'bases': bases,
             }], out_file)
