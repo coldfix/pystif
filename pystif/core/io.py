@@ -41,19 +41,36 @@ def read_system_from_file(file):
     return parse_text("\n".join(lines))
 
 
+def expand_symmetries(matrix, cols, symm):
+    if not symm:
+        return matrix
+    sg = SymmetryGroup.load(symm, cols)
+    seen = VectorMemory()
+    return np.array([v for r in matrix for v in sg(r)
+                     if not seen(v)])
+
+
 def read_table_from_file(file):
     comments = []
     contents = remove_comments(file, comments.append)
     matrix = np.loadtxt(contents, ndmin=2)
     cols = []
     symm = []
+    subs = []
     def add_cols(s):
         cols.extend(map(_name, s.split()))
     def add_symm(s):
         symm.extend(parse_symmetries(s))
+    def add_subs(s):
+        spec = parse_symmetries(s)
+        symm.extend(spec)
+        subs.extend(spec)
     for line in comments:
-        detect_prefix(line.strip(), '::', add_cols)
-        detect_prefix(line.strip(), '>>', add_symm)
+        l = line.strip()
+        detect_prefix(l, '::', add_cols)
+        detect_prefix(l, '>>', add_symm)
+        detect_prefix(l, '~~', add_subs)
+    matrix = expand_symmetries(matrix, cols, subs)
     return matrix, cols or None, symm
 
 
