@@ -1,9 +1,9 @@
-rvar A B C D E F
+rvar A B C a b c
 
 # iid initial state
-D :: E :: F
+a :: b :: c
 
 # causality DAG
-A :: B,C,F | D,E
-B :: A,C,D | E,F
-C :: A,B,E | D,F
+A :: B,C,c | a,b
+B :: A,C,a | b,c
+C :: A,B,b | a,c
