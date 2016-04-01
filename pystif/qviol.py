@@ -10,7 +10,7 @@ Arguments:
 
 Options:
     -o FILE, --output FILE              Set output file
-    -c CONSTR, --constraints CONSTR     Optimization constraints (CHSH|CHSHE|SEP|CGLMP)
+    -c CONSTR, --constraints CONSTR     Optimization constraints (CHSH|CHSHE|PPT|CGLMP)
     -n NUM, --num-runs NUM              Number of searches for each inequality [default: 10]
     -d DIMS, --dimensions DIMS          Hilbert space dimensions of subsystems [default: 222]
 """
@@ -228,11 +228,6 @@ class Constraints:
         state, parties = self.system.realize(params)
         return self.evaluate_all_constraints(state, parties)
 
-    @classmethod
-    def optimization_constraints(cls, system):
-        return {'type': 'ineq',
-                'fun': cls(system)}
-
 
 class LinearConstraints(Constraints):
 
@@ -447,14 +442,13 @@ def get_constraints_obj(constraints_name, system):
     constraint_classes = {
         'CHSHE': CHSHE2,
         'CHSH': CHSH2,
-        'SEP': PPT2,
         'PPT': PPT2,
         'CGLMP': CGLMP2,
     }
     if constraints_name is None:
-        return None
+        return []
     cls = constraint_classes[constraints_name.upper()]
-    return cls.optimization_constraints(system)
+    return cls(system)
 
 
 @application
@@ -496,15 +490,15 @@ def main(app):
         system.mixing = False
         result = scipy.optimize.minimize(
             system.violation, system.random(),
-            (expr,), constraints=constr)
+            (expr,),
+            constraints=constr and [
+                {'type': 'ineq', 'fun': constr},
+            ])
 
         objective = result.fun
         params = result.x
         state, parties = system.realize(params)
-        if constr:
-            fconstr = constr['fun'].evaluate_all_constraints(state, parties)
-        else:
-            fconstr = []
+        fconstr = constr and constr.evaluate_all_constraints(state, parties)
         success = False
         reoptimize = False
 
@@ -516,7 +510,7 @@ def main(app):
             print(i, 'no violation', objective, fconstr)
         elif any(x < 0 for x in fconstr):
             print(i, 'unsatisfied constraint', objective, fconstr)
-            reoptimize = objective / min(fconstr) > 1000
+            reoptimize = objective / min(fconstr) > 100
         else:
             success = True
 
@@ -524,10 +518,10 @@ def main(app):
             print(i, 'reoptimization...')
 
             def constraint_violation(params):
-                return -sum(constr['fun'](params))
+                return -sum(constr(params))
 
             def retain_objective(params):
-                return -(system.violation(params, expr) - 0.8 * objective)
+                return -(system.violation(params, expr) - 0.5 * objective)
 
             system.mixing = True
             result = scipy.optimize.minimize(
@@ -542,10 +536,7 @@ def main(app):
             params = result.x
             objective = system.violation(params, expr)
             state, parties = system.realize(params)
-            if constr:
-                fconstr = constr['fun'].evaluate_all_constraints(state, parties)
-            else:
-                fconstr = []
+            fconstr = constr.evaluate_all_constraints(state, parties)
 
             if not result.success:
                 print(i, '  -> error', result.message)
@@ -565,6 +556,7 @@ def main(app):
                 'opt_params': params,
                 'state': state,
                 'bases': bases,
+                'reoptimize': reoptimize,
             }], out_file)
             out_file.flush()
 
