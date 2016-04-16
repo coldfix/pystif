@@ -19,7 +19,6 @@ Options:
 
 from functools import partial
 
-import os
 import numpy as np
 
 from .core.app import application
