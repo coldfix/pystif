@@ -184,7 +184,7 @@ class ConvexCone:
             fx = plane @ vertex
             sx = inner @ vertex
             plane, inner = (
-                inner - sx/fx * plane,
+                sx * plane - fx * inner,
                 fx * plane + sx * inner,
             )
 
