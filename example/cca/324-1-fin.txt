@@ -1,0 +1,2 @@
+rvar A B C
+I(A:C) = 0

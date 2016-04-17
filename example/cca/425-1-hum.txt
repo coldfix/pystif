@@ -1,0 +1,12 @@
+# CCA with 5 i.i.d. cells, each influencing 4 of 2 dependend cells
+# Cyclic overlap: 0
+rvar A B C D a b c d e
+
+# iid initial state
+a :: b :: c :: d :: e
+
+# causality DAG
+A :: B,C,D,c,d,e | a,b
+B :: A,C,D,d,e,a | b,c
+C :: A,B,D,e,a,b | c,d
+D :: A,B,C,a,b,c | d,e

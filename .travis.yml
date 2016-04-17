@@ -39,9 +39,10 @@ install:
 
 script:
   - nosetests
-  - bash ./example/cca3.sh
-  - bash ./example/bell2x2.sh
-  - bash ./example/cca4.sh
+  - bash ./example/bell/2x2.sh
+  - bash ./example/cca/323.sh
+  - bash ./example/cca/424.sh
+  - bash ./example/cca/324.sh
 
 cache:
   - directories:

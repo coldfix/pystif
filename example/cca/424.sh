@@ -7,12 +7,14 @@ set -e
 set -x
 
 here=$(dirname $BASH_SOURCE)
-data=$here/data
+code=424-1
+data=$here/$code
 
 # DISABLED FOR TEST PERFORMANCE:
-# minimize the initial system:
-# time minimize cca4.txt -o min.txt
-cp $data/init-4-1.txt min.txt
+# # minimize the initial system:
+# time minimize $data-hum.txt -o min.txt
+# equiv min.txt $data-ini.txt
+cp $data-ini.txt min.txt
 
 # use different elimination methods:
 time chm min.txt -s 15 -o fin-chm.txt -q
@@ -20,11 +22,8 @@ time fme min.txt -s 15 -o fin-fme.txt -q
 time afi min.txt -s 15 -o fin-afi.txt -q \
     -y "abcdABCD <> bcdaBCDA; abcdABCD <> dcbaDCBA"
 
-# consistency check
-equiv min.txt $data/init-4-1.txt
-
-equiv fin-chm.txt $data/final-4-1.txt
-equiv fin-fme.txt $data/final-4-1.txt
-equiv fin-afi.txt $data/final-4-1.txt
+equiv fin-chm.txt $data-fin.txt
+equiv fin-fme.txt $data-fin.txt
+equiv fin-afi.txt $data-fin.txt
 
 pretty fin-chm.txt -y "abcd <> bcda; abcd <> dcba"

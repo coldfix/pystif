@@ -106,8 +106,7 @@ The constraint matrix ``Q`` can be specified in either of two input formats:
   to use Shannon information measures (e.g. ``2 I(X:Y|Z) <= H(X)`` and define
   Markov conveniently as ``A -> B -> C -> D``.
 
-For examples look for ``*.txt`` files in the ``example/`` and
-``example/data/`` subfolders.
+For examples look for ``*.txt`` files in the ``example/*`` subfolders.
 
 Note that inhomogenious systems can be emulated by thinking of one of the
 columns as constant ``1`` (don't you dare thinking of another number!).
