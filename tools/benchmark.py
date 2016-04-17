@@ -35,11 +35,6 @@ COLUMNS = (
     ('     r_f',    'ridges_per_facet'),
     ('     v_f',    'vertices_per_facet'),
     ('     v_r',    'vertices_per_ridge'),
-    ('   _tafi',    'afi_symm_time'),
-    ('   _tchm',    'chm_symm_time'),
-    ('  _f',        'fafi_symm_num_facets'),
-    ('  _r',        'afi_symm_num_ridges'),
-    ('  _v',        'afi_symm_num_vertices'),
 )
 
 
@@ -89,41 +84,35 @@ def make_tasks(system, filename, output_dims, num_runs, prefix):
 
 
 def exec_task(task, print_):
-    afi_pure = single_pass(task, 'afi', 'pure', '-y', '', '-r1')
-    chm_pure = single_pass(task, 'chm', 'pure', '-y', '')
-    afi_symm = single_pass(task, 'afi', 'symm', '-r1')
-    chm_symm = single_pass(task, 'chm', 'symm')
+    passes = (
+        single_pass(task, 'afi', '-y', '', '-r1'),
+        single_pass(task, 'chm', '-y', ''),
+    )
+    afi, chm = passes
 
-    if not afi_pure or not chm_pure or not afi_symm or not chm_symm:
+    if not all(passes):
         print_(
             len(task.subspace),
-            bool(afi_pure),
-            bool(chm_pure),
-            bool(afi_symm),
-            bool(chm_symm),
+            bool(afi),
+            bool(chm),
         )
         return
     print_(
         len(task.subspace),
-        afi_pure['time'],
-        chm_pure['time'],
-        afi_pure['num_facets'],
-        afi_pure['num_ridges'],
-        afi_pure['num_vertices'],
-        afi_pure['ridges_per_facet'][0],
-        afi_pure['vertices_per_facet'][0],
-        afi_pure['vertices_per_ridge'][0],
-        afi_symm['time'],
-        chm_symm['time'],
-        afi_symm['num_facets'],
-        afi_symm['num_ridges'],
-        afi_symm['num_vertices'],
+        afi['time'],
+        chm['time'],
+        afi['num_facets'],
+        afi['num_ridges'],
+        afi['num_vertices'],
+        afi['ridges_per_facet'][0],
+        afi['vertices_per_facet'][0],
+        afi['vertices_per_ridge'][0],
     )
 
 
-def single_pass(task, method, extra, *cmd_args):
+def single_pass(task, method, *cmd_args):
     space = " ".join(map(str, task.subspace))
-    basename = '{}{}-{}-{}'.format(task.prefix, task.name, extra, method)
+    basename = '{}{}-{}'.format(task.prefix, task.name, method)
     outf = basename + '.txt'
     logf = basename + '.log'
     inff = basename + '.yml'
