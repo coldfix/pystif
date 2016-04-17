@@ -2,7 +2,7 @@
 Find projection of a convex cone to a lower dimensional subspace.
 
 Usage:
-    chm INPUT -s SUBSPACE [-o OUTPUT] [-x XRAYS] [-l LIMIT] [-r] [-q]... [-v]... [-p] [-i FILE]
+    chm INPUT -s SUBSPACE [-o OUTPUT] [-x XRAYS] [-l LIMIT] [-y SYMMETRIES] [-r] [-q]... [-v]... [-p] [-i FILE]
 
 Options:
     -o OUTPUT, --output OUTPUT      Save facets of projected cone
@@ -10,6 +10,7 @@ Options:
     -s SUB, --subspace SUB          Subspace specification (dimension or file)
     -l LIMIT, --limit LIMIT         Add constraints H(i)≤LIMIT for i<SUBDIM
                                     [default: 1]
+    -y SYM, --symmetry SYM          Symmetry group generators
     -r, --resume                    Resume using previously computed rays
                                     (must be fully dimensional!)
     -q, --quiet                     Less status output
