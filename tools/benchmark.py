@@ -37,6 +37,11 @@ COLUMNS = (
     'ridges_per_facet',
     'vertices_per_facet',
     'vertices_per_ridge',
+    'afi_symm_time',
+    'chm_symm_time',
+    'afi_symm_num_facets',
+    'afi_symm_num_ridges',
+    'afi_symm_num_vertices',
 )
 
 
@@ -80,8 +85,11 @@ def make_tasks(input_files, output_dims, num_runs, prefix):
 
 
 def exec_task(task, print_):
-    afi = single_pass(task, 'afi', '-r1')
-    chm = single_pass(task, 'chm')
+    afi = single_pass(task, 'afi', '-y', '', '-r1')
+    chm = single_pass(task, 'chm', '-y', '')
+    afi_symm = single_pass(task, 'afi', '-r1')
+    chm_symm = single_pass(task, 'chm')
+
     if not afi or not chm:
         print_(
             dim,
@@ -104,6 +112,11 @@ def exec_task(task, print_):
         afi['ridges_per_facet'][0],
         afi['vertices_per_facet'][0],
         afi['vertices_per_ridge'][0],
+        afi_symm['time'],
+        chm_symm['time'],
+        afi_symm['num_facets'],
+        afi_symm['num_ridges'],
+        afi_symm['num_vertices'],
     )
 
 
