@@ -25,6 +25,20 @@ import yaml
 
 from pystif.core.io import System
 
+COLUMNS = (
+    'in_dim',
+    'in_rows',
+    'out_dim',
+    'afi_time',
+    'chm_time',
+    'num_facets',
+    'num_ridges',
+    'num_vertices',
+    'ridges_per_facet',
+    'vertices_per_facet',
+    'vertices_per_ridge',
+)
+
 
 def main(argv=None):
     opts = docopt(__doc__, argv)
@@ -35,7 +49,8 @@ def main(argv=None):
     os.makedirs(logdir, exist_ok=True)
     tasks = make_tasks(input_files, output_dims, num_runs, logdir+'/')
     output_file = _open_for_writing(opts['--output'])
-    print_ = partial(_print, file=output_file)
+    print_ = partial(_print, file=output_file, flush=True)
+    print("#", *COLUMNS, file=output_file, flush=True)
     for task in tasks:
         exec_task(task, print_)
 
