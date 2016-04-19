@@ -35,6 +35,7 @@ COLUMNS = (
     ('     r_f',    'ridges_per_facet'),
     ('     v_f',    'vertices_per_facet'),
     ('     v_r',    'vertices_per_ridge'),
+    (' vpf_geo',    'vertices_per_facet_geom'),
 )
 
 
@@ -90,15 +91,18 @@ def exec_task(task, print_):
     )
     afi, chm = passes
 
+    dim = len(task.subspace)
     if not all(passes):
         print_(
-            len(task.subspace),
+            dim,
             bool(afi),
             bool(chm),
         )
         return
+    vpf_detail = afi['vertices_per_facet_detail']
+    vpf_geom = (sum(n**((dim-1)/2) for n in vpf_detail)/len(vpf_detail)) ** (2/(dim-1))
     print_(
-        len(task.subspace),
+        dim,
         afi['time'],
         chm['time'],
         afi['num_facets'],
@@ -107,6 +111,7 @@ def exec_task(task, print_):
         afi['ridges_per_facet'][0],
         afi['vertices_per_facet'][0],
         afi['vertices_per_ridge'][0],
+        vpf_geom,
     )
 
 
