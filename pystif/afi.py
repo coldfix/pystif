@@ -318,25 +318,30 @@ class AFI:
         # - vertex/ridge
         # - vertex/face
         # - ridge/face
-        rpf = mean_variance([
+        rpf = [
             len(f.subfaces) for f in facets
-        ])
-        vpf = mean_variance([
+        ]
+        vpf = [
             sum(1 for v in vertices if np.allclose(f.subspace.normals @ v, 0))
             for f in facets
-        ])
-        vpr = mean_variance([
+        ]
+        vpr = [
             sum(1 for v in vertices if np.allclose(r.subspace.normals @ v, 0))
             for r in ridges
-        ])
+        ]
+
         return {
             'num_facets': len(facets),
             'num_ridges': len(ridges),
             'num_vertices': len(vertices),
             'num_chm': self._num_chm,
-            'ridges_per_facet': rpf,
-            'vertices_per_facet': vpf,
-            'vertices_per_ridge': vpr,
+            'ridges_per_facet': mean_variance(rpf),
+            'vertices_per_facet': mean_variance(vpf),
+            'vertices_per_ridge': mean_variance(vpr),
+            'ridges_per_facet_detail': rpf,
+            'vertices_per_facet_detail': vpf,
+            'vertices_per_ridge_detail': vpr,
+            # TODO: more complete output
         }
 
 
