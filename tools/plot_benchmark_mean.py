@@ -12,8 +12,8 @@ import sys
 
 data = np.loadtxt(sys.argv[1])
 cols = [
-    'dim',
-    'num_rows',
+    # 'dim',
+    # 'num_rows',
     'subdim',
     't_afi',
     't_chm',
@@ -31,7 +31,7 @@ def _i(*args):
 key = lambda row: row[0]
 rows = data[:,_i('subdim', 't_afi', 't_chm')]
 
-dat = [list(g) for k, g in groupby(rows, key)]
+dat = [list(g) for k, g in groupby(sorted(rows, key=key), key)]
 dat = [(*np.mean(g, axis=0), *np.std(g, axis=0)) for g in dat]
 dat = np.array(dat)
 
