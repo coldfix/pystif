@@ -145,6 +145,8 @@ def cycles_to_spec(rules):
 
 
 def parse_symmetries(s):
+    if not s.strip():
+        return ()
     from .parse import symm_list, tokenize
     return symm_list.parse(tokenize(s))
 

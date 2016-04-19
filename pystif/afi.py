@@ -297,10 +297,15 @@ class AFI:
             return (len(active) >= dim and
                     matrix_rank(active) >= dim)
         vertices = VectorMemory()
+        checked = VectorMemory()
         for v in self._vertices:
             v = np.array(v)
+            if v in checked:
+                continue
+            symm = list(self.symmetries(v))
+            checked.add(*symm)
             if is_vertex(v):
-                vertices.add(*list(self.symmetries(v)))
+                vertices.add(*symm)
         vertices = np.array(list(vertices.seen))
         for f in facets:
             for r in f.subfaces:

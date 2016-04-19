@@ -2,7 +2,7 @@
 Find projection of a convex cone to a lower dimensional subspace.
 
 Usage:
-    chm INPUT -s SUBSPACE [-o OUTPUT] [-x XRAYS] [-l LIMIT] [-r] [-q]... [-v]... [-p] [-i FILE]
+    chm INPUT -s SUBSPACE [-o OUTPUT] [-x XRAYS] [-l LIMIT] [-y SYMMETRIES] [-r] [-q]... [-v]... [-p] [-i FILE]
 
 Options:
     -o OUTPUT, --output OUTPUT      Save facets of projected cone
@@ -10,6 +10,7 @@ Options:
     -s SUB, --subspace SUB          Subspace specification (dimension or file)
     -l LIMIT, --limit LIMIT         Add constraints H(i)≤LIMIT for i<SUBDIM
                                     [default: 1]
+    -y SYM, --symmetry SYM          Symmetry group generators
     -r, --resume                    Resume using previously computed rays
                                     (must be fully dimensional!)
     -q, --quiet                     Less status output
@@ -82,19 +83,18 @@ class CHM:
         self.seen_ray = VectorMemory()
         # Make sure the dataset lives in a full dimensional subspace
         self.subspace = LinearSubspace.from_rowspace(rays)
-        self.all_rays = []
-        self.new_rays = [np.zeros(self.subspace.dim)]
-        for r in rays:
-            self.add(r)
+        self.all_rays = [np.zeros(self.subspace.dim)]
+        self.new_rays = []
+        self.seen_ray(np.zeros(self.subspace.onb.shape[1]))
 
     def add(self, ray):
         """Add another ray to the list of extreme rays."""
         if ray in self.seen_ray:
-            return False
+            return
         for r in self.symmetries(ray):
             if self.subspace.contains(r) and not self.seen_ray(r):
                 self.new_rays.append(self.subspace.into(r))
-        return True
+                yield r
 
     def compute(self):
         """Compute the convex hull with the newly added points."""
@@ -137,6 +137,10 @@ def convex_hull_method(polyhedron, rays,
 
     chm = CHM(rays, qinfo, symmetries=symmetries)
 
+    for ray in rays:
+        for r in chm.add(ray):
+            report_ray(r)
+
     while chm.new_rays:
         hull = chm.compute()
         total = len(hull.equations)
@@ -152,8 +156,8 @@ def convex_hull_method(polyhedron, rays,
             else:
                 # not valid - search a violating extreme point:
                 ray = polyhedron.search(face)
-                if chm.add(ray):
-                    report_ray(ray)
+                for r in chm.add(ray):
+                    report_ray(r)
 
         status_info(total, total, len(result))
 
