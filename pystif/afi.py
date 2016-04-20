@@ -317,7 +317,7 @@ class AFI:
                 ridges.add(r)
 
         def vertices_of(face):
-            return Minimize().minimize(([
+            return Minimize().minimize([
                 v for v in vertices
                 if np.allclose(face.subspace.normals @ v, 0)
             ])
