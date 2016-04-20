@@ -4,12 +4,14 @@ subspaces of various dimensions.
 
 Usage:
     benchmark INPUT [-o OUTPUT] [-s DIMS] [-n NUM] [-l LOGS]
+    benchmark INPUT [-o OUTPUT] --update-only -l LOGS
 
 Options:
     -o OUTPUT, --output OUTPUT      Output file
     -s DIMS, --subspaces DIMS       Subspace dimensions     [default: 5..12]
     -n NUM, --num-runs NUM          Runs for each dimension [default: 10]
     -l LOGS, --logs LOGS            Log file folder         [default: ./tmp]
+    -u, --update-only               Only update output file
 """
 
 from collections import namedtuple
@@ -47,7 +49,6 @@ def main(argv=None):
     logdir = opts['--logs']
     os.makedirs(logdir, exist_ok=True)
     system = System.load(input_file)
-    tasks = make_tasks(system, input_file, output_dims, num_runs, logdir+'/')
     output_file = _open_for_writing(opts['--output'])
     print_ = partial(_print, file=output_file, flush=True)
     print_('# input system:')
@@ -58,8 +59,27 @@ def main(argv=None):
     print_('#', *cols_long)
     print_()
     print_('#', *cols_short)
+    if opts['--update-only']:
+        return update(print_, system, input_file, logdir+'/')
+
+    tasks = make_tasks(system, input_file, output_dims, num_runs, logdir+'/')
     for task in tasks:
         exec_task(task, print_)
+
+
+def update(print_, system, input_file, logdir):
+
+    task_basename, _ = os.path.splitext(os.path.basename(input_file))
+    afi_glob = '{}{}-*-afi.yml'.format(logdir, task_basename)
+
+    import glob
+    for afi_file in sorted(glob.glob(afi_glob)):
+        chm_file = afi_file.replace('-afi.yml', '-chm.yml')
+        with open(afi_file) as f:
+            afi = yaml.safe_load(f)
+        with open(chm_file) as f:
+            chm = yaml.safe_load(f)
+        print_(*task_results(afi, chm))
 
 
 class Task(namedtuple('Task', ['filename', 'system', 'subspace', 'i', 'prefix'])):
@@ -90,18 +110,22 @@ def exec_task(task, print_):
         single_pass(task, 'chm', '-y', ''),
     )
     afi, chm = passes
-
-    dim = len(task.subspace)
     if not all(passes):
         print_(
-            dim,
+            len(task.subspace),
             bool(afi),
             bool(chm),
         )
         return
+    print_(*task_results(*passes))
+
+
+def task_results(afi, chm):
+    subspace = list(map(int, afi['subspace'].split()))
+    dim = len(subspace)
     vpf_detail = afi['vertices_per_facet_detail']
     vpf_geom = (sum(n**((dim-1)/2) for n in vpf_detail)/len(vpf_detail)) ** (2/(dim-1))
-    print_(
+    return (
         dim,
         afi['time'],
         chm['time'],
