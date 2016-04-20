@@ -25,6 +25,7 @@ from .core.app import application
 from .core.util import VectorMemory, PointSet
 from .core.linalg import matrix_rank
 from .chm import convex_hull_method, print_status, print_qhull
+from .core.lp import Minimize
 
 
 def mean_variance(samples):
@@ -314,6 +315,13 @@ class AFI:
                 # if any(is_face_identical(r, _r) for _r in ridges):
                 #     continue
                 ridges.add(r)
+
+        def vertices_of(face):
+            return Minimize().minimize(([
+                v for v in vertices
+                if np.allclose(face.subspace.normals @ v, 0)
+            ])
+
         # TODO: other statistics like variance of quantities:
         # - vertex/ridge
         # - vertex/face
@@ -321,14 +329,8 @@ class AFI:
         rpf = [
             len(f.subfaces) for f in facets
         ]
-        vpf = [
-            sum(1 for v in vertices if np.allclose(f.subspace.normals @ v, 0))
-            for f in facets
-        ]
-        vpr = [
-            sum(1 for v in vertices if np.allclose(r.subspace.normals @ v, 0))
-            for r in ridges
-        ]
+        vpf = [len(vertices_of(f)) for f in facets]
+        vpr = [len(vertices_of(r)) for r in ridges]
 
         return {
             'num_facets': len(facets),
