@@ -2,10 +2,10 @@
 Points to facets utility.
 
 Usage:
-    p2f INPUT -p POINTS -s SUBSPACE [-o OUTPUT] [-l LIMIT] [-y SYMMETRIES] [-q]... [-p]
+    p2f INPUT -P POINTS -s SUBSPACE [-o OUTPUT] [-l LIMIT] [-y SYMMETRIES] [-q]... [-p]
 
 Options:
-    -p POINTS, --points POINTS      File with points
+    -P POINTS, --points POINTS      File with points
     -o OUTPUT, --output OUTPUT      Set output file for solution
     -s SUB, --subspace SUB          Subspace specification (dimension or list)
     -l LIMIT, --limit LIMIT         Add constraints H(i)≤LIMIT for i<SUBDIM

@@ -106,7 +106,7 @@ class Application:
 
     @cachedproperty
     def symm_spec(self):
-        if self.opts.get('--symmetry'):
+        if self.opts.get('--symmetry') is not None:
             from .symmetry import parse_symmetries
             return parse_symmetries(self.opts['--symmetry'])
         return self.system.symmetries

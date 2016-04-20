@@ -53,7 +53,7 @@ class VerboseFME(FMEStatusInfo, FME):
 
 @application
 def main(app):
-    fme = FME() if app.verbosity >= 0 else VerboseFME()
+    fme = FME() if app.verbosity < 0 else VerboseFME()
 
     system = app.system
 

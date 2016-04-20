@@ -3,13 +3,15 @@ Compare runtimes of AFI/CHM by projecting the given input systems to random
 subspaces of various dimensions.
 
 Usage:
-    benchmark INPUT... [-o OUTPUT] [-s DIMS] [-n NUM] [-l LOGS]
+    benchmark INPUT [-o OUTPUT] [-s DIMS] [-n NUM] [-l LOGS]
+    benchmark INPUT [-o OUTPUT] --update-only -l LOGS
 
 Options:
     -o OUTPUT, --output OUTPUT      Output file
     -s DIMS, --subspaces DIMS       Subspace dimensions     [default: 5..12]
     -n NUM, --num-runs NUM          Runs for each dimension [default: 10]
     -l LOGS, --logs LOGS            Log file folder         [default: ./tmp]
+    -u, --update-only               Only update output file
 """
 
 from collections import namedtuple
@@ -25,19 +27,59 @@ import yaml
 
 from pystif.core.io import System
 
+COLUMNS = (
+    (' d',          'out_dim'),
+    ('   t_afi',    'afi_time'),
+    ('   t_chm',    'chm_time'),
+    ('   f',        'num_facets'),
+    ('   r',        'num_ridges'),
+    ('   v',        'num_vertices'),
+    ('     r_f',    'ridges_per_facet'),
+    ('     v_f',    'vertices_per_facet'),
+    ('     v_r',    'vertices_per_ridge'),
+    (' vpf_geo',    'vertices_per_facet_geom'),
+)
+
 
 def main(argv=None):
     opts = docopt(__doc__, argv)
-    input_files = opts['INPUT']
+    input_file = opts['INPUT']
     output_dims = sorted(set(parse_range(opts['--subspaces'])))
     num_runs = int(opts['--num-runs'])
     logdir = opts['--logs']
     os.makedirs(logdir, exist_ok=True)
-    tasks = make_tasks(input_files, output_dims, num_runs, logdir+'/')
+    system = System.load(input_file)
     output_file = _open_for_writing(opts['--output'])
-    print_ = partial(_print, file=output_file)
+    print_ = partial(_print, file=output_file, flush=True)
+    print_('# input system:')
+    print_('#  - file:', input_file)
+    print_('#  - rows:', system.shape[0])
+    print_('#  - dim: ', system.shape[1])
+    cols_short, cols_long = zip(*COLUMNS)
+    print_('#', *cols_long)
+    print_()
+    print_('#', *cols_short)
+    if opts['--update-only']:
+        return update(print_, system, input_file, logdir+'/')
+
+    tasks = make_tasks(system, input_file, output_dims, num_runs, logdir+'/')
     for task in tasks:
         exec_task(task, print_)
+
+
+def update(print_, system, input_file, logdir):
+
+    task_basename, _ = os.path.splitext(os.path.basename(input_file))
+    afi_glob = '{}{}-*-afi.yml'.format(logdir, task_basename)
+
+    import glob
+    for afi_file in sorted(glob.glob(afi_glob)):
+        chm_file = afi_file.replace('-afi.yml', '-chm.yml')
+        with open(afi_file) as f:
+            afi = yaml.safe_load(f)
+        with open(chm_file) as f:
+            chm = yaml.safe_load(f)
+        print_(*task_results(afi, chm))
 
 
 class Task(namedtuple('Task', ['filename', 'system', 'subspace', 'i', 'prefix'])):
@@ -55,32 +97,36 @@ def get_random_subspace(dim, subdim):
     return random.sample(range(dim), subdim)
 
 
-def make_tasks(input_files, output_dims, num_runs, prefix):
-    input_systems = [System.load(f) for f in input_files]
+def make_tasks(system, filename, output_dims, num_runs, prefix):
     return (
         Task(filename, system, get_random_subspace(system.dim, subdim), i, prefix)
-        for filename, system in zip(input_files, input_systems)
         for subdim in output_dims
         for i in range(num_runs))
 
 
 def exec_task(task, print_):
-    afi = single_pass(task, 'afi', '-r1')
-    chm = single_pass(task, 'chm')
-    if not afi or not chm:
+    passes = (
+        single_pass(task, 'afi', '-y', '', '-r1'),
+        single_pass(task, 'chm', '-y', ''),
+    )
+    afi, chm = passes
+    if not all(passes):
         print_(
-            dim,
-            num_rows,
             len(task.subspace),
             bool(afi),
             bool(chm),
         )
         return
-    num_rows, dim = task.system.shape
-    print_(
+    print_(*task_results(*passes))
+
+
+def task_results(afi, chm):
+    subspace = list(map(int, afi['subspace'].split()))
+    dim = len(subspace)
+    vpf_detail = afi['vertices_per_facet_detail']
+    vpf_geom = (sum(n**((dim-1)/2) for n in vpf_detail)/len(vpf_detail)) ** (2/(dim-1))
+    return (
         dim,
-        num_rows,
-        len(task.subspace),
         afi['time'],
         chm['time'],
         afi['num_facets'],
@@ -89,6 +135,7 @@ def exec_task(task, print_):
         afi['ridges_per_facet'][0],
         afi['vertices_per_facet'][0],
         afi['vertices_per_ridge'][0],
+        vpf_geom,
     )
 
 
@@ -140,7 +187,11 @@ def _open_for_writing(filename):
 
 
 def _fmt(arg):
-    return '{:.3f}'.format(arg) if isinstance(arg, float) else arg
+    if isinstance(arg, float):
+        return '{:8.3f}'.format(arg)
+    if isinstance(arg, int):
+        return '{:4}'.format(arg)
+    return arg
 
 
 def _print(*args, **kwargs):

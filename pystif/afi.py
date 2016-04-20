@@ -19,13 +19,13 @@ Options:
 
 from functools import partial
 
-import os
 import numpy as np
 
 from .core.app import application
 from .core.util import VectorMemory, PointSet
 from .core.linalg import matrix_rank
 from .chm import convex_hull_method, print_status, print_qhull
+from .core.lp import Minimize
 
 
 def mean_variance(samples):
@@ -298,10 +298,15 @@ class AFI:
             return (len(active) >= dim and
                     matrix_rank(active) >= dim)
         vertices = VectorMemory()
+        checked = VectorMemory()
         for v in self._vertices:
             v = np.array(v)
+            if v in checked:
+                continue
+            symm = list(self.symmetries(v))
+            checked.add(*symm)
             if is_vertex(v):
-                vertices.add(*list(self.symmetries(v)))
+                vertices.add(*symm)
         vertices = np.array(list(vertices.seen))
         for f in facets:
             for r in f.subfaces:
@@ -310,29 +315,35 @@ class AFI:
                 # if any(is_face_identical(r, _r) for _r in ridges):
                 #     continue
                 ridges.add(r)
+
+        def vertices_of(face):
+            return Minimize().minimize(([
+                v for v in vertices
+                if np.allclose(face.subspace.normals @ v, 0)
+            ])
+
         # TODO: other statistics like variance of quantities:
         # - vertex/ridge
         # - vertex/face
         # - ridge/face
-        rpf = mean_variance([
+        rpf = [
             len(f.subfaces) for f in facets
-        ])
-        vpf = mean_variance([
-            sum(1 for v in vertices if np.allclose(f.subspace.normals @ v, 0))
-            for f in facets
-        ])
-        vpr = mean_variance([
-            sum(1 for v in vertices if np.allclose(r.subspace.normals @ v, 0))
-            for r in ridges
-        ])
+        ]
+        vpf = [len(vertices_of(f)) for f in facets]
+        vpr = [len(vertices_of(r)) for r in ridges]
+
         return {
             'num_facets': len(facets),
             'num_ridges': len(ridges),
             'num_vertices': len(vertices),
             'num_chm': self._num_chm,
-            'ridges_per_facet': rpf,
-            'vertices_per_facet': vpf,
-            'vertices_per_ridge': vpr,
+            'ridges_per_facet': mean_variance(rpf),
+            'vertices_per_facet': mean_variance(vpf),
+            'vertices_per_ridge': mean_variance(vpr),
+            'ridges_per_facet_detail': rpf,
+            'vertices_per_facet_detail': vpf,
+            'vertices_per_ridge_detail': vpr,
+            # TODO: more complete output
         }
 
 

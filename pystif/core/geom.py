@@ -2,8 +2,9 @@
 import numpy as np
 
 from .array import scale_to_int, make_int_exact
-from .linalg import (matrix_imker_nice, matrix_nullspace, random_direction_vector,
-                     basis_vector, plane_normal, as_column_vector)
+from .linalg import (matrix_imker_nice, matrix_nullspace, matrix_rowspace,
+                     random_direction_vector, basis_vector, plane_normal,
+                     as_column_vector)
 from .lp import Problem
 from .util import PointSet, cached
 
@@ -139,6 +140,25 @@ class ConvexCone:
         self.points.add(extreme_point)
         return extreme_point
 
+    # The above variant sometimes fails (don't ask me why…), use my own
+    # (slightly more inefficient) variant instead:
+    def search_ensure_vertex(self, q):
+        """
+        Like ``search()``, but ensure that the resulting point is an extreme
+        point.
+        """
+        assert len(q) == self.dim
+        lp = self.lp.copy()
+        onb = matrix_rowspace(np.vstack((q, np.eye(self.dim))))
+        for q_i in onb:
+            v = lp.minimum(q_i, embed=True)
+            lp.add_row(q_i, v, v, embed=True)
+
+        extreme_point = lp.get_prim_solution()
+        extreme_point = extreme_point[0:self.dim]
+        extreme_point = scale_to_int(extreme_point)
+        return extreme_point
+
     def intersection(self, space):
         """
         Return the ConvexCone obtained from the intersection with the
@@ -184,7 +204,7 @@ class ConvexCone:
             fx = plane @ vertex
             sx = inner @ vertex
             plane, inner = (
-                inner - sx/fx * plane,
+                sx * plane - fx * inner,
                 fx * plane + sx * inner,
             )
 

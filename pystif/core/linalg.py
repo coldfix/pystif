@@ -44,7 +44,7 @@ matrix_rank = np.linalg.matrix_rank
 
 def matrix_rowspace(A, eps=1e-10):
     """Return matrix row space, i.e. Im[A.T]."""
-    return matrix_im_ker(A, eps)[1]
+    return matrix_imker(A, eps)[0]
 
 
 def matrix_nullspace(A, eps=1e-10):
