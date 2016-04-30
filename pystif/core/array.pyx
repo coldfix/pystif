@@ -1,3 +1,4 @@
+# cython: embedsignature=True
 """
 Utility functions that need Cython based optimization.
 """
