@@ -2,8 +2,8 @@
 Find quantum violations for the tripartite bell scenario.
 
 Usage:
-    qviol INPUT [-c CONSTR] [-o FILE] [-n NUM] [-d DIMS]
-    qviol summary INPUT
+    qviol INPUT [-c CONSTR] [-o FILE] [-n NUM] [-d DIMS] [-p PAR] [-s SUBSET]
+    qviol summary INPUT [-q]
 
 Arguments:
     INPUT                               File with known faces of the local cone
@@ -13,12 +13,16 @@ Options:
     -c CONSTR, --constraints CONSTR     Optimization constraints (CHSH|CHSHE|PPT|CGLMP)
     -n NUM, --num-runs NUM              Number of searches for each inequality [default: 10]
     -d DIMS, --dimensions DIMS          Hilbert space dimensions of subsystems [default: 222]
+    -p PAR, --parametrization PAR       Set parametrization [default: all]
+    -s SUBSET, --select SUBSET
+
+    -q, --quiet                         Don't list the inequalities
 """
 
 from operator import matmul
 from functools import reduce, partial
 from itertools import product
-from math import log2, sin, cos, pi
+from math import log2, sin, cos, pi, sqrt
 import cmath
 import sys
 
@@ -142,52 +146,131 @@ def unpack_unitary(params, dim):
     return Phi_L @ V @ Phi_R
 
 
+
+def random_unitaries(subdim):
+    # 1 measurement = U(n).CT @ diag[1 … n] @ U(n)
+    num_unitary_params = (sum(x**2 for x in subdim) +
+                          sum(x**2 for x in subdim[1:]))
+    return np.random.uniform(0, 2*pi, size=num_unitary_params)
+
+def unpack_unitaries(subdim, l):
+    U = [[np.eye(subdim[0], dtype=complex),
+          unpack_unitary(l, subdim[0])]]
+    U += [[unpack_unitary(l, d) for _ in range(2)]
+          for d in subdim[1:]]
+    return U
+
+
+class Mixing:
+
+    # If 'mixing' is enabled the parameter list is extended by an
+    # additional mixing probability with the unit matrix. This induces
+    # states to be returned as density matrices rather than vectors:
+
+    def __init__(self, base_para):
+        self.base_para = base_para
+
+    def random(self, system):
+        p = self.base_para.random(system)
+        return np.hstack((p, 0))
+
+    def unpack(self, system, params):
+        p_mix = params[-1]
+        state, bases = self.base_para.unpack(system, params[:-1])
+        state = ((1-p_mix) * projector(state) +
+                 p_mix * np.eye(dim) / dim)
+        return state, bases
+
+
+class ParametrizeAll:
+
+    def random(self, system):
+        # phases are absorbed into Phi_R:
+        s = random_direction_vector(system.dim*2)
+        u = random_unitaries(system.subdim)
+        return np.hstack((s, u))
+
+    def unpack(self, system, params):
+        l = list(params)
+        dim = system.dim
+        D = np.diag(range(dim))
+        U = unpack_unitaries(system.subdim, l)
+        state = to_quantum_state(to_unit_vector(l).reshape(dim, 2))
+        return state, U
+
+
+class FixedState:
+
+    def __init__(self, state):
+        self.state = state
+
+    def random(self, system):
+        return random_unitaries(system.subdim)
+
+    def unpack(self, system, params):
+        l = list(params)
+        dim = system.dim
+        D = np.diag(range(dim))
+        U = unpack_unitaries(system.subdim, l)
+        state = self.state
+        return state, U
+
+
+class ParametrizeGHZ3:
+
+    def random(self, system):
+        u = random_unitaries(system.subdim)
+        a = np.random.uniform(0, 2*pi)
+        return np.hstack((u, a))
+
+    def unpack(self, system, params):
+        l = list(params)
+        dim = system.dim
+        alpha = l.pop()
+        D = np.diag(range(dim))
+        U = unpack_unitaries(system.subdim, l)
+        state = GHZ_state3(alpha)
+        return state, U
+
+
+def GHZ_state2():
+    return np.array([
+        1, 0,   0, 0,
+        0, 0,   0, 1,
+    ], dtype=complex) / sqrt(2)
+
+
+def GHZ_state3(alpha):
+    c, s = cos_sin(alpha)
+    s /= sqrt(2)
+    return np.array([
+        c, 0, 0,    0, 0, 0,    0, 0, 0,
+        0, 0, 0,    0, s, 0,    0, 0, 0,
+        0, 0, 0,    0, 0, 0,    0, 0, s,
+    ], dtype=complex)
+
+
+def W_state2():
+    return np.array([
+        0, 1,   1, 0,
+        1, 0,   0, 0,
+    ], dtype=complex) / sqrt(3)
+
+
+
 class TripartiteBellScenario(CompositeQuantumSystem):
 
     symm = 'Aa <> aA; AaBb <> BbAa; AaCc <> CcAa'
 
-    def __init__(self, system, dims=(2, 2, 2)):
+    def __init__(self, system, parametrization, dims=(2, 2, 2)):
         super().__init__(dims)
         self.cols = system.columns
         sg = SymmetryGroup.load(self.symm, self.cols)
         self.rows = [g[0] for g in group_by_symmetry(sg, system.matrix)]
-        # If 'mixing' is enabled the parameter list is extended by an
-        # additional mixing probability with the unit matrix. This induces
-        # states to be returned as density matrices rather than vectors:
-        self.mixing = False
-
-    def random(self):
-        # phases are absorbed into Phi_R:
-        s = random_direction_vector(self.dim*2)
-        # 1 measurement = U(n).CT @ diag[1 … n] @ U(n)
-        num_unitary_params = (sum(x**2 for x in self.subdim) +
-                              sum(x**2 for x in self.subdim[1:]))
-        u = np.random.uniform(0, 2*pi, size=num_unitary_params)
-        if self.mixing:
-            return np.hstack((s, u, 0))
-        return np.hstack((s, u))
+        self.parametrization = parametrization
 
     def unpack(self, params):
-        l = list(params)
-
-        if self.mixing:
-            p_mix = l.pop()
-
-        D = np.diag(range(self.dim))
-        U = [[np.eye(self.subdim[0], dtype=complex),
-              unpack_unitary(l, self.subdim[0])]]
-        U += [[unpack_unitary(l, subdim) for _ in range(2)]
-              for subdim in self.subdim[1:]]
-        #M = [dagger(u) @ D @ u for u in U]
-        #M = list(zip(M[::2], M[1::2]))
-
-        state = to_quantum_state(to_unit_vector(l).reshape(self.dim, 2))
-
-        if self.mixing:
-            state = ((1-p_mix) * projector(state) +
-                     p_mix * np.eye(self.dim) / self.dim)
-
-        return state, U
+        return self.parametrization.unpack(self, params)
 
     def realize(self, params):
         state, bases = self.unpack(params)
@@ -432,11 +515,12 @@ def load_summary(filename):
     return indices, rows, cols
 
 
-def show_summary(opts):
+def show_summary(opts, quiet=False):
     indices, rows, cols = load_summary(opts['INPUT'])
     print(len(rows), "rows:", ",".join(map(str, indices)))
-    for r in rows:
-        print(format_human_readable(r, cols))
+    if not quiet:
+        for r in rows:
+            print(format_human_readable(r, cols))
 
 
 def get_constraints_obj(constraints_name, system):
@@ -458,14 +542,28 @@ def main(app):
     opts = app.opts
     dims = list(map(int, opts['--dimensions']))
     if opts['summary']:
-        show_summary(opts)
+        show_summary(opts, opts['--quiet'])
         return
 
     if opts['INPUT'].lower().endswith('.yml'):
         indices, rows, cols = load_summary(opts['INPUT'])
         app.system = System(np.array(rows), cols)
 
-    system = TripartiteBellScenario(app.system, dims=dims)
+    par = opts['--parametrization'].lower()
+    if par == 'all':
+        parametrization = ParametrizeAll()
+    elif par == 'ghz':
+        if dims == [2, 2, 2]:
+            parametrization = FixedState(GHZ_state2())
+        elif dims == [3, 3, 3]:
+            parametrization = ParametrizeGHZ3()
+    elif par == 'w':
+        if dims == [2, 2, 2]:
+            parametrization = FixedState(W_state2())
+
+    with_mixing = Mixing(parametrization)
+
+    system = TripartiteBellScenario(app.system, parametrization, dims=dims)
     constr = get_constraints_obj(opts['--constraints'], system)
 
     num_runs = int(opts['--num-runs'])
@@ -474,6 +572,10 @@ def main(app):
         out_file = open(opts['--output'], 'wt')
     else:
         out_file = sys.stdout
+
+    if opts['--select']:
+        select = [int(x) for x in opts['--select'].split(',')]
+        system.rows = [system.rows[i] for i in select]
 
     yaml_dump({
         'rows': system.rows,
@@ -488,9 +590,9 @@ def main(app):
 
     for _, (i, expr) in product(range(num_runs), enumerate(system.rows)):
 
-        system.mixing = False
+        system.parametrization = parametrization
         result = scipy.optimize.minimize(
-            system.violation, system.random(),
+            system.violation, system.parametrization.random(system),
             (expr,),
             constraints=constr and [
                 {'type': 'ineq', 'fun': constr},
@@ -524,7 +626,7 @@ def main(app):
             def retain_objective(params):
                 return -(system.violation(params, expr) - 0.5 * objective)
 
-            system.mixing = True
+            system.parametrization = with_mixing
             result = scipy.optimize.minimize(
                 constraint_violation, np.hstack((params, 0.001)),
                 constraints=[
