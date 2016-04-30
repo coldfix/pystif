@@ -531,6 +531,22 @@ def get_constraints_obj(constraints_name, system):
     return cls(system)
 
 
+def get_parametrization(par, dims):
+    par = par.lower()
+    if par == 'all':
+        return ParametrizeAll()
+    elif par == 'ghz':
+        if dims == [2, 2, 2]:
+            return FixedState(GHZ_state2())
+        elif dims == [3, 3, 3]:
+            return ParametrizeGHZ3()
+    elif par == 'w':
+        if dims == [2, 2, 2]:
+            return FixedState(W_state2())
+    raise ValueError("Unknown parametrization/dimensionality: {}/{}"
+                     .format(par, dims))
+
+
 @application
 def main(app):
 
@@ -544,18 +560,7 @@ def main(app):
         indices, rows, cols = load_summary(opts['INPUT'])
         app.system = System(np.array(rows), cols)
 
-    par = opts['--parametrization'].lower()
-    if par == 'all':
-        parametrization = ParametrizeAll()
-    elif par == 'ghz':
-        if dims == [2, 2, 2]:
-            parametrization = FixedState(GHZ_state2())
-        elif dims == [3, 3, 3]:
-            parametrization = ParametrizeGHZ3()
-    elif par == 'w':
-        if dims == [2, 2, 2]:
-            parametrization = FixedState(W_state2())
-
+    parametrization = get_parametrization(opts['--parametrization'], dims)
     with_mixing = Mixing(parametrization)
 
     system = TripartiteBellScenario(app.system, parametrization, dims=dims)
@@ -573,6 +578,8 @@ def main(app):
         system.rows = [system.rows[i] for i in select]
 
     yaml_dump({
+        'opts': opts,
+        'dims': dims,
         'rows': system.rows,
         'cols': system.cols,
         'expr': [
@@ -656,6 +663,7 @@ def main(app):
                 'bases': bases,
                 'reoptimize': reoptimize,
                 'mixing': mixing,
+                'parametrization': opts['--parametrization'],
             }], out_file)
             out_file.flush()
 
