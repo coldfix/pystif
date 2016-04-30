@@ -2,7 +2,7 @@
 Find quantum violations for the tripartite bell scenario.
 
 Usage:
-    qviol INPUT [-c CONSTR] [-o FILE] [-n NUM] [-d DIMS] [-p PAR]
+    qviol INPUT [-c CONSTR] [-o FILE] [-n NUM] [-d DIMS] [-p PAR] [-s SUBSET]
     qviol summary INPUT [-q]
 
 Arguments:
@@ -14,6 +14,7 @@ Options:
     -n NUM, --num-runs NUM              Number of searches for each inequality [default: 10]
     -d DIMS, --dimensions DIMS          Hilbert space dimensions of subsystems [default: 222]
     -p PAR, --parametrization PAR       Set parametrization [default: all]
+    -s SUBSET, --select SUBSET
 
     -q, --quiet                         Don't list the inequalities
 """
@@ -571,6 +572,10 @@ def main(app):
         out_file = open(opts['--output'], 'wt')
     else:
         out_file = sys.stdout
+
+    if opts['--select']:
+        select = [int(x) for x in opts['--select'].split(',')]
+        system.rows = [system.rows[i] for i in select]
 
     yaml_dump({
         'rows': system.rows,
