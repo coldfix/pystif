@@ -236,7 +236,7 @@ def GHZ_state2():
     return np.array([
         1, 0,   0, 0,
         0, 0,   0, 1,
-    ]) / sqrt(2)
+    ], dtype=complex) / sqrt(2)
 
 
 def GHZ_state3(alpha):
@@ -246,14 +246,14 @@ def GHZ_state3(alpha):
         c, 0, 0,    0, 0, 0,    0, 0, 0,
         0, 0, 0,    0, s, 0,    0, 0, 0,
         0, 0, 0,    0, 0, 0,    0, 0, s,
-    ])
+    ], dtype=complex)
 
 
 def W_state2():
     return np.array([
         0, 1,   1, 0,
         1, 0,   0, 0,
-    ]) / sqrt(3)
+    ], dtype=complex) / sqrt(3)
 
 
 
