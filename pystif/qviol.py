@@ -176,10 +176,8 @@ class Mixing:
 
     def unpack(self, system, params):
         p_mix = params[-1]
-        state, bases = self.base_para.unpack(system, params[:-1])
-        state = ((1-p_mix) * projector(state) +
-                 p_mix * np.eye(dim) / dim)
-        return state, bases
+        state, bases, _ = self.base_para.unpack(system, params[:-1])
+        return state, bases, p_mix
 
 
 class ParametrizeAll:
@@ -192,11 +190,9 @@ class ParametrizeAll:
 
     def unpack(self, system, params):
         l = list(params)
-        dim = system.dim
-        D = np.diag(range(dim))
         U = unpack_unitaries(system.subdim, l)
-        state = to_quantum_state(to_unit_vector(l).reshape(dim, 2))
-        return state, U
+        state = to_quantum_state(to_unit_vector(l).reshape(system.dim, 2))
+        return state, U, None
 
 
 class FixedState:
@@ -209,11 +205,9 @@ class FixedState:
 
     def unpack(self, system, params):
         l = list(params)
-        dim = system.dim
-        D = np.diag(range(dim))
         U = unpack_unitaries(system.subdim, l)
         state = self.state
-        return state, U
+        return state, U, None
 
 
 class ParametrizeGHZ3:
@@ -225,12 +219,10 @@ class ParametrizeGHZ3:
 
     def unpack(self, system, params):
         l = list(params)
-        dim = system.dim
         alpha = l.pop()
-        D = np.diag(range(dim))
         U = unpack_unitaries(system.subdim, l)
         state = GHZ_state3(alpha)
-        return state, U
+        return state, U, None
 
 
 def GHZ_state2():
@@ -273,7 +265,10 @@ class TripartiteBellScenario(CompositeQuantumSystem):
         return self.parametrization.unpack(self, params)
 
     def realize(self, params):
-        state, bases = self.unpack(params)
+        state, bases, p_mix = self.unpack(params)
+        if p_mix:
+            state = ((1-p_mix) * projector(state) +
+                     p_mix * np.eye(self.dim) / self.dim)
         projectors = [[[projector(u) for u in basis.T]
                        for basis in party]
                       for party in bases]
@@ -651,7 +646,7 @@ def main(app):
         if success:
             print(i, 'success', objective, fconstr)
 
-            state, bases = system.unpack(params)
+            state, bases, mixing = system.unpack(params)
             yaml_dump([{
                 'i_row': int(i),
                 'f_objective': objective,
@@ -660,6 +655,7 @@ def main(app):
                 'state': state,
                 'bases': bases,
                 'reoptimize': reoptimize,
+                'mixing': mixing,
             }], out_file)
             out_file.flush()
 
