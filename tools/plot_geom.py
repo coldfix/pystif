@@ -27,6 +27,7 @@ def load_data(filename):
         ('ridges_per_facet', float),
         ('vertices_per_facet', float),
         ('vertices_per_ridge', float),
+        ('vpf_geo', float),
     ])
     data = np.rec.array(data)
     data = np.lib.recfunctions.rec_append_fields(
@@ -71,14 +72,35 @@ class AFI_Model:
     def __call__(self, x, a, b, c):
         return (
             a * x.num_facets * x.num_vertices**((x.subdim-1)*b)
-            + c * x.num_ridges * np.log2(x.num_vertices)
+            + c * x.num_facets * x.ridges_per_facet * np.log2(x.num_vertices)
         )
 
     def model(self, a, b, c):
-        return r'${}\ f\ v^{{(d-1)/{:.3}}} + {}\ r\ \log_2 v$'.format(
+        return r'${}\ f\ v^{{(d-1)/{:.3}}}{}+ {}\ f\ \overline{{r_f}}\ \log_2 v$'.format(
             format_scientific(a),
             1/b,
+            "$\n$\\ ",
             format_scientific(c))
+
+
+class AFI_Model2:
+
+    #init = [5e-5, 0.5, 0.5, 1]
+    init = [5e-5, 0.5]
+
+    def __call__(self, x, a, b, c=0.5, d=1):
+        return (
+            a * x.num_facets * x.vpf_geo**((x.subdim-d)*c)
+            + b * x.num_facets * x.ridges_per_facet * np.log2(x.num_vertices)
+        )
+
+    def model(self, a, b, c=0.5, d=1):
+        return r'${0}\ f\ v^{{(d-{3})/{2:.3}}} + {1}\ f\ \overline{{r_f}}\ \log_2 v$'.format(
+            format_scientific(a),
+            format_scientific(b),
+            1/c, d
+        )
+
 
 
 class CHM_Model:
@@ -92,7 +114,8 @@ class CHM_Model:
                 #+ f
                 )
 
-    def model(self, a, b, c):
+    def model(self, a, b, c, *stuff):
+        return r'CHM TODO'
         return r'${}\ f\ v^{{(d-1)/{:.3}}} + {}\ r\ \log_2 v$'.format(
             format_scientific(a),
             1/b,
@@ -121,11 +144,13 @@ class Plotter:
         self._data = data
         self.select()
 
-    def _figure(self, xaxis, yaxis, figsize=(5.5, 3.5)):
+    def _figure(self, xaxis=None, yaxis=None, figsize=(5.5, 3.5)):
         fig = plt.figure(figsize=figsize)
         ax = fig.add_subplot(111)
-        ax.set_xlabel(self.LABEL[xaxis])
-        ax.set_ylabel(self.LABEL[yaxis])
+        if xaxis is not None:
+            ax.set_xlabel(self.LABEL[xaxis])
+        if yaxis is not None:
+            ax.set_ylabel(self.LABEL[yaxis])
         fig.tight_layout()
         return fig, ax
 
@@ -145,36 +170,37 @@ class Plotter:
 
     def runtimes(self, xaxis='chm_cmplx'):
         x = self.data
-        fig, ax = self._figure(xaxis, 'runtime')
+        #fig, ax = self._figure(xaxis, 'runtime')
+        fig, ax = self._figure()
         ax.loglog(x[xaxis], x.t_afi, **self.AFI_STYLE)
         ax.loglog(x[xaxis], x.t_chm, **self.CHM_STYLE)
         ax.legend(loc='upper left', numpoints=5)
         return fig
 
-    def _fit(self, force=False):
+    def _fit(self, afi_model=AFI_Model(), chm_model=CHM_Model(), force=False):
         if self.fitted and not force:
             return
         self.fitted = True
 
-        self.afi_model = AFI_Model()
-        self.chm_model = CHM_Model()
+        def yerror(t):
+            return np.sqrt(t)
 
         data = self.data
         self.afi_fit = Fit.leastsq(
-            self.afi_model, data,
-            data.t_afi, np.sqrt(data.t_afi),
-            self.afi_model.init)
+            afi_model, data,
+            data.t_afi, yerror(data.t_afi),
+            afi_model.init)
         print(self.afi_fit.info())
 
         self.chm_fit = Fit.leastsq(
-            self.chm_model, data,
-            data.t_chm, np.sqrt(data.t_chm),
-            self.chm_model.init)
+            chm_model, data,
+            data.t_chm, yerror(data.t_chm),
+            chm_model.init)
         print(self.chm_fit.info())
 
         self.model = {
-            'afi': self.afi_model.model(*self.afi_fit.coeffs),
-            'chm': '',
+            'afi': afi_model.model(*self.afi_fit.coeffs),
+            'chm': chm_model.model(*self.chm_fit.coeffs),
         }
 
 
@@ -207,15 +233,15 @@ class Plotter:
         data = self.data
         fit = getattr(self, which+'_fit')(self.data)
 
-        fig, ax = self._figure('runtime_actual', 'runtime_fitted',
-                               figsize=(5.5,3))
+        fig, ax = self._figure(figsize=(5.5,3))
         ax.loglog(data.t_afi, fit, color="blue", ls="none", marker="o",
-                  label="$y="+self.model[which][1:], ms=2)
+                  label="$"+self.model[which][1:], ms=2)
         ax.loglog(fit, fit, '-', color="red", lw=1.5, label="$y=x$")
         legend = ax.legend(loc='upper left', numpoints=5,
-                           bbox_to_anchor=(0.00, 0.99),
+                           #bbox_to_anchor=(0.00, 0.99),
                            bbox_transform=ax.transAxes,
-                           borderaxespad=0)
+                           #borderaxespad=0
+                           )
         legend.get_frame().set_alpha(0)
 
         num = max(max(fit), max(data.t_afi))
@@ -225,16 +251,28 @@ class Plotter:
 
         return fig
 
+    def vpf_vert(self):
+        fig, ax = self._figure('runtime', 'runtime')
+        ax.plot(self.data.num_vertices, self.data.vpf_geo, 'o')
+        return fig
+
 def main():
     p = Plotter(load_data(sys.argv[1]))
 
+    # IN THESIS:
+    p.runtimes('afi_cmplx').savefig("runtime-all.pdf")
+    #p._fit(AFI_Model2())
     p.fit_versus_actual('afi').savefig("fit-versus-actual-afi.pdf")
-    return
-    p.fit_versus_actual('chm').savefig("fit-versus-actual-chm.pdf")
-    p.runtime_fit('afi_cmplx').savefig("fit-afi_cmplx.pdf")
 
-    p.runtimes('afi_cmplx').savefig("runtime-all-afi_cmplx.pdf")
-    p.runtimes('chm_cmplx').savefig("runtime-all-chm_cmplx.pdf")
+    # OTHERS:
+    p.select(mindim=10)
+    p.fit_versus_actual('chm').savefig("fit-versus-actual-chm.pdf")
+
+    return
+
+    p.vpf_vert().savefig('bla.pdf')
+    p.runtime_fit('afi_cmplx').savefig("fit-afi_cmplx.pdf")
+    return
 
     p.select(mindim=10)
     p.runtimes('afi_cmplx').savefig("time__afi-hi.pdf")
