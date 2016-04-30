@@ -3,7 +3,7 @@ Find quantum violations for the tripartite bell scenario.
 
 Usage:
     qviol INPUT [-c CONSTR] [-o FILE] [-n NUM] [-d DIMS] [-p PAR]
-    qviol summary INPUT
+    qviol summary INPUT [-q]
 
 Arguments:
     INPUT                               File with known faces of the local cone
@@ -14,6 +14,8 @@ Options:
     -n NUM, --num-runs NUM              Number of searches for each inequality [default: 10]
     -d DIMS, --dimensions DIMS          Hilbert space dimensions of subsystems [default: 222]
     -p PAR, --parametrization PAR       Set parametrization [default: all]
+
+    -q, --quiet                         Don't list the inequalities
 """
 
 from operator import matmul
@@ -512,11 +514,12 @@ def load_summary(filename):
     return indices, rows, cols
 
 
-def show_summary(opts):
+def show_summary(opts, quiet=False):
     indices, rows, cols = load_summary(opts['INPUT'])
     print(len(rows), "rows:", ",".join(map(str, indices)))
-    for r in rows:
-        print(format_human_readable(r, cols))
+    if not quiet:
+        for r in rows:
+            print(format_human_readable(r, cols))
 
 
 def get_constraints_obj(constraints_name, system):
@@ -538,7 +541,7 @@ def main(app):
     opts = app.opts
     dims = list(map(int, opts['--dimensions']))
     if opts['summary']:
-        show_summary(opts)
+        show_summary(opts, opts['--quiet'])
         return
 
     if opts['INPUT'].lower().endswith('.yml'):
