@@ -14,6 +14,8 @@ import os
 import yaml
 from collections import OrderedDict, defaultdict
 from functools import reduce
+from itertools import groupby
+from operator import itemgetter as get
 
 from docopt import docopt
 
@@ -29,17 +31,31 @@ def int_vector(v):
     return tuple(int(round(x)) for x in v)
 
 
-def load_witnesses(filename, cols):
+def grouped(l, key):
+    return [list(g) for k, g in groupby(sorted(l, key=key), key=key)]
+
+
+def load_witnesses(filename, cols, ineqs):
     with open(filename) as f:
         data = yaml.safe_load(f)
-
     results = data['results'] or ()
-    indices = sorted({int(r['i_row']) for r in results})
-    rows = [int_vector(data['rows'][i]) for i in indices]
 
-    colorder = [data['cols'].index(c) for c in cols]
-    rows = [tuple(r[i] for i in colorder) for r in rows]
-    return rows
+    # establish expected column order:
+    col_trans = [data['cols'].index(c) for c in cols]
+    file_rows = [int_vector(r[i] for i in col_trans)
+                 for r in data['rows']]
+
+    # find index of inequality within global list
+    ineq_indices = {v: i for i, v in enumerate(ineqs)}
+    file_row_idx = [ineq_indices[r] for r in file_rows]
+    for r in results:
+        r['i_row'] = file_row_idx[int(r['i_row'])]
+
+    # sort by ineq-index and select only the entry with the maximum violation
+    return [
+        min(g, key=get('f_objective'))
+        for g in grouped(results, get('i_row'))
+    ]
 
 
 def facet_weight(f, cols):
@@ -231,29 +247,26 @@ def format_short_cca(ineqs, cols):
         yield format_vector(ineq)
 
 
-def witness_info(prefix, ineqs, cols):
-
+def load_all_witnesses(prefix, cols, ineqs):
     prefix += '{:02}D-'.format(len(cols))
 
     wit = witnesses = OrderedDict()
-    wit[2, 'none' ] = load_witnesses(prefix + "222-none.yml", cols)
+    wit[2, 'none' ] = load_witnesses(prefix + "222-none.yml", cols, ineqs)
     if not wit[2, 'none']:
-        return
-    wit[2, 'chshe'] = load_witnesses(prefix + "222-CHSHE.yml", cols)
-    wit[2, 'chsh' ] = load_witnesses(prefix + "222-CHSH.yml", cols)
-    wit[2, 'ppt'  ] = load_witnesses(prefix + "222-PPT.yml", cols)
-    wit[3, 'none' ] = load_witnesses(prefix + "333-none.yml", cols)
-    wit[3, 'chshe'] = load_witnesses(prefix + "333-CHSHE.yml", cols)
-    wit[3, 'cglmp'] = load_witnesses(prefix + "333-CGLMP.yml", cols)
-    wit[3, 'ppt'  ] = load_witnesses(prefix + "333-PPT.yml", cols)
+        return {}
+    wit[2, 'chshe'] = load_witnesses(prefix + "222-CHSHE.yml", cols, ineqs)
+    wit[2, 'chsh' ] = load_witnesses(prefix + "222-CHSH.yml", cols, ineqs)
+    wit[2, 'ppt'  ] = load_witnesses(prefix + "222-PPT.yml", cols, ineqs)
+    wit[3, 'none' ] = load_witnesses(prefix + "333-none.yml", cols, ineqs)
+    wit[3, 'chshe'] = load_witnesses(prefix + "333-CHSHE.yml", cols, ineqs)
+    wit[3, 'cglmp'] = load_witnesses(prefix + "333-CGLMP.yml", cols, ineqs)
+    wit[3, 'ppt'  ] = load_witnesses(prefix + "333-PPT.yml", cols, ineqs)
+    return wit
 
-    ineq_indices = {v: i for i, v in enumerate(ineqs)}
 
-    indices = {k: {ineq_indices[r] for r in l}
-               for k, l in witnesses.items()}
-
-    for k in witnesses:
-        yield " ".join(map(str, sorted(indices[k])))
+def witness_info(witnesses):
+    for _, w in witnesses.items():
+        yield " ".join(str(r['i_row']) for r in w)
 
 
 def read_bell_file(filename):
@@ -301,7 +314,6 @@ def main(args=None):
         num_vars = it.num_vars(len(cols)+1)
         basename = '{}cca-{}'.format(oprefix, num_vars)
 
-
     make_latex = True
     make_compact = True
     make_witness = bool(wprefix)
@@ -317,8 +329,9 @@ def main(args=None):
             f.write("\n".join(format_short_3(ineqs, cols, mode)))
 
     if make_witness:
+        wit = load_all_witnesses(wprefix, cols, ineqs)
         with open(basename + '.wit', 'wt') as f:
-            f.write("\n".join(witness_info(wprefix, ineqs, cols)))
+            f.write("\n".join(witness_info(wit)))
 
 
 if __name__ == '__main__':
