@@ -1,3 +1,4 @@
+# cython: embedsignature=True
 """
 Cython Wrapper for GLPK. For more information, see :class:`Problem`.
 """

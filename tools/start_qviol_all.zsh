@@ -3,7 +3,7 @@
 # ts = task spooler
 ts -S 4
 
-data=example/data
+data=example/bell
 outp=example/qviol-bell3x2
 
 function start_qviol() {
@@ -11,7 +11,7 @@ function start_qviol() {
     subdims=$2
     constrs=(${@:3})
 
-    facets=$data/final-bell3x2-$conedim.txt
+    facets=$data/3x2-fin-$conedim.txt
     prefix=$outp/$conedim-$subdims
     noconstr=$prefix-none.yml
 
@@ -24,14 +24,15 @@ function start_qviol() {
     done
 }
 
-if [[ -n $@ ]]; then
-    dims=($@)
-else
-    dims=(26D 18D 14D 12D 08D)
-fi
+function start_all() {
+    if [[ -n $@ ]]; then
+        dims=($@)
+    else
+        dims=(26D 18D 14D 12D 08D)
+    fi
 
-for dim in $dims; do
-    start_qviol $dim 333 CHSHE CGLMP
-    start_qviol $dim 222 CHSHE CHSH PPT
-done
-
+    for dim in $dims; do
+        start_qviol $dim 333 CHSHE CGLMP PPT
+        start_qviol $dim 222 CHSHE CHSH PPT
+    done
+}

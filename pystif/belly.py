@@ -1,9 +1,10 @@
 """
 Usage:
-    belly NUM_PARTIES NUM_CE [-v MAX_VARS]
+    belly NUM_PARTIES NUM_CE [-v MAX_VARS] [-o OUTPUT]
 
 Options:
     -v MAX_VARS, --vars MAX_VARS        Term size in output [default: 2]
+    -o OUTPUT, --output OUTPUT          Output file
 
 The expansion will stop when arriving at an expression with only Shannon
 entropy terms with at most ``MAX_VARS`` variables, e.g. ``MAX_VARS=2``
