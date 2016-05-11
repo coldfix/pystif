@@ -298,6 +298,7 @@ def read_cca_file(filename):
     return ineqs, colnames
 
 
+
 def main(args=None):
     opts = docopt(__doc__, args)
 
@@ -305,6 +306,7 @@ def main(args=None):
     wprefix = opts['--witnesses'] or ''
     mode = opts['--mode']
 
+    print("  - loading system...")
     if mode == 'bell':
         ineqs, cols = read_bell_file(opts['INPUT'])
         dim = len(cols)
@@ -319,6 +321,7 @@ def main(args=None):
     make_witness = bool(wprefix)
 
     if make_latex:
+        print("  - formatting equations...")
         with open(basename + '.tex', 'wt') as f:
             f.write("\n".join(format_latex(ineqs, cols, mode)))
 
@@ -329,6 +332,7 @@ def main(args=None):
             f.write("\n".join(format_short_3(ineqs, cols, mode)))
 
     if make_witness:
+        print("  - loading witnesses...")
         wit = load_all_witnesses(wprefix, cols, ineqs)
         with open(basename + '.wit', 'wt') as f:
             f.write("\n".join(witness_info(wit)))
