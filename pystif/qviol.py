@@ -2,7 +2,7 @@
 Find quantum violations for the tripartite bell scenario.
 
 Usage:
-    qviol INPUT [-c CONSTR] [-o FILE] [-n NUM] [-d DIMS] [-p PAR] [-s SUBSET]
+    qviol INPUT [-c CONSTR] [-o FILE] [-n NUM] [-d DIMS] [-p PAR] [-s SUBSET] [-D]
     qviol summary INPUT [-q]
 
 Arguments:
@@ -15,11 +15,12 @@ Options:
     -d DIMS, --dimensions DIMS          Hilbert space dimensions of subsystems [default: 222]
     -p PAR, --parametrization PAR       Set parametrization [default: all]
     -s SUBSET, --select SUBSET
+    -D, --degenerate
 
     -q, --quiet                         Don't list the inequalities
 """
 
-from operator import matmul
+from operator import matmul, add
 from functools import reduce, partial
 from itertools import product
 from math import log2, sin, cos, pi, sqrt
@@ -254,12 +255,14 @@ class TripartiteBellScenario(CompositeQuantumSystem):
 
     symm = 'Aa <> aA; AaBb <> BbAa; AaCc <> CcAa'
 
-    def __init__(self, system, parametrization, dims=(2, 2, 2)):
+    def __init__(self, system, parametrization, dims=(2, 2, 2),
+                 degenerate=False):
         super().__init__(dims)
         self.cols = system.columns
         sg = SymmetryGroup.load(self.symm, self.cols)
         self.rows = [g[0] for g in group_by_symmetry(sg, system.matrix)]
         self.parametrization = parametrization
+        self.degenerate = degenerate
 
     def unpack(self, params):
         return self.parametrization.unpack(self, params)
@@ -272,6 +275,10 @@ class TripartiteBellScenario(CompositeQuantumSystem):
         projectors = [[[projector(u) for u in basis.T]
                        for basis in party]
                       for party in bases]
+        if self.degenerate:
+            projectors = [[[projs[0] + projs[1]] + projs[2:]
+                           for projs in party]
+                          for party in projectors]
         return state, projectors
 
     def _mkcombo(self, parties, cols):
@@ -289,6 +296,9 @@ class TripartiteBellScenario(CompositeQuantumSystem):
 
     def violation(self, params, expr):
         state, parties = self.realize(params)
+        return self._violation(state, parties, expr)
+
+    def _violation(self, state, parties, expr):
         mcombo = self._mkcombo(parties, self.cols)
         measured = [measure_many(state, m) for m in mcombo]
         entropies = [H(x) for x in measured]
@@ -563,7 +573,8 @@ def main(app):
     parametrization = get_parametrization(opts['--parametrization'], dims)
     with_mixing = Mixing(parametrization)
 
-    system = TripartiteBellScenario(app.system, parametrization, dims=dims)
+    system = TripartiteBellScenario(app.system, parametrization, dims=dims,
+                                    degenerate=opts['--degenerate'])
     constr = get_constraints_obj(opts['--constraints'], system)
 
     num_runs = int(opts['--num-runs'])
@@ -578,7 +589,7 @@ def main(app):
         system.rows = [system.rows[i] for i in select]
 
     yaml_dump({
-        'opts': opts,
+        'opts': dict(opts),
         'dims': dims,
         'rows': system.rows,
         'cols': system.cols,
@@ -664,6 +675,7 @@ def main(app):
                 'reoptimize': reoptimize,
                 'mixing': mixing,
                 'parametrization': opts['--parametrization'],
+                'degenerate': opts['--degenerate'],
             }], out_file)
             out_file.flush()
 
