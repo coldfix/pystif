@@ -73,13 +73,18 @@ def facet_weight(f, cols):
     return [*weights, f]
 
 
-def breqn(eqns):
+def raw_breqn(eqns):
     yield r'\begin{dgroup*}'
     for lhs, rhs in eqns:
-        yield r'\begin{dmath*}'
-        yield r'  {} = {}'.format(lhs, ' '.join(rhs).lstrip('+ '))
+        yield r'\begin{dmath*}' #+ r'\breakingcomma'
+        yield r'  {} = {}'.format(lhs, rhs)
         yield r'\end{dmath*}'
     yield '\\end{dgroup*}'
+
+
+def breqn(eqns):
+    yield from raw_breqn((lhs, ' '.join(rhs).lstrip('+ '))
+                         for lhs, rhs in eqns)
 
 
 def align(eqns):
@@ -269,6 +274,217 @@ def witness_info(witnesses):
         yield " ".join(str(r['i_row']) for r in w)
 
 
+#----------------------------------------
+# STUFF FOR STATE LISTING
+#----------------------------------------
+
+from pystif import qviol
+from pystif.qviol import exp_i, cos_sin
+from math import cos, sin
+from numpy.testing import assert_allclose
+import numpy as np
+
+def simplify_params(params, dim):
+    phases = [params.pop() for _ in range(2*dim-1)]
+    alpha = phases[:dim]
+    beta  = phases[dim:]
+    if dim == 2:
+        gamma = [params.pop()]
+    else:
+        gamma = [params.pop() for _ in range(4)]
+    return alpha, beta, gamma
+
+def implement_simple_3(alpha, beta, gamma):
+    Phi_L = np.diag([exp_i(a) for a in alpha])
+    Phi_R = np.diag([exp_i(b) for b in beta]+[1])
+    a, b, c, d = gamma
+    #----------------------------------------
+    # V_L = np.array([
+    #     [1-(1-cos(c))*cos(a)**2,
+    #         (1-cos(c))*cos(a)*sin(a)*exp_i(-b),
+    #         sin(c)*cos(a)],
+    #     [(1-cos(c))*cos(a)*sin(a)*exp_i(b),
+    #         1-(1-cos(c))*sin(a)**2,
+    #         sin(c)*sin(a)*exp_i(b)],
+    #     [-sin(c)*cos(a),
+    #         -sin(c)*sin(a)*exp_i(b),
+    #         cos(c)],
+    # ])
+    #----------------------------------------
+
+    exp_gamma = exp_i(a)
+    exp_delta = exp_i(b)
+    a = [exp_gamma.real,
+         exp_gamma.imag * exp_delta]
+
+    a = qviol.as_column_vector(a)
+    a_ = qviol.dagger(a)
+
+    c, s = cos_sin(c)
+    I = np.eye(2)
+    V_L = np.array(np.bmat([
+        [I - (1 - c) * (a@a_),  s * a],
+        [-s * a_,               [[c]]],
+    ]))
+
+    V_R = np.array([
+        [ cos(d),   sin(d), 0],
+        [-sin(d),   cos(d), 0],
+        [      0,        0, 1],
+    ])
+    return Phi_L @ V_L @ V_R @ Phi_R
+
+def implement_simple_2(alpha, beta, gamma):
+    Phi_L = np.diag([exp_i(a) for a in alpha])
+    Phi_R = np.diag([exp_i(b) for b in beta]+[1])
+    a, = gamma
+    V = np.array([
+        [cos(a), sin(a)],
+        [-sin(a), cos(a)],
+    ])
+    return Phi_L @ V @ Phi_R
+
+def explicit_params(params, dim):
+    params = list(params)
+    for k in range(5):
+        p1 = params
+        p2 = params[:]
+        m1 = qviol.unpack_unitary(p1, dim)
+        alpha, beta, gamma = simplify_params(p2, dim)
+        # early consistency check
+        if dim == 2:
+            m2 = implement_simple_2(alpha, beta, gamma)
+        else:
+            m2 = implement_simple_3(alpha, beta, gamma)
+        assert len(p1) == len(p2)
+        assert_allclose(m1, m2)
+        yield alpha, beta, gamma
+
+
+trumped_by = {
+    (2, 'none'): [(2, 'chshe')],
+    (2, 'chshe'): [(2, 'chsh')],
+    (2, 'chsh'): [(2, 'ppt')],
+    (2, 'ppt'): [],
+    (3, 'none'): [(3, 'cglmp'), (2, 'none')],
+    (3, 'cglmp'): [(3, 'chshe')],
+    (3, 'chshe'): [(3, 'ppt'), (2, 'chshe')],
+    (3, 'ppt'): [(2, 'ppt')],
+}
+
+
+def select_states(wit):
+    """Select strongest claim for each inequality."""
+    indices_all = {
+        k: {r['i_row'] for r in w}
+        for k, w in wit.items()
+    }
+    is_trumped = lambda k, i: any(i in indices_all[p] for p in trumped_by[k])
+    indices_sliced = {
+        k: {i for i in w if not is_trumped(k, i)}
+        for k, w in indices_all.items()
+    }
+    return OrderedDict([
+        (k, [r for r in w if r['i_row'] in indices_sliced[k]])
+        for k, w in wit.items()
+    ])
+
+
+def _fmt_num(n):
+    return r'{{%s}%.6f}' % ('+' if n >= 0 else '-', abs(n))
+
+def _format_cmplx(z):
+    r, i = z
+    return r'{%s\,%si}' % (_fmt_num(r), _fmt_num(i))
+
+
+def chunks(l, n):
+    """Yield successive n-sized chunks from l."""
+    for i in range(0, len(l), n):
+        yield l[i:i+n]
+
+def _fmt_vec(v):
+    return r'\smash{\big(}&&%s\,\smash{\big)}' % (
+        ',\\\\\n& && '.join(
+            ',\\,'.join(map(_fmt_num, chunk))
+            for chunk in chunks(v, 6)))
+
+def _format_state(k, r):
+    v = r['state']
+    lhs = r'\vec\psi'.format(r['i_row'], k[0])
+    rhs = r'\smash{\big(}&&%s\,\smash{\big)}' % (
+        ',\\\\\n& && '.join(
+            ',\\,'.join(map(_format_cmplx, chunk))
+            for chunk in chunks(v, 3)))
+    return lhs, rhs
+
+def _format_bases(k, r):
+    if len(r['state']) == 8:
+        dim = 2
+    elif len(r['state']) == 27:
+        dim = 3
+    params = list(r['opt_params'])
+    if r.get('reoptimize'):
+        params.pop()
+    names = [
+        r'\vec\alpha_2',
+        r'\vec\beta_1',
+        r'\vec\beta_2',
+        r'\vec\gamma_1',
+        r'\vec\gamma_2',
+    ]
+    for n, (a, b, c) in zip(names, explicit_params(params, dim)):
+        yield (n, _fmt_vec(a + b + c))
+
+
+def _format_mixing(r):
+    if r.get('reoptimize'):
+        mixing = '&&{:.6f}'.format(r.get('mixing'))
+        yield (r'\lambda', mixing)
+
+def _alignat(eqns):
+    yield r'\begin{alignat*}{2}'
+    yield '\\\\\n'.join(
+        r'  {} &= {}'.format(lhs, rhs)
+        for lhs, rhs in eqns
+    )
+    yield r'\end{alignat*}'
+
+
+def state_listing(flat):
+    for k, r in flat:
+        if k[1] == 'none':
+            remark = ''
+        else:
+            remark = ' satisfying bipartite {}'.format(k[1].upper())
+        yield r'\noindent'
+        #yield r'Violation:'
+        yield (r'$I_{%s}\cdot\vec h_{\vec\psi} = %.5f$' % (r['i_row'], r['f_objective'])
+               +r' for $\vec\psi\in\Qunits{%d}$%s:' % (k[0], remark))
+        yield from _alignat([
+            *_format_mixing(r),
+            _format_state(k, r),
+            *_format_bases(k, r)
+        ])
+        yield r''
+
+
+def make_state_listing(wit, basename):
+
+    flat = sorted(
+        ((k, r) for k, w in wit.items() for r in w),
+        key=lambda r: r[1]['i_row'])
+
+    state_all = "\n".join(state_listing(flat))
+
+    with open(basename + '.state.tex', 'wt') as f:
+        f.write(state_all)
+
+#----------------------------------------
+# OTHER STUFF AGAIN
+#----------------------------------------
+
+
 def read_bell_file(filename):
     system = System.load(filename)
     cols = sorted(system.columns, key=lambda c: (len(c), c.lower(), c))
@@ -336,6 +552,11 @@ def main(args=None):
         wit = load_all_witnesses(wprefix, cols, ineqs)
         with open(basename + '.wit', 'wt') as f:
             f.write("\n".join(witness_info(wit)))
+
+        # select subset of states that support the strongest claim:
+        print("  - formatting states...")
+        wit = select_states(wit)
+        make_state_listing(wit, basename)
 
 
 if __name__ == '__main__':
