@@ -8,6 +8,7 @@ import sys
 import math
 
 import matplotlib
+import mpl_toolkits.axisartist as axisartist
 from matplotlib import pyplot as plt
 import numpy as np
 import numpy.lib.recfunctions
@@ -67,6 +68,8 @@ def rec_group_mean(x, key):
 
 class AFI_Model:
 
+    """Modified by v_r -> v^gamma"""
+
     init = [5e-5, 0.5, 0.5]
 
     def __call__(self, x, a, b, c):
@@ -85,22 +88,61 @@ class AFI_Model:
 
 class AFI_Model2:
 
-    #init = [5e-5, 0.5, 0.5, 1]
+    """Original theory."""
+
     init = [5e-5, 0.5]
 
-    def __call__(self, x, a, b, c=0.5, d=1):
+    def __call__(self, x, a, b, c=2, d=1):
         return (
-            a * x.num_facets * x.vpf_geo**((x.subdim-d)*c)
+            a * x.num_facets * x.vpf_geo**((x.subdim-d)/c)
             + b * x.num_facets * x.ridges_per_facet * np.log2(x.num_vertices)
         )
 
-    def model(self, a, b, c=0.5, d=1):
-        return r'${0}\ f\ v^{{(d-{3})/{2:.3}}} + {1}\ f\ \overline{{r_f}}\ \log_2 v$'.format(
+    def model(self, a, b, c=2, d=1):
+        return r'${0}\ f\ {v}^{{(d-{3})/{2}}} + {1}\ f\ \overline{{r_f}}\ \log_2 v$'.format(
             format_scientific(a),
             format_scientific(b),
-            1/c, d
+            c, d,
+            v=r'\overline{v_{f,\mathrm{geo}}}'
         )
 
+class AFI_Model3:
+
+    """Most adapted, simplest model"""
+
+    init = [5e-5, 0.5, 0.5]
+
+    def __call__(self, x, a, b, c):
+        return (
+            a * x.num_facets * x.num_vertices**((x.subdim-1)*b)
+            + c * x.num_ridges * np.log2(x.num_vertices)
+        )
+
+    def model(self, a, b, c):
+        return r'${}\ f\ v^{{(d-1)/{:.3}}}+ {}\ r\ \log_2 v$'.format(
+            format_scientific(a),
+            1/b,
+            format_scientific(c))
+
+
+class AFI_Model4:
+
+    """Original theory, but allow convex hull to scale more freely."""
+
+    init = [5e-5, 0.5, 2.0, 1.0]
+
+    def __call__(self, x, a, b, c, d):
+        return (
+            a * x.num_facets * x.vpf_geo**((x.subdim-d)/c)
+            + b * x.num_facets * x.ridges_per_facet * np.log2(x.num_vertices)
+        )
+
+    def model(self, a, b, c, d):
+        return r'${0}\ f\ v^{{(d-{3:.3})/{2:.3}}} + {1}\ f\ \overline{{r_f}}\ \log_2 v$'.format(
+            format_scientific(a),
+            format_scientific(b),
+            c, d
+        )
 
 
 class CHM_Model:
@@ -146,7 +188,8 @@ class Plotter:
 
     def _figure(self, xaxis=None, yaxis=None, figsize=(5.5, 3.5)):
         fig = plt.figure(figsize=figsize)
-        ax = fig.add_subplot(111)
+        ax = axisartist.Subplot(fig, 111)
+        fig.add_subplot(ax)
         if xaxis is not None:
             ax.set_xlabel(self.LABEL[xaxis])
         if yaxis is not None:
@@ -175,6 +218,7 @@ class Plotter:
         ax.loglog(x[xaxis], x.t_afi, **self.AFI_STYLE)
         ax.loglog(x[xaxis], x.t_chm, **self.CHM_STYLE)
         ax.legend(loc='upper left', numpoints=5)
+        #ax.axis[:].invert_ticklabel_direction()
         return fig
 
     def _fit(self, afi_model=AFI_Model(), chm_model=CHM_Model(), force=False):
@@ -229,13 +273,27 @@ class Plotter:
 
     def fit_versus_actual(self, which='afi'):
         self._fit()
-
         data = self.data
+
         fit = getattr(self, which+'_fit')(self.data)
 
-        fig, ax = self._figure(figsize=(5.5,3))
+        fig, ax = self._figure(figsize=(6.2,3.6))
+
+
+        if True:
+            def yerror(t):
+                return np.sqrt(t)
+            fit2_model = AFI_Model2()
+            fit2 = Fit.leastsq(
+                fit2_model, data,
+                data.t_afi, yerror(data.t_afi),
+                fit2_model.init)
+            ax.loglog(data.t_afi, fit2(data),
+                      color="yellow", ls="none", marker="v",
+                      label="$y="+fit2_model.model(*fit2.coeffs)[1:], ms=3.3)
+
         ax.loglog(data.t_afi, fit, color="blue", ls="none", marker="o",
-                  label="$"+self.model[which][1:], ms=2)
+                  label="$y="+self.model[which][1:], ms=2.5)
         ax.loglog(fit, fit, '-', color="red", lw=1.5, label="$y=x$")
         legend = ax.legend(loc='upper left', numpoints=5,
                            #bbox_to_anchor=(0.00, 0.99),
@@ -247,7 +305,10 @@ class Plotter:
         num = max(max(fit), max(data.t_afi))
         exp = math.log10(num)
         new = (math.ceil(num * math.pow(10, -exp)) + 1) * math.pow(10, exp)
-        ax.set_xlim(right=new)
+        #ax.set_xlim(right=new)
+        ax.set_xlim(right=7e2)
+
+        #ax.axis[:].invert_ticklabel_direction()
 
         return fig
 
@@ -261,12 +322,24 @@ def main():
 
     # IN THESIS:
     p.runtimes('afi_cmplx').savefig("runtime-all.pdf")
-    #p._fit(AFI_Model2())
-    p.fit_versus_actual('afi').savefig("fit-versus-actual-afi.pdf")
 
-    # OTHERS:
-    p.select(mindim=10)
+    #----------------------------------------
+    # p._fit(AFI_Model2())
+    # p.fit_versus_actual('afi').savefig("fit-versus-actual-afi-orig.pdf")
+    #----------------------------------------
+    p.select()
+    p._fit(AFI_Model3())
+    p.fit_versus_actual('afi').savefig("fit-versus-actual-afi-adap.pdf")
     p.fit_versus_actual('chm').savefig("fit-versus-actual-chm.pdf")
+
+    #----------------------------------------
+    # p.select()
+    # p._fit(AFI_Model3())
+    # p.fit_versus_actual('afi').savefig("fit-versus-actual-afi-most.pdf")
+    # p.select()
+    # p._fit(AFI_Model4())
+    # p.fit_versus_actual('afi').savefig("fit-versus-actual-afi-free.pdf")
+    #----------------------------------------
 
     return
 
