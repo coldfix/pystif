@@ -10,6 +10,8 @@ from cpython cimport array as c_array
 cimport cython
 import numpy as np
 
+from fractions import Fraction
+
 
 cdef c_array.array int_array_template = array('i', [])
 cdef c_array.array double_array_template = array('d', [])
@@ -83,21 +85,17 @@ def scale_to_min(v, double threshold=1e-10):
     return v/min
 
 
-def scale_to_int(v, double threshold=1e-7, int max_factor=1000):
+def scale_to_int(v, double threshold=1e-5, int max_factor=1000):
     """Scale v such that it has only integer components."""
     v = scale_to_min(v, threshold)
-    cdef double c, mc, r, d, f
+    cdef double c, amc
     cdef long m = 1
     for c in double_view(v):
-        mc = m*c
-        r = round(mc)
-        d = abs(r - mc)
-        if d < threshold:
-            continue
-        f = 1/d
-        if abs(f - round(f)) > threshold:
+        amc = abs(m*c)
+        f = Fraction(amc).limit_denominator(max_factor//m + 1)
+        if abs(f.numerator - f.denominator*amc) > threshold:
             return v
-        m *= int(round(f))
+        m *= f.denominator
         if m > max_factor:
             return v
     return make_int_exact(v*m)
