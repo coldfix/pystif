@@ -145,7 +145,8 @@ class ConvexCone:
     def search_ensure_vertex(self, q):
         """
         Like ``search()``, but ensure that the resulting point is an extreme
-        point.
+        point. For unknown reasons (numerical instabilities?) this sometimes
+        fails with pystif.core.lp.NoFeasibleError.
         """
         assert len(q) == self.dim
         lp = self.lp.copy()

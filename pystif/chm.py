@@ -155,6 +155,9 @@ def convex_hull_method(polyhedron, rays,
                 result.append(face)
             else:
                 # not valid - search a violating extreme point:
+                # NOTE: we should really use search_ensure_vertex() to avoid
+                # getting non-extremal points (which will decrease the
+                # performance of convex hull etc):
                 ray = polyhedron.search(face)
                 for r in chm.add(ray):
                     report_ray(r)
