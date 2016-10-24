@@ -4,6 +4,8 @@ Cython Wrapper for GLPK. For more information, see :class:`Problem`.
 """
 
 cimport cython
+from libc.stdint cimport int8_t
+
 import numpy as np
 
 from . cimport glpk as glp
@@ -26,6 +28,10 @@ __all__ = [
 ]
 
 
+ctypedef int (*GetIntValue)(glp.Prob*, int)
+ctypedef double (*GetFloatValue)(glp.Prob*, int)
+
+
 cpdef enum:
     MIN = glp.MIN
     MAX = glp.MAX
@@ -33,6 +39,13 @@ cpdef enum:
 cpdef enum:
     PRIMAL = glp.PRIMAL
     DUAL = glp.DUAL
+
+cpdef enum:
+    BS = glp.BS
+    NL = glp.NL
+    NU = glp.NU
+    NF = glp.NF
+    NS = glp.NS
 
 
 cdef int get_vartype(double lb, double ub):
@@ -446,26 +459,57 @@ cdef class Problem:
                     self.get_objective_value() >= -threshold)
         return all(map(_implies, _as_matrix(L)))
 
-    @cython.boundscheck(False)
-    @cython.wraparound(False)
     def get_prim_solution(self):
         """Return primal solution as numpy array."""
-        ret = np.empty(self.num_cols, np.float64, "c")
+        return self._get_float_vector(&glp.get_col_prim, self.num_cols)
+
+    def get_dual_solution(self):
+        """Return dual solution as numpy array."""
+        return self._get_float_vector(&glp.get_row_dual, self.num_rows)
+
+    def get_row_prim(self): return self._get_float_vector(&glp.get_row_prim, self.num_rows)
+    def get_row_dual(self): return self._get_float_vector(&glp.get_row_dual, self.num_rows)
+    def get_col_prim(self): return self._get_float_vector(&glp.get_col_prim, self.num_cols)
+    def get_col_dual(self): return self._get_float_vector(&glp.get_col_dual, self.num_cols)
+
+    def get_row_stats(self):
+        """
+        Return current status assigned to the auxiliary variables associated
+        with the rows as follows:
+
+            BS: basic variable
+            NL: non-basic variable on its lower bound
+            NU: non-basic variable on its upper bound
+            NF: non-basic free (unbounded) variable
+            NS: non-basic fixed variable
+        """
+        return self._get_byte_vector(&glp.get_row_stat, self.num_cols)
+
+    def get_col_stats(self):
+        """
+        Return current status assigned to the structural variables associated
+        with the columns with meanings as in `get_row_stats`.
+        """
+        return self._get_byte_vector(&glp.get_col_stat, self.num_cols)
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    cdef _get_float_vector(self, GetFloatValue get_value, int num_items):
+        ret = np.empty(num_items, np.float64, "c")
         cdef double[:] buf = ret
-        cdef int col
-        for col in range(self.num_cols):
-            buf[col] = glp.get_col_prim(self._lp, col+1)
+        cdef int item
+        for item in range(num_items):
+            buf[item] = get_value(self._lp, item+1)
         return ret
 
     @cython.boundscheck(False)
     @cython.wraparound(False)
-    def get_dual_solution(self):
-        """Return dual solution as numpy array."""
-        ret = np.empty(self.num_rows, np.float64, "c")
-        cdef double[:] buf = ret
-        cdef int row
-        for row in range(self.num_rows):
-            buf[row] = glp.get_row_dual(self._lp, row+1)
+    cdef _get_byte_vector(self, GetIntValue get_value, int num_items):
+        ret = np.empty(num_items, np.int8, "c")
+        cdef int8_t[:] buf = ret
+        cdef int item
+        for item in range(num_items):
+            buf[item] = get_value(self._lp, item+1)
         return ret
 
     property name:

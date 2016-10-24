@@ -32,6 +32,13 @@ cdef extern from "glpk.h":
         UNBND  "GLP_UNBND"  #  solution is unbounded
 
     enum:
+        BS "GLP_BS" # basic variable
+        NL "GLP_NL" # non-basic variable on its lower bound
+        NU "GLP_NU" # non-basic variable on its upper bound
+        NF "GLP_NF" # non-basic free (unbounded) variable
+        NS "GLP_NS" # non-basic fixed variable
+
+    enum:
         MSG_OFF "GLP_MSG_OFF"  #  no output
         MSG_ERR "GLP_MSG_ERR"  #  warning and error messages only
         MSG_ON  "GLP_MSG_ON"   #  normal output
@@ -116,6 +123,9 @@ cdef extern from "glpk.h":
 
     double get_col_prim "glp_get_col_prim" (Prob* prob, int col)
     double get_col_dual "glp_get_col_dual" (Prob* prob, int col)
+
+    int get_row_stat "glp_get_row_stat" (Prob* prob, int row)
+    int get_col_stat "glp_get_col_stat" (Prob* prob, int col)
 
     # names
 
