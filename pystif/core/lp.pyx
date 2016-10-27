@@ -63,6 +63,14 @@ cdef int get_vartype(double lb, double ub):
     return glp.DB
 
 
+cdef double fix_infinities(double value):
+    if value == -DBL_MAX:
+        return -INF
+    if value == +DBL_MAX:
+        return +INF
+    return value
+
+
 class OptimizeError(RuntimeError):
     """Any error that occured during optimization."""
 
@@ -354,6 +362,11 @@ cdef class Problem:
         return (-INF if lb == -DBL_MAX else lb,
                 +INF if ub == +DBL_MAX else ub)
 
+    def get_row_lbs(self): return self._get_float_vector(&glp.get_row_lb, self.num_rows)
+    def get_row_ubs(self): return self._get_float_vector(&glp.get_row_ub, self.num_rows)
+    def get_col_lbs(self): return self._get_float_vector(&glp.get_col_lb, self.num_cols)
+    def get_col_ubs(self): return self._get_float_vector(&glp.get_col_ub, self.num_cols)
+
     cdef _check_row_size(self, int size, embed, str name='row'):
         if size == self.num_cols:
             return
@@ -392,6 +405,12 @@ cdef class Problem:
             glp.set_obj_coef(self._lp, col+1, buf[col])
         for col in range(buf.size, self.num_cols):
             glp.set_obj_coef(self._lp, col+1, 0)
+
+    @cython.boundscheck(False)
+    @cython.wraparound(False)
+    def get_objective(self):
+        """Get objective coefficients as numpy array."""
+        return self._get_float_vector(&glp.get_obj_coef, self.num_cols)
 
     def simplex(self, int method=glp.PRIMAL):
         """Perform simplex algorithm."""
@@ -486,7 +505,7 @@ cdef class Problem:
             NF: non-basic free (unbounded) variable
             NS: non-basic fixed variable
         """
-        return self._get_byte_vector(&glp.get_row_stat, self.num_cols)
+        return self._get_byte_vector(&glp.get_row_stat, self.num_rows)
 
     def get_col_stats(self):
         """
@@ -502,7 +521,7 @@ cdef class Problem:
         cdef double[:] buf = ret
         cdef int item
         for item in range(num_items):
-            buf[item] = get_value(self._lp, item+1)
+            buf[item] = fix_infinities(get_value(self._lp, item+1))
         return ret
 
     @cython.boundscheck(False)
