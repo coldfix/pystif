@@ -28,6 +28,9 @@ __all__ = [
 ]
 
 
+int_ = (int, np.integer)
+
+
 ctypedef int (*GetIntValue)(glp.Prob*, int)
 ctypedef double (*GetFloatValue)(glp.Prob*, int)
 
@@ -317,7 +320,7 @@ cdef class Problem:
 
     def set_row_bnds(self, rows, double lb, double ub):
         """Set bounds of the specified row(s)."""
-        if isinstance(rows, int):
+        if isinstance(rows, int_):
             rows = (rows,)
         cdef int vartype = get_vartype(lb, ub)
         cdef int row
@@ -327,7 +330,7 @@ cdef class Problem:
 
     def set_col_bnds(self, cols, double lb, double ub):
         """Set bounds of the specified col."""
-        if isinstance(cols, int):
+        if isinstance(cols, int_):
             cols = (cols,)
         cdef int vartype = get_vartype(lb, ub)
         cdef int col
