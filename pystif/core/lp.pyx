@@ -582,6 +582,8 @@ cdef class Problem:
         obj_val = self.get_objective_value()
         col_stats = self.get_col_stats()
         row_stats = self.get_row_stats()
+        if any(col_stats == NF) or any(row_stats == NF):
+            return False
         struc_var = 1*(col_stats == NL) - (col_stats == NU)
         slack_var = 1*(row_stats == NU) - (row_stats == NL)
         slack_ind = np.flatnonzero(slack_var)
