@@ -534,6 +534,76 @@ cdef class Problem:
             buf[item] = get_value(self._lp, item+1)
         return ret
 
+    def is_dual_degenerate(self):
+        """
+        Check for dual degeneracy of the previous LP, i.e. whether the primal
+        problem has multiple optimal solutions.
+        """
+        return not self.is_unique()
+
+    def is_unique(self):
+
+        """
+        Check whether the primal problem has a unique optimimzer, i.e. whether
+        the previous LP is not dual degenerate.
+        """
+
+        # The method is based on: G. Appa, "On the uniqueness of solutions to
+        # linear programs", 2002.
+
+        # Appa assumes the primal standard form
+        #       max cx, s.t. Ax=b, x≥0
+        # and explains checking for uniqueness of an optimal solution `x*` as
+        #       max dx, s.t. Ax=b, cx=cx*, x≥0
+        # where `dₖ=1` if `x*ₖ=0` and `dₖ=0` elsewhere.
+
+        # Our more general setup is
+        #       lᵣ≤Ax≤uᵣ, lₓ≤x≤uₓ
+        # Applying standard techniques to convert this to standard form:
+        #       lᵣ=Ax-sₗ    uᵣ=Ax+sᵤ        where x=p-n
+        #       lₓ= x-sₙ    uₓ= x+sₚ
+        #       p≥0, n≥0,   sₗ≥0, sᵤ≥0,     sₙ≥0, sₚ≥0
+
+        # Therefore, the rule `dₖ=1 where x*ₖ=0` applies to our system as
+        # follows:
+
+        # The slack variables sₗ/sᵤ become zero if the corresponding
+        # constraint is at its lower/upper limit. We insert a slack variable
+        # with the appropriate sign for this row and set the objective
+        # coefficient to +1 as in Appa's description.
+
+        # The slack variables sₙ/sₚ become zero if the corresponding
+        # structural variable xₖ is at its lower/upper limit. We set the
+        # objective coefficient to ±1 to move away from the bound.
+
+        # p=0, n=0, ignored?!
+
+        obj_vec = self.get_objective()
+        obj_val = self.get_objective_value()
+        col_stats = self.get_col_stats()
+        row_stats = self.get_row_stats()
+        struc_var = 1*(col_stats == NL) - (col_stats == NU)
+        slack_var = 1*(row_stats == NU) - (row_stats == NL)
+        slack_ind = np.flatnonzero(slack_var)
+        num_slack = len(slack_ind)
+        orig_size = self.num_cols
+        objective = np.hstack((struc_var, np.ones(num_slack)))
+
+        lp = self.copy()
+        lp.add(obj_vec, obj_val, obj_val)
+        if num_slack > 0:
+            lp.add_cols(num_slack, lb=0)
+
+        # Fill in coefficients for slack variables sₗ/sᵤ
+        for islack, irow in enumerate(slack_ind):
+            row = lp.get_row(irow)
+            row[orig_size + islack] = slack_var[irow]
+            bnd = self.get_row_bnds(irow)[slack_var[irow] > 0]
+            lp.set_row(irow, row)
+            lp.set_row_bnds(irow, bnd, bnd)
+
+        return np.isclose(lp.maximum(objective), 0)
+
     property name:
         """Problem name (will be cut off at 255 chars)."""
         def __set__(self, name):
