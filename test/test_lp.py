@@ -6,6 +6,19 @@ from pystif.core.lp import Problem, UnboundedError, NofeasibleError
 from numpy.testing import assert_array_equal, assert_almost_equal
 
 
+def is_max_unique(lp, objective):
+    lp.minimize([-x for x in objective])
+    return lp.is_unique()
+
+
+def is_unique(lp, opt, objective):
+    if opt == 'min':
+        lp.minimize([-x for x in objective])
+    else:
+        lp.maximize(objective)
+    return lp.is_unique()
+
+
 class TestLP(unittest.TestCase):
 
     def test_add_rows(self):
@@ -119,6 +132,94 @@ class TestLP(unittest.TestCase):
         self.assertFalse(b.implies([0, 0, 1]))  # y ≥ 0
         self.assertFalse(a.implies([0, 1, 0]))  # x ≥ 0
         self.assertTrue(b.implies([0, 1, 0]))   # x ≥ 0
+
+    def test_is_unique_2D(self):
+        lp = Problem(num_cols=3, lb_col=0)
+        lp.set_col_bnds(0, 1, 1)
+        lp.add([
+          # [0,  1,  0],        # x ≥ 0    (implicit)
+          # [0,  0,  1],        # y ≥ 0    (implicit)
+            [2, -1,  0],        # 2 ≥ x
+            [2,  0, -1],        # 2 ≥ y
+            [3, -1, -1],        # 3 ≥ x + y
+            [1, -1,  1],        # y ≥ x - 1
+        ])
+
+        # facets
+        self.assertFalse(is_max_unique(lp, [0, -1,  0]))    # col 0
+        self.assertFalse(is_max_unique(lp, [0,  0, -1]))    # col 1
+        self.assertFalse(is_max_unique(lp, [0,  0, +1]))    # row 1
+        self.assertFalse(is_max_unique(lp, [0, +1, +1]))    # row 2
+        self.assertFalse(is_max_unique(lp, [0, +1, -1]))    # row 3
+
+        # "hidden" face
+        self.assertTrue(is_max_unique(lp, [0, +1,  0]))     # row 0
+
+        # "random" directions
+        self.assertTrue(is_max_unique(lp, [0, -1.2, +0.2]))
+        self.assertTrue(is_max_unique(lp, [0, -1.2, +0.2]))
+        self.assertTrue(is_max_unique(lp, [0, +5.2, +1.2]))
+        self.assertTrue(is_max_unique(lp, [0, +2.3, -0.5]))
+
+    def test_unique_3D_cube_1(self):
+        lp = Problem(num_cols=4)
+        lp.set_col_bnds(0, 1, 1)
+        lp.add([
+            [0,  1,  0,  0],    # x ≥ 0
+            [0,  0,  1,  0],    # y ≥ 0
+            [0,  0,  0,  1],    # z ≥ 0
+            [1, -1,  0,  0],    # 1 ≥ x
+            [1,  0, -1,  0],    # 1 ≥ y
+            [1,  0,  0, -1],    # 1 ≥ z
+        ])
+        self._check_uniqueness_3d_cube(lp, 'max')
+        self._check_uniqueness_3d_cube(lp, 'min')
+
+    def test_unique_3D_cube_2(self):
+        lp = Problem(num_cols=4)
+        lp.set_col_bnds(0, 1, 1)
+        lp.add([
+            [0,  1,  0,  0],    # x ≥ 0
+            [0,  0,  1,  0],    # y ≥ 0
+            [0,  0,  0,  1],    # z ≥ 0
+        ], -1, +1)
+        self._check_uniqueness_3d_cube(lp, 'max')
+        self._check_uniqueness_3d_cube(lp, 'min')
+
+    def _check_uniqueness_3d_cube(self, lp, opt):
+        # facets
+        self.assertFalse(is_unique(lp, opt, [0, -1,  0,  0]))
+        self.assertFalse(is_unique(lp, opt, [0,  0, -1,  0]))
+        self.assertFalse(is_unique(lp, opt, [0, -1,  0, -1]))
+        self.assertFalse(is_unique(lp, opt, [0,  1,  0,  0]))
+        self.assertFalse(is_unique(lp, opt, [0,  0,  1,  0]))
+        self.assertFalse(is_unique(lp, opt, [0,  0,  0,  1]))
+
+        # edges
+        self.assertFalse(is_unique(lp, opt, [0, -1, -1,  0]))
+        self.assertFalse(is_unique(lp, opt, [0, -1, +1,  0]))
+        self.assertFalse(is_unique(lp, opt, [0, +1, -1,  0]))
+        self.assertFalse(is_unique(lp, opt, [0, +1, +1,  0]))
+
+        self.assertFalse(is_unique(lp, opt, [0,  0, -1, -1]))
+        self.assertFalse(is_unique(lp, opt, [0,  0, -1, +1]))
+        self.assertFalse(is_unique(lp, opt, [0,  0, +1, -1]))
+        self.assertFalse(is_unique(lp, opt, [0,  0, +1, +1]))
+
+        self.assertFalse(is_unique(lp, opt, [0, -1,  0, -1]))
+        self.assertFalse(is_unique(lp, opt, [0, -1,  0, +1]))
+        self.assertFalse(is_unique(lp, opt, [0, +1,  0, -1]))
+        self.assertFalse(is_unique(lp, opt, [0, +1,  0, +1]))
+
+        # vertices
+        self.assertTrue(is_unique(lp, opt, [0, -1, -1, -1]))
+        self.assertTrue(is_unique(lp, opt, [0, -1, -1, +1]))
+        self.assertTrue(is_unique(lp, opt, [0, -1, +1, -1]))
+        self.assertTrue(is_unique(lp, opt, [0, -1, +1, +1]))
+        self.assertTrue(is_unique(lp, opt, [0, +1, -1, -1]))
+        self.assertTrue(is_unique(lp, opt, [0, +1, -1, +1]))
+        self.assertTrue(is_unique(lp, opt, [0, +1, +1, -1]))
+        self.assertTrue(is_unique(lp, opt, [0, +1, +1, +1]))
 
 
 if __name__ == '__main__':
