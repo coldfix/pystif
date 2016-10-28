@@ -6,19 +6,6 @@ from pystif.core.lp import Problem, UnboundedError, NofeasibleError
 from numpy.testing import assert_array_equal, assert_almost_equal
 
 
-def is_max_unique(lp, objective):
-    lp.minimize([-x for x in objective])
-    return lp.is_unique()
-
-
-def is_unique(lp, opt, objective):
-    if opt == 'min':
-        lp.minimize([-x for x in objective])
-    else:
-        lp.maximize(objective)
-    return lp.is_unique()
-
-
 class TestLP(unittest.TestCase):
 
     def test_add_rows(self):
@@ -146,20 +133,20 @@ class TestLP(unittest.TestCase):
         ])
 
         # facets
-        self.assertFalse(is_max_unique(lp, [0, -1,  0]))    # col 0
-        self.assertFalse(is_max_unique(lp, [0,  0, -1]))    # col 1
-        self.assertFalse(is_max_unique(lp, [0,  0, +1]))    # row 1
-        self.assertFalse(is_max_unique(lp, [0, +1, +1]))    # row 2
-        self.assertFalse(is_max_unique(lp, [0, +1, -1]))    # row 3
+        self._assert_LP_unique(lp, [0, -1,  0])     # col 0
+        self._assert_LP_unique(lp, [0,  0, -1])     # col 1
+        self._assert_LP_unique(lp, [0,  0, +1])     # row 1
+        self._assert_LP_unique(lp, [0, +1, +1])     # row 2
+        self._assert_LP_unique(lp, [0, +1, -1])     # row 3
 
         # "hidden" face
-        self.assertTrue(is_max_unique(lp, [0, +1,  0]))     # row 0
+        self._assert_LP_unique(lp, [0, +1,  0])     # row 0
 
         # "random" directions
-        self.assertTrue(is_max_unique(lp, [0, -1.2, +0.2]))
-        self.assertTrue(is_max_unique(lp, [0, -1.2, +0.2]))
-        self.assertTrue(is_max_unique(lp, [0, +5.2, +1.2]))
-        self.assertTrue(is_max_unique(lp, [0, +2.3, -0.5]))
+        self._assert_LP_unique(lp, [0, -1.2, +0.2])
+        self._assert_LP_unique(lp, [0, -1.2, +0.2])
+        self._assert_LP_unique(lp, [0, +5.2, +1.2])
+        self._assert_LP_unique(lp, [0, +2.3, -0.5])
 
     def test_unique_3D_cube_1(self):
         lp = Problem(num_cols=4)
@@ -172,8 +159,7 @@ class TestLP(unittest.TestCase):
             [1,  0, -1,  0],    # 1 ≥ y
             [1,  0,  0, -1],    # 1 ≥ z
         ])
-        self._check_uniqueness_3d_cube(lp, 'max')
-        self._check_uniqueness_3d_cube(lp, 'min')
+        self._check_uniqueness_3d_cube(lp)
 
     def test_unique_3D_cube_2(self):
         lp = Problem(num_cols=4)
@@ -183,43 +169,55 @@ class TestLP(unittest.TestCase):
             [0,  0,  1,  0],    # y ≥ 0
             [0,  0,  0,  1],    # z ≥ 0
         ], -1, +1)
-        self._check_uniqueness_3d_cube(lp, 'max')
-        self._check_uniqueness_3d_cube(lp, 'min')
+        self._check_uniqueness_3d_cube(lp)
 
-    def _check_uniqueness_3d_cube(self, lp, opt):
+    def _check_uniqueness_3d_cube(self, lp):
         # facets
-        self.assertFalse(is_unique(lp, opt, [0, -1,  0,  0]))
-        self.assertFalse(is_unique(lp, opt, [0,  0, -1,  0]))
-        self.assertFalse(is_unique(lp, opt, [0, -1,  0, -1]))
-        self.assertFalse(is_unique(lp, opt, [0,  1,  0,  0]))
-        self.assertFalse(is_unique(lp, opt, [0,  0,  1,  0]))
-        self.assertFalse(is_unique(lp, opt, [0,  0,  0,  1]))
+        self._assert_LP_unique(lp, [0, -1,  0,  0])
+        self._assert_LP_unique(lp, [0,  0, -1,  0])
+        self._assert_LP_unique(lp, [0, -1,  0, -1])
+        self._assert_LP_unique(lp, [0,  1,  0,  0])
+        self._assert_LP_unique(lp, [0,  0,  1,  0])
+        self._assert_LP_unique(lp, [0,  0,  0,  1])
 
         # edges
-        self.assertFalse(is_unique(lp, opt, [0, -1, -1,  0]))
-        self.assertFalse(is_unique(lp, opt, [0, -1, +1,  0]))
-        self.assertFalse(is_unique(lp, opt, [0, +1, -1,  0]))
-        self.assertFalse(is_unique(lp, opt, [0, +1, +1,  0]))
+        self._assert_LP_unique(lp, [0, -1, -1,  0])
+        self._assert_LP_unique(lp, [0, -1, +1,  0])
+        self._assert_LP_unique(lp, [0, +1, -1,  0])
+        self._assert_LP_unique(lp, [0, +1, +1,  0])
 
-        self.assertFalse(is_unique(lp, opt, [0,  0, -1, -1]))
-        self.assertFalse(is_unique(lp, opt, [0,  0, -1, +1]))
-        self.assertFalse(is_unique(lp, opt, [0,  0, +1, -1]))
-        self.assertFalse(is_unique(lp, opt, [0,  0, +1, +1]))
+        self._assert_LP_unique(lp, [0,  0, -1, -1])
+        self._assert_LP_unique(lp, [0,  0, -1, +1])
+        self._assert_LP_unique(lp, [0,  0, +1, -1])
+        self._assert_LP_unique(lp, [0,  0, +1, +1])
 
-        self.assertFalse(is_unique(lp, opt, [0, -1,  0, -1]))
-        self.assertFalse(is_unique(lp, opt, [0, -1,  0, +1]))
-        self.assertFalse(is_unique(lp, opt, [0, +1,  0, -1]))
-        self.assertFalse(is_unique(lp, opt, [0, +1,  0, +1]))
+        self._assert_LP_unique(lp, [0, -1,  0, -1])
+        self._assert_LP_unique(lp, [0, -1,  0, +1])
+        self._assert_LP_unique(lp, [0, +1,  0, -1])
+        self._assert_LP_unique(lp, [0, +1,  0, +1])
 
         # vertices
-        self.assertTrue(is_unique(lp, opt, [0, -1, -1, -1]))
-        self.assertTrue(is_unique(lp, opt, [0, -1, -1, +1]))
-        self.assertTrue(is_unique(lp, opt, [0, -1, +1, -1]))
-        self.assertTrue(is_unique(lp, opt, [0, -1, +1, +1]))
-        self.assertTrue(is_unique(lp, opt, [0, +1, -1, -1]))
-        self.assertTrue(is_unique(lp, opt, [0, +1, -1, +1]))
-        self.assertTrue(is_unique(lp, opt, [0, +1, +1, -1]))
-        self.assertTrue(is_unique(lp, opt, [0, +1, +1, +1]))
+        self._assert_LP_unique(lp, [0, -1, -1, -1])
+        self._assert_LP_unique(lp, [0, -1, -1, +1])
+        self._assert_LP_unique(lp, [0, -1, +1, -1])
+        self._assert_LP_unique(lp, [0, -1, +1, +1])
+        self._assert_LP_unique(lp, [0, +1, -1, -1])
+        self._assert_LP_unique(lp, [0, +1, -1, +1])
+        self._assert_LP_unique(lp, [0, +1, +1, -1])
+        self._assert_LP_unique(lp, [0, +1, +1, +1])
+
+    def _assert_LP_unique(self, lp, objective):
+        lp.safe_mode = True
+        lp.minimize([-x for x in objective])
+        unique = lp.is_unique()
+        lp.maximize(objective)
+        self.assertEqual(lp.is_unique(), unique())
+        lp.safe_mode = False
+        lp.minimize([-x for x in objective])
+        self.assertEqual(lp.is_unique(), unique())
+        lp.maximize(objective)
+        self.assertEqual(lp.is_unique(), unique())
+        return unique
 
 
 if __name__ == '__main__':

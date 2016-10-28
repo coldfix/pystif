@@ -119,6 +119,7 @@ cdef class Problem:
         """
         Init system from constraint matrix L.
         """
+        self.safe_mode = True
         self._lp = glp.create_prob()
         if L is not None:
             L = _as_matrix(L)
@@ -578,18 +579,32 @@ cdef class Problem:
 
         # p=0, n=0, ignored?!
 
-        obj_vec = self.get_objective()
-        obj_val = self.get_objective_value()
-        col_stats = self.get_col_stats()
-        row_stats = self.get_row_stats()
-        if any(col_stats == NF) or any(row_stats == NF):
-            return False
-        struc_var = 1*(col_stats == NL) - (col_stats == NU)
-        slack_var = 1*(row_stats == NU) - (row_stats == NL)
+        if self.safe_mode:
+            # Manually check whether rows/columns are on their lower/upper
+            # bounds. The GLPK row/column stats doesn't report if basic
+            # variables are at their limits - and I admittedly don't fully
+            # understand GLP_NF.
+            prim = self.get_prim_solution()
+            cost = self.get_matrix() @ prim
+            struc_var = (1*np.isclose(prim, self.get_col_lbs())
+                         - np.isclose(prim, self.get_col_ubs()))
+            slack_var = (1*np.isclose(cost, self.get_row_ubs())
+                         - np.isclose(cost, self.get_row_lbs()))
+        else:
+            col_stats = self.get_col_stats()
+            row_stats = self.get_row_stats()
+            if any(col_stats == NF) or any(row_stats == NF):
+                return False
+            struc_var = 1*(col_stats == NL) - (col_stats == NU)
+            slack_var = 1*(row_stats == NU) - (row_stats == NL)
+
         slack_ind = np.flatnonzero(slack_var)
         num_slack = len(slack_ind)
         orig_size = self.num_cols
         objective = np.hstack((struc_var, np.ones(num_slack)))
+
+        obj_vec = self.get_objective()
+        obj_val = self.get_objective_value()
 
         lp = self.copy()
         lp.add(obj_vec, obj_val, obj_val)
