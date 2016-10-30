@@ -133,20 +133,20 @@ class TestLP(unittest.TestCase):
         ])
 
         # facets
-        self._assert_LP_unique(lp, [0, -1,  0])     # col 0
-        self._assert_LP_unique(lp, [0,  0, -1])     # col 1
-        self._assert_LP_unique(lp, [0,  0, +1])     # row 1
-        self._assert_LP_unique(lp, [0, +1, +1])     # row 2
-        self._assert_LP_unique(lp, [0, +1, -1])     # row 3
+        self.assertFalse(self._is_LP_unique(lp, [0, -1,  0]))   # col 0
+        self.assertFalse(self._is_LP_unique(lp, [0,  0, -1]))   # col 1
+        self.assertFalse(self._is_LP_unique(lp, [0,  0, +1]))   # row 1
+        self.assertFalse(self._is_LP_unique(lp, [0, +1, +1]))   # row 2
+        self.assertFalse(self._is_LP_unique(lp, [0, +1, -1]))   # row 3
 
         # "hidden" face
-        self._assert_LP_unique(lp, [0, +1,  0])     # row 0
+        self.assertTrue(self._is_LP_unique(lp, [0, +1,  0]))    # row 0
 
         # "random" directions
-        self._assert_LP_unique(lp, [0, -1.2, +0.2])
-        self._assert_LP_unique(lp, [0, -1.2, +0.2])
-        self._assert_LP_unique(lp, [0, +5.2, +1.2])
-        self._assert_LP_unique(lp, [0, +2.3, -0.5])
+        self.assertTrue(self._is_LP_unique(lp, [0, -1.2, +0.2]))
+        self.assertTrue(self._is_LP_unique(lp, [0, -1.2, +0.2]))
+        self.assertTrue(self._is_LP_unique(lp, [0, +5.2, +1.2]))
+        self.assertTrue(self._is_LP_unique(lp, [0, +2.3, -0.5]))
 
     def test_unique_3D_cube_1(self):
         lp = Problem(num_cols=4)
@@ -165,58 +165,58 @@ class TestLP(unittest.TestCase):
         lp = Problem(num_cols=4)
         lp.set_col_bnds(0, 1, 1)
         lp.add([
-            [0,  1,  0,  0],    # x ≥ 0
-            [0,  0,  1,  0],    # y ≥ 0
-            [0,  0,  0,  1],    # z ≥ 0
+            [0,  1,  0,  0],    # -1 ≤ x ≤ +1
+            [0,  0,  1,  0],    # -1 ≤ y ≤ +1
+            [0,  0,  0,  1],    # -1 ≤ z ≤ +1
         ], -1, +1)
         self._check_uniqueness_3d_cube(lp)
 
     def _check_uniqueness_3d_cube(self, lp):
         # facets
-        self._assert_LP_unique(lp, [0, -1,  0,  0])
-        self._assert_LP_unique(lp, [0,  0, -1,  0])
-        self._assert_LP_unique(lp, [0, -1,  0, -1])
-        self._assert_LP_unique(lp, [0,  1,  0,  0])
-        self._assert_LP_unique(lp, [0,  0,  1,  0])
-        self._assert_LP_unique(lp, [0,  0,  0,  1])
+        self.assertFalse(self._is_LP_unique(lp, [0, -1,  0,  0]))
+        self.assertFalse(self._is_LP_unique(lp, [0,  0, -1,  0]))
+        self.assertFalse(self._is_LP_unique(lp, [0,  0,  0, -1]))
+        self.assertFalse(self._is_LP_unique(lp, [0,  1,  0,  0]))
+        self.assertFalse(self._is_LP_unique(lp, [0,  0,  1,  0]))
+        self.assertFalse(self._is_LP_unique(lp, [0,  0,  0,  1]))
 
         # edges
-        self._assert_LP_unique(lp, [0, -1, -1,  0])
-        self._assert_LP_unique(lp, [0, -1, +1,  0])
-        self._assert_LP_unique(lp, [0, +1, -1,  0])
-        self._assert_LP_unique(lp, [0, +1, +1,  0])
+        self.assertFalse(self._is_LP_unique(lp, [0, -1, -1,  0]))
+        self.assertFalse(self._is_LP_unique(lp, [0, -1, +1,  0]))
+        self.assertFalse(self._is_LP_unique(lp, [0, +1, -1,  0]))
+        self.assertFalse(self._is_LP_unique(lp, [0, +1, +1,  0]))
 
-        self._assert_LP_unique(lp, [0,  0, -1, -1])
-        self._assert_LP_unique(lp, [0,  0, -1, +1])
-        self._assert_LP_unique(lp, [0,  0, +1, -1])
-        self._assert_LP_unique(lp, [0,  0, +1, +1])
+        self.assertFalse(self._is_LP_unique(lp, [0,  0, -1, -1]))
+        self.assertFalse(self._is_LP_unique(lp, [0,  0, -1, +1]))
+        self.assertFalse(self._is_LP_unique(lp, [0,  0, +1, -1]))
+        self.assertFalse(self._is_LP_unique(lp, [0,  0, +1, +1]))
 
-        self._assert_LP_unique(lp, [0, -1,  0, -1])
-        self._assert_LP_unique(lp, [0, -1,  0, +1])
-        self._assert_LP_unique(lp, [0, +1,  0, -1])
-        self._assert_LP_unique(lp, [0, +1,  0, +1])
+        self.assertFalse(self._is_LP_unique(lp, [0, -1,  0, -1]))
+        self.assertFalse(self._is_LP_unique(lp, [0, -1,  0, +1]))
+        self.assertFalse(self._is_LP_unique(lp, [0, +1,  0, -1]))
+        self.assertFalse(self._is_LP_unique(lp, [0, +1,  0, +1]))
 
         # vertices
-        self._assert_LP_unique(lp, [0, -1, -1, -1])
-        self._assert_LP_unique(lp, [0, -1, -1, +1])
-        self._assert_LP_unique(lp, [0, -1, +1, -1])
-        self._assert_LP_unique(lp, [0, -1, +1, +1])
-        self._assert_LP_unique(lp, [0, +1, -1, -1])
-        self._assert_LP_unique(lp, [0, +1, -1, +1])
-        self._assert_LP_unique(lp, [0, +1, +1, -1])
-        self._assert_LP_unique(lp, [0, +1, +1, +1])
+        self.assertTrue(self._is_LP_unique(lp, [0, -1, -1, -1]))
+        self.assertTrue(self._is_LP_unique(lp, [0, -1, -1, +1]))
+        self.assertTrue(self._is_LP_unique(lp, [0, -1, +1, -1]))
+        self.assertTrue(self._is_LP_unique(lp, [0, -1, +1, +1]))
+        self.assertTrue(self._is_LP_unique(lp, [0, +1, -1, -1]))
+        self.assertTrue(self._is_LP_unique(lp, [0, +1, -1, +1]))
+        self.assertTrue(self._is_LP_unique(lp, [0, +1, +1, -1]))
+        self.assertTrue(self._is_LP_unique(lp, [0, +1, +1, +1]))
 
-    def _assert_LP_unique(self, lp, objective):
+    def _is_LP_unique(self, lp, objective):
         lp.safe_mode = True
         lp.minimize([-x for x in objective])
         unique = lp.is_unique()
         lp.maximize(objective)
-        self.assertEqual(lp.is_unique(), unique())
+        self.assertEqual(lp.is_unique(), unique)
         lp.safe_mode = False
         lp.minimize([-x for x in objective])
-        self.assertEqual(lp.is_unique(), unique())
+        self.assertEqual(lp.is_unique(), unique)
         lp.maximize(objective)
-        self.assertEqual(lp.is_unique(), unique())
+        self.assertEqual(lp.is_unique(), unique)
         return unique
 
 

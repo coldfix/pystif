@@ -110,6 +110,7 @@ cdef class Problem:
     """
 
     cdef glp.Prob* _lp
+    cdef public bint safe_mode
 
     def __cinit__(self, L=None, *,
                   int num_cols=0,
@@ -579,6 +580,11 @@ cdef class Problem:
 
         # p=0, n=0, ignored?!
 
+        col_stats = self.get_col_stats()
+        row_stats = self.get_row_stats()
+        if any(col_stats == NF) or any(row_stats == NF):
+            return False
+
         if self.safe_mode:
             # Manually check whether rows/columns are on their lower/upper
             # bounds. The GLPK row/column stats doesn't report if basic
@@ -591,10 +597,6 @@ cdef class Problem:
             slack_var = (1*np.isclose(cost, self.get_row_ubs())
                          - np.isclose(cost, self.get_row_lbs()))
         else:
-            col_stats = self.get_col_stats()
-            row_stats = self.get_row_stats()
-            if any(col_stats == NF) or any(row_stats == NF):
-                return False
             struc_var = 1*(col_stats == NL) - (col_stats == NU)
             slack_var = 1*(row_stats == NU) - (row_stats == NL)
 
