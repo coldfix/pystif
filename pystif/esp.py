@@ -21,9 +21,15 @@ Options:
     -i FILE, --info FILE            Print short summary to file (YAML)
 """
 
+# Interesting references in the ESP paper:
+# - [2,8] efficient methods for converting between halfspace and vertex
+#   representations
+# - [4] equality subsystem (similar to equality set)
+
 from collections import namedtuple
 
 import numpy as np
+from numpy.linalg import pinv   # Moore-Penrose pseudo-inverse
 
 from .core.app import application
 from .core.lp import Problem
@@ -94,21 +100,31 @@ def adjacent_facet(P, f: Face, r: Face, *, eps=1e-7):
     Output: Equality set E_adj such that π(Pᴱ_adj) is a facet of π(P) and
             π(P_Eᵣ)⊂ π(Pᴱ_adj).
     """
+    d, k = P.block_dims()
     # Compute a point on the affine hull of the adjacent facet.
     lp = Problem(P.matrix[r.E])
     b = f.b * (1-eps)
     lp.add_row(f.a, b, b, embed=True)
-    x = lp.maximize(r.a, embed=True)
+    xy = lp.maximize(r.a, embed=True)
 
     # Compute the equality set of the adjacent facet.
-    E =
+    if lp.is_unique():
+        E_adj = equality_set(P.matrix[r.E], xy)
+    else:
+        gamma = (r.f @ x[:d]) / (f.f @ x[:d])
+        poly = np.vstack((
+            P.matrix[r.E],
+            -(f.f + gamma * r.f),
+            +(f.f + gamma * r.f),
+        ))
+        E_adj = equality_set_of_face(poly) # FIXME
 
     # Compute affine hull of adjacent facet.
-
+    a_adj = matrix_nullspace(D[E_adj].T).T @ C[E_adj]
     # Normalize and ensure halfspace contains origin.
-
+    a_adj /= norm(a_adj)
     # Report adjacent facet.
-    return adj
+    return Face(E_adj, a_adj, 0)
 
 
 def ridges(P, facet):
@@ -120,12 +136,41 @@ def ridges(P, facet):
     Output: List [Eᵣ] whose elements are all equality sets Eᵣ such that
             π(P_Eᵣ) is a facet of π(Pᴱ).
     """
-    pass
     # Initialize variables.
+    E_r = []
+    C, D = P.blocks()
+    d, k = P.block_dims()
+    E_c = sorted(set(range(len(C))) - set(facet.E))
+    # Compute S, L, t as in Lemma 31.
+    S = C[E_c] - D[E_c] @ pinv(D[facet.E]) @ C[facet.E]
+    L = D[E_c] @ matrix_nullspace(D[facet.E])
+    t = 0 # P.b[E_c] - D[E_c] @ D[facet.E].H @ b[facet.E]
+    C, D = P.blocks()
     # Compute the dimension of Pᴱ.
-    # Call ESP recursively to compute the ridges.
-    # Test each i ∈ Eᶜ to see if E ∪ {i} defines a ridge.
+    if matrix_rank(P.matrix[facet.E]) < k+1:
+        # Call ESP recursively to compute the ridges.
+        P_f = P.intersection(facet.f)
+        E_f = esp(P_f)
+        E = [to_ridge(f) for f in E_f] # TODO…
+    else:
+        # Test each i ∈ Eᶜ to see if E ∪ {i} defines a ridge.
+        for i in E_c:
+            # Q(i) as defined in Proposition 35
+            Q_i = [j for j in E_c
+                   if matrix_rank(np.vstack((face.f, S[[i, j]]))) == 2]
+            # Compute τ* from LP (17)
+            lp = Problem(np.hstack(([1], -S[Q_i])))
+            lp.add(np.hstack((0, facet.f)), 0, 0)
+            lp.add(np.hstack((0, S[i])), 0, 0)
+            lp.add([1], -1, embed=True)
+            tau = lp.minimize([1], embed=True)[0]
+            if tau < 0 and not np.isclose(tau, 0):
+                # TODO: Compute equality set Q(i)??
+                E_r.append(Face(Q(i), S[i], 0))
+
     # Normalize all equations and make orthogonal to the facet π(Pᴱ)
+    # TODO…
+    return E_r
 
 
 def shoot(P):
@@ -138,11 +183,45 @@ def shoot(P):
     Output: A randomly selected equality set E₀ of P such that
             `π(P_E₀) ≘ {x | a_f∙x = b_f} ∩ π(P)` is a facet of π(P).
     """
-    pass
+    C, D = P.blocks()
+    d, k = P.block_dims()
     # Find a face of P that projects to a facet of π(P)
+    while True:
+        gamma = np.random.normal(size=d)
+        trans = np.hstack((C @ gamma, D))
+        lp = Problem(trans)
+        ry = lp.maximize([1], embed=True)
+        E0 = equality_set(trans, ry)        # assumes b=0
+        N = matrix_nullspace(D[E0].T)
+        f = N.T @ C[E0]
+        # TODO: should the condition be rather `dim π(Pᴱ) = d - 1`???
+        # until: dim π(P_E₀) = d − rank Nᵀ C_E₀ = d − 1
+        if matrix_rank(f) == 1:
+            break
     # Compute affine hull of facet
+    f /= norm(f)
     # Handle dual-degeneracy in LP
+    if lp.is_dual_degenerate():
+        # Compute equality set E₀ such that P_E₀ = {(x, y) | a_f∙x = b_f} ∩ P
+        E0 = equality_set_of_face(P, f)
     # Report facet
+    return Face(E0, f, 0)
+
+
+def equality_set(matrix, vector):
+    """Return list of row indices for which m@v = 0."""
+    return np.flatnonzero(np.isclose(matrix @ vector, 0))
+
+
+def equality_set_of_face(P, f):
+    """
+    [Appendix A]
+    """
+    # TODO: this assumes P = {x : Ax ≥ 0}
+    lp = P.lp.copy()
+    lp.add(f, 0, 0)
+    return [i for i, row in enumerate(P.matrix)
+            if not np.isclose(lp.maximum(row), 0)]
 
 
 @application

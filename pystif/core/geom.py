@@ -28,6 +28,13 @@ class ConvexCone:
         self.lp = lp
         self.dim = dim
         self.points = PointSet()
+        self.matrix = lp.get_matrix()
+
+    def blocks(self):
+        return np.hsplit(self.matrix, [self.dim])
+
+    def block_dims(self):
+        return self.dim, self.matrix.shape[1] - self.dim
 
     @classmethod
     def from_cone(cls, system, dim, limit):
