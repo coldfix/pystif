@@ -22,29 +22,82 @@ Options:
 """
 
 # Interesting references in the ESP paper:
-# - [2,8] efficient methods for converting between halfspace and vertex
-#   representations
-# - [4] equality subsystem (similar to equality set)
+# - [2,8]   efficient methods for converting between H-/V-representation
+# - [4]     equality subsystem (similar to equality set)
+# - [10,16] FME
+# - [2,3,8] block elimination
+# - [1]     similar algorithm
 
-from collections import namedtuple
+# TODO:
+# - change inequality signs to `≥` (+fix optimization directions)
+# - work on convex cones
+# - check whether ESP needs x≥0 as part of the matrix description
+
+from functools import partial
 
 import numpy as np
-from numpy.linalg import pinv   # Moore-Penrose pseudo-inverse
+from numpy.linalg import pinv, norm     # Moore-Penrose pseudo-inverse
+from numpy import sign
 
+from .core.linalg import (
+    matrix_rank as rank,
+    random_direction_vector,
+    matrix_nullspace,
+)
 from .core.app import application
-from .core.lp import Problem
+from .core.lp import Problem as _Problem
+from .core.geom import ConvexCone, unit_vector
 
 
-# aff F = { π(x) | Lᴱx ≤ mᴱ }
-#       = { π(x) | a∙x ≤ b }
-Face = namedtuple('Face', [
-    'E',    # equality set (list)
-    'a',    # normal vector (np.array)
-    'b',    # inhomogeneity (float)
-])
+inf = float("inf")
+
+def Problem(matrix):
+    lp = _Problem(matrix, lb_row=-inf, ub_row=0)
+    lp.set_col_bnds(0, 1, 1)
+    return lp
 
 
-def esp(P):
+# NOTE: we reinterpret the ConvexCone `C = {x : Lx ≥ 0}` as a polytope
+# `P = {y : Ay ≤ b}`, by the identification `y = (1, x)`, `L = (-b | -A)`:
+Polytope = ConvexCone
+
+
+def vstack(*args): return np.vstack(args)
+def hstack(*args): return np.hstack(args)
+
+
+def null(A):
+    return matrix_nullspace(A).T
+
+
+class Face:
+
+    def __init__(self, E, a):
+        self.E = E      # equality set (list)
+        self.a = a      # normal vector (np.array)
+
+    @property
+    def E(self):
+        return self._E_list
+
+    @E.setter
+    def E(self, E):
+        self._E_list = sorted(E)
+        self._E_set = frozenset(self._E_list)
+
+    def __hash__(self):
+        return hash(self._E_set)
+
+    def __eq__(self, other):
+        return self.E_set == other.E_set
+
+
+def esp(P: Polytope):
+    """Full ESP algorithm. See :func:`esp_worker` for more details."""
+    return _with_full_rank(partial(_at_origin, esp_worker), P)
+
+
+def esp_worker(P: Polytope):
     """
     [Algorithm 3.1] Equality Set Projection ESP.
 
@@ -57,37 +110,24 @@ def esp(P):
             Given as list of :class:`Face`.
     """
     # Initialize ridge-facet list L with random facet.
-    L = []
     f = shoot(P)
-    for r in ridges(P, f):
-        L.append((f, r))
+    L = {r: f for r in ridges(P, f)}
     # Initialize matrix G, vector g and list E.
     R = [f]
     # Search for adjacent facets until the list L is empty.
     while L:
-        f = adjacent_facet(P, *L.pop())
+        f = adjacent_facet(P, *L.popitem())
         for r in ridges(P, f):
-            for i, (_, rr) in enumerate(L):
-                if r.E == rr.E:
-                    del L[i]
-                    break
-            else:
-                L.append((f, r))
+            try:
+                L.pop(r)
+            except KeyError:
+                L[r] = f
         R.append(f)
     # Report projection.
     return R
 
 
-# FME:
-# - 16
-# - 10
-# block elimination:
-# - 8, 2, 3
-# similar:
-# - 1
-
-
-def adjacent_facet(P, f: Face, r: Face, *, eps=1e-7):
+def adjacent_facet(P: Polytope, r: Face, f: Face, *, eps=1e-7):
     """
     [Algorithm 4.1] Adjacency oracle.
 
@@ -103,31 +143,28 @@ def adjacent_facet(P, f: Face, r: Face, *, eps=1e-7):
     d, k = P.block_dims()
     # Compute a point on the affine hull of the adjacent facet.
     lp = Problem(P.matrix[r.E])
-    b = f.b * (1-eps)
-    lp.add_row(f.a, b, b, embed=True)
+    a_f = hstack(f.a[0]*(1-eps), f.a[1:])
+    lp.add_row(a_f, 0, 0, embed=True)
     xy = lp.maximize(r.a, embed=True)
 
     # Compute the equality set of the adjacent facet.
+    M_r = P.matrix[r.E]
     if lp.is_unique():
-        E_adj = equality_set(P.matrix[r.E], xy)
+        E_adj_r = active_constraints(M_r, xy)
     else:
-        gamma = (r.f @ x[:d]) / (f.f @ x[:d])
-        poly = np.vstack((
-            P.matrix[r.E],
-            -(f.f + gamma * r.f),
-            +(f.f + gamma * r.f),
-        ))
-        E_adj = equality_set_of_face(poly) # FIXME
+        gamma = - (r.a @ x[:d]) / (f.a @ x[:d])
+        face = f.a + gamma * r.a
+        E_adj_r = equality_set(P, face, M_r)
+    E_adj = np.array(r.E)[E_adj_r]
 
     # Compute affine hull of adjacent facet.
-    a_adj = matrix_nullspace(D[E_adj].T).T @ C[E_adj]
-    # Normalize and ensure halfspace contains origin.
-    a_adj /= norm(a_adj)
+    a_adj = null(D[E_adj].T).T @ C[E_adj]
+    a_adj = norm_ineq(a_adj)
     # Report adjacent facet.
-    return Face(E_adj, a_adj, 0)
+    return Face(E_adj, a_adj)
 
 
-def ridges(P, facet):
+def ridges(P: Polytope, facet: Face):
     """
     [Algorithm 5.1] Ridge oracle.
 
@@ -137,43 +174,50 @@ def ridges(P, facet):
             π(P_Eᵣ) is a facet of π(Pᴱ).
     """
     # Initialize variables.
-    E_r = []
     C, D = P.blocks()
     d, k = P.block_dims()
-    E_c = sorted(set(range(len(C))) - set(facet.E))
+    E = facet.E
+    E_c = sorted(set(range(len(C))) - set(E))
     # Compute S, L, t as in Lemma 31.
-    S = C[E_c] - D[E_c] @ pinv(D[facet.E]) @ C[facet.E]
-    L = D[E_c] @ matrix_nullspace(D[facet.E])
-    t = 0 # P.b[E_c] - D[E_c] @ D[facet.E].H @ b[facet.E]
-    C, D = P.blocks()
+    S = C[E_c] - D[E_c] @ pinv(D[E]) @ C[E]
+    L = D[E_c] @ null(D[E])
     # Compute the dimension of Pᴱ.
-    if matrix_rank(P.matrix[facet.E]) < k+1:
+    if rank(P.matrix[E]) < k+1:
         # Call ESP recursively to compute the ridges.
-        P_f = P.intersection(facet.f)
+        P_f = P.activate(E)
         E_f = esp(P_f)
-        E = [to_ridge(f) for f in E_f] # TODO…
     else:
         # Test each i ∈ Eᶜ to see if E ∪ {i} defines a ridge.
-        for i in E_c:
-            # Q(i) as defined in Proposition 35
-            Q_i = [j for j in E_c
-                   if matrix_rank(np.vstack((face.f, S[[i, j]]))) == 2]
-            # Compute τ* from LP (17)
-            lp = Problem(np.hstack(([1], -S[Q_i])))
-            lp.add(np.hstack((0, facet.f)), 0, 0)
-            lp.add(np.hstack((0, S[i])), 0, 0)
-            lp.add([1], -1, embed=True)
-            tau = lp.minimize([1], embed=True)[0]
-            if tau < 0 and not np.isclose(tau, 0):
-                # TODO: Compute equality set Q(i)??
-                E_r.append(Face(Q(i), S[i], 0))
-
+        def Q(S_i):         # Q(i) as defined in Proposition 35
+            return [S_j for S_j in S if rank(vstack(facet.a, S_i, S_j)) == 2]
+        def LP17(S_i, S_Qi, c=1):
+            lp = Problem(S_Qi)
+            lp.add(facet.a, 0, 0)
+            lp.add(S_i, 0, 0)
+            i_tau = lp.add_col(-np.ones(len(S_Qi)), -c, embed=True)
+            return lp.minimize(unit_vector(i_tau+1, i_tau))[-1]
+        E_f = [
+            Face(Q_i, S_i)
+            for S_i in S
+            for Q_i in [Q(S_i)]
+            for tau in [LP17(S_i, Q_i)]
+            if tau < 0 and not np.isclose(tau, 0)
+        ]
     # Normalize all equations and make orthogonal to the facet π(Pᴱ)
-    # TODO…
-    return E_r
+    return [Face(ridge.E, to_ridge(ridge.a, facet.a)) for ridge in E_f]
 
 
-def shoot(P):
+def to_ridge(ridge: np.array, facet: np.array):
+    """
+    [Remark 36] Convert the facets of π(F) into ridges of π(P), i.e. make
+    orthogonal to the facet π(Pᴱ).
+    """
+    facet = norm_ineq(facet)
+    ridge = ridge - (ridge @ facet) * facet
+    return norm_ineq(ridge)
+
+
+def shoot(P: Polytope):
     """
     [Algorithm 6.1] Shooting oracle: Calculation of a random facet of π(P).
 
@@ -187,54 +231,131 @@ def shoot(P):
     d, k = P.block_dims()
     # Find a face of P that projects to a facet of π(P)
     while True:
-        gamma = np.random.normal(size=d)
-        trans = np.hstack((C @ gamma, D))
+        gamma = random_direction_vector(d-1).reshape((d-1, 1))
+        trans = hstack(C[:,:1], C[:,1:] @ gamma, D)
         lp = Problem(trans)
-        ry = lp.maximize([1], embed=True)
-        E0 = equality_set(trans, ry)        # assumes b=0
-        N = matrix_nullspace(D[E0].T)
-        f = N.T @ C[E0]
+        ry = lp.maximize(unit_vector(k+2, 1))
+        E0 = active_constraints(trans, ry)        # assumes b=0
+        # Compute affine hull of facet
+        N = null(D[E0].T)
+        a = N.T @ C[E0]
         # TODO: should the condition be rather `dim π(Pᴱ) = d - 1`???
         # until: dim π(P_E₀) = d − rank Nᵀ C_E₀ = d − 1
-        if matrix_rank(f) == 1:
+        if rank(a[:,1:]) == 1:
             break
-    # Compute affine hull of facet
-    f /= norm(f)
+    a = norm_ineq(a[0])
     # Handle dual-degeneracy in LP
     if lp.is_dual_degenerate():
         # Compute equality set E₀ such that P_E₀ = {(x, y) | a_f∙x = b_f} ∩ P
-        E0 = equality_set_of_face(P, f)
+        E0 = equality_set(P, a)
     # Report facet
-    return Face(E0, f, 0)
+    return Face(E0, a)
 
 
-def equality_set(matrix, vector):
+def norm_ineq(a: np.array):
+    """Normalize and ensure halfspace contains origin."""
+    return a * (sign(a[0]) /
+                norm(a[1:]))
+
+
+def active_constraints(matrix, point):
     """Return list of row indices for which m@v = 0."""
-    return np.flatnonzero(np.isclose(matrix @ vector, 0))
+    return np.flatnonzero(np.isclose(matrix @ point, 0))
 
 
-def equality_set_of_face(P, f):
-    """
-    [Appendix A]
-    """
-    # TODO: this assumes P = {x : Ax ≥ 0}
+def equality_set(P: Polytope, a: np.array = None, M: np.array = None):
+    """[Appendix A] Calculation of the Affine Hull."""
+    # NOTE: this assumes P = {x : Mx ≤ 0}
+    lp = P.lp
+    if a is not None:
+        lp = lp.copy()
+        lp.add(a, 0, 0, embed=True)
+    if M is None:
+        M = P.matrix
+    return [
+        i for i, row in enumerate(M)
+        if np.isclose(lp.minimum(row), 0)
+    ]
+
+
+def _with_full_rank(func, P):
+    """[Appendix B] Projection of non Full-Dimensional Polytopes."""
+    C_, D = P.blocks()
+    # find subspace in which P is contained
+    A = equality_set(P)
+    if not A:
+        return func(P)
+    F_ = null(D[A].T).T @ C_[A]
+    b, C = C_[:,:1], C_[:,1:]
+    f, F = F_[:,:1], F_[:,1:]
+    N_F = null(F)
+    M = hstack(- b + C @ pinv(F) @ f, C @ N_F, D)
+    lp = Problem(M)
+    # apply ESP
+    dim = C_.shape[1] - rank(F)
+    facets = func(Polytope(lp, dim))
+    # transform back
+    return [
+        Face(facet.E, facet_f)
+        for facet in facets
+        for facet_f in [hstack(facet.a[0], facet.a[1:] @ N_F.T)]
+    ]
+
+
+def _at_origin(func, P):
+    """[Appendix C] Projection of Polytopes that do not Contain the Origin."""
+    # translate polytope to the origin
+    d, k = P.block_dims()
     lp = P.lp.copy()
-    lp.add(f, 0, 0)
-    return [i for i, row in enumerate(P.matrix)
-            if not np.isclose(lp.maximum(row), 0)]
+    i_tau = lp.add_col(-np.ones(len(P.matrix)))
+    translate = lp.minimize(unit_vector(i_tau+1, i_tau))[:-1]
+    M = P.matrix
+    lp = P.lp.copy()
+    lp.set_col(0, M @ translate)
+    # apply ESP
+    facets = func(Polytope(lp, P.dim))
+    # translate projection back
+    back = hstack(1, -translate[1:d])
+    return [
+        Face(facet.E, facet_f)
+        for facet in facets
+        for facet_f in [hstack(facet.a @ back, facet.a[1:])]
+    ]
 
 
 @application
 def main(app):
     system = app.system
 
-    # TODO: translate to origin
-    cut = np.hstack((np.ones(app.subdim), np.zeros(app.dim-app.subdim)))
+    # make sure there is a const-column
+    if '_' in system.columns:
+        system, _ = system.prepare_for_projection('_')
+        matrix = system.matrix
+    else:
+        system.columns = ['_'] + system.columns
+        matrix = hstack(
+            np.zeros((len(system.matrix), 1)),
+            system.matrix)
 
-    system.matrix = np.vstack((
-        system.matrix,
-        -cut,
-    ))
+    num_rows, num_cols = matrix.shape
 
-    for f in esp(app.polyhedron):
+    matrix = vstack(
+        # change inequalities from `a∙x ≥ b` to `-a∙x ≤ -b`:
+        -matrix,
+        # make lower bounds on columns xₖ≥0 explicit
+        hstack(np.zeros((num_cols-1, 1)), -np.eye(num_cols-1)),
+        # add a bound Σxₖ≤1
+        hstack(-1, np.ones(num_cols-1)),
+    )
+
+    lp = Problem(matrix)
+
+    polytope = Polytope(lp, system.subdim)
+
+    # write updated system back
+    system.matrix = matrix
+    app.system = system
+    app.polyhedron = polytope
+
+    for f in esp(polytope):
         pass

@@ -180,6 +180,29 @@ class ConvexCone:
         lp.add(space, 0, 0, embed=True)
         return self.__class__(lp, self.dim)
 
+    def activate(self, rows):
+        """
+        Return the ConvexCone obtained by replacing the inequalities with the
+        specified indices with equalities.
+
+        :param frozenset rows:
+        """
+        lp = self.lp.copy()
+        inf = float("inf")
+        for row in rows:
+            lb, ub = lp.get_row_bnds(row)
+            has_lb = lb > -inf
+            has_ub = ub < +inf
+            if has_lb and not has_lb:
+                lp.set_row_bnds(row, lb, lb)
+            elif has_ub and not has_lb:
+                lp.set_row_bnds(row, ub, ub)
+                m = lp.minimum(lp.get_row(row))
+            elif lb != ub:
+                # free or double bounded row:
+                raise NotImplementedError
+        return self.__class__(lp, self.dim)
+
     @cached
     def rank(self):
         """Geometric dimension of the projected polyhedron."""

@@ -35,6 +35,7 @@ setup(
             'fme = pystif.fme:main',
             'minimize = pystif.minimize:main',
             'afi = pystif.afi:main',
+            'esp = pystif.esp:main',
             'rfd = pystif.rfd:main',
             'p2f = pystif.p2f:main',
             'qviol = pystif.qviol:main',
