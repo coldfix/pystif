@@ -33,8 +33,6 @@ Options:
 # - work on convex cones
 # - check whether ESP needs x≥0 as part of the matrix description
 
-from functools import partial
-
 import numpy as np
 from numpy.linalg import pinv, norm     # Moore-Penrose pseudo-inverse
 from numpy import sign
@@ -94,7 +92,11 @@ class Face:
 
 def esp(P: Polytope):
     """Full ESP algorithm. See :func:`esp_worker` for more details."""
-    return _with_full_rank(partial(_at_origin, esp_worker), P)
+    P, t1 = _at_origin(P)
+    P, t2 = _with_full_rank(P)
+    facets = esp_worker(P)
+    return [Face(facet.E, t1(t2(facet.a)))
+            for facet in facets]
 
 
 def esp_worker(P: Polytope):
@@ -278,13 +280,13 @@ def equality_set(P: Polytope, a: np.array = None, M: np.array = None):
     ]
 
 
-def _with_full_rank(func, P):
+def _with_full_rank(P):
     """[Appendix B] Projection of non Full-Dimensional Polytopes."""
     C_, D = P.blocks()
     # find subspace in which P is contained
     A = equality_set(P)
     if not A:
-        return func(P)
+        return (P, lambda a: a)
     F_ = null(D[A].T).T @ C_[A]
     b, C = C_[:,:1], C_[:,1:]
     f, F = F_[:,:1], F_[:,1:]
@@ -293,34 +295,23 @@ def _with_full_rank(func, P):
     lp = Problem(M)
     # apply ESP
     dim = C_.shape[1] - rank(F)
-    facets = func(Polytope(lp, dim))
-    # transform back
-    return [
-        Face(facet.E, facet_f)
-        for facet in facets
-        for facet_f in [hstack(facet.a[0], facet.a[1:] @ N_F.T)]
-    ]
+    return (Polytope(lp, dim),
+            lambda a: hstack(a[0], a[1:] @ N_F.T))
 
 
-def _at_origin(func, P):
+def _at_origin(P):
     """[Appendix C] Projection of Polytopes that do not Contain the Origin."""
     # translate polytope to the origin
     d, k = P.block_dims()
     lp = P.lp.copy()
-    i_tau = lp.add_col(-np.ones(len(P.matrix)))
-    translate = lp.minimize(unit_vector(i_tau+1, i_tau))[:-1]
+    i_tau = lp.add_col(-1*(lp.get_row_lbs() != 0))
+    translate = lp.minimize(unit_vector(d+k+1, i_tau))[:-1]
     M = P.matrix
     lp = P.lp.copy()
     lp.set_col(0, M @ translate)
-    # apply ESP
-    facets = func(Polytope(lp, P.dim))
-    # translate projection back
     back = hstack(1, -translate[1:d])
-    return [
-        Face(facet.E, facet_f)
-        for facet in facets
-        for facet_f in [hstack(facet.a @ back, facet.a[1:])]
-    ]
+    return (Polytope(lp, P.dim),
+            lambda a: hstack(a @ back, a[1:]))
 
 
 @application
