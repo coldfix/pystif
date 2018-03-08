@@ -4,6 +4,7 @@ Find quantum violations for the tripartite bell scenario.
 Usage:
     qviol INPUT [-c CONSTR] [-o FILE] [-n NUM] [-d DIMS] [-p PAR] [-s SUBSET] [-D]
     qviol summary INPUT [-q]
+    qviol check INPUT [-c CONSTR] [-d DIMS]
 
 Arguments:
     INPUT                               File with known faces of the local cone
@@ -576,6 +577,19 @@ def main(app):
     system = TripartiteBellScenario(app.system, parametrization, dims=dims,
                                     degenerate=opts['--degenerate'])
     constr = get_constraints_obj(opts['--constraints'], system)
+
+    if opts['check']:
+        # Check whether the states/bases in the given qviol YAML output file
+        # fulfil the given `--constraints`. This can be useful to cross-check
+        # whether two different bipartite constraints are fulfilled with the
+        # same state.
+        with open(opts['INPUT']) as f:
+            data = yaml.safe_load(f)
+        for result in data['results']:
+            state, parties = system.realize(result['opt_params'])
+            fconstr = constr.evaluate_all_constraints(state, parties)
+            print(any(x < 0 for x in fconstr), result['i_row'])
+        return
 
     num_runs = int(opts['--num-runs'])
 
