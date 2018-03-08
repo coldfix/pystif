@@ -77,7 +77,7 @@ class CompositeQuantumSystem:
         :param int subsys: subsystem index
         """
         l = np.eye(self.cumdim[subsys])
-        r = np.eye(self.dim / self.cumdim[subsys+1])
+        r = np.eye(self.dim // self.cumdim[subsys+1])
         return kron(l, operator, r)
 
     def lift_all(self, parties):
