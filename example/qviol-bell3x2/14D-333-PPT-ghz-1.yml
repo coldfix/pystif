@@ -1,0 +1,8 @@
+cols: ['H(A,B,C)', 'H(A,B,c)', 'H(A,b,C)', 'H(A,b,c)', 'H(a,B,C)', 'H(a,B,c)', 'H(a,b,C)',
+  'H(a,b,c)', H(A), H(a), H(B), H(b), H(C), H(c)]
+constr: PPT
+expr: ["0 \u2264 H(A,B,C) + H(A,b,C) + H(A,b,c) + H(a,B,C) + H(a,B,c) + H(a,b,c) -\
+    \ 3 H(A,B,c) - H(a) - H(b) - H(C)"]
+rows:
+- [1.0, -3.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0, 0.0, -1.0, 0.0, -1.0, -1.0, 0.0]
+results:

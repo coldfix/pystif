@@ -1,0 +1,50 @@
+#! /bin/zsh
+
+prefix=example/qviol-bell3x2
+
+# 14D-333-CGLMP: 7?
+# 14D-333-CHSHE: 7
+# 14D-333-PPT: 7
+#
+# 26D-222-none: 6,8
+#
+
+summary() {
+    echo "$1 {{"
+    echo -n "  free: "
+    qviol summary -q $prefix/$1.yml
+    for x in ${@:2}; do
+        echo -n "  $(printf '%-5s' $x:) "
+        qviol summary -q $prefix/$1-$x.yml
+    done
+    echo "}}"
+    echo ""
+}
+
+summ_xd() {
+    d=$1
+    echo ""
+    echo ""
+    echo "${d}D cone --- 222"
+    echo ""
+    summary ${d}D-222-none w ghz
+    summary ${d}D-222-CHSHE w ghz
+    summary ${d}D-222-CHSH w ghz
+    summary ${d}D-222-PPT w ghz
+
+    echo ""
+    echo "${d}D cone --- 333"
+    echo ""
+    summary ${d}D-333-none ghz
+    summary ${d}D-333-CGLMP ghz
+    summary ${d}D-333-CHSHE ghz
+    summary ${d}D-333-PPT ghz
+}
+
+summ_all() {
+    for d in 08 12 14 18 26; do
+        summ_xd $d
+    done
+}
+
+

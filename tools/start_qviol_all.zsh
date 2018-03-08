@@ -20,7 +20,11 @@ function start_qviol() {
     echo $job_num
 
     for constr in $constrs; do
-        ts -D $job_num qviol $noconstr -d $subdims -o $prefix-$constr.yml -c $constr
+        ts -D $job_num qviol $noconstr \
+            -d $subdims \
+            -o $prefix-$constr.yml \
+            -c $constr \
+            -p ${parametrization-all}
     done
 }
 
