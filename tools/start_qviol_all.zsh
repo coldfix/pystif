@@ -28,7 +28,7 @@ function start_all() {
     if [[ -n $@ ]]; then
         dims=($@)
     else
-        dims=(26D 18D 14D 12D 08D)
+        dims=(26D 20D 18D 14D 12D 08D)
     fi
 
     for dim in $dims; do
