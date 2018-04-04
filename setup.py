@@ -10,7 +10,7 @@ Before running this script, install 'cython'.
 from setuptools import setup, Extension
 from Cython.Build import cythonize
 
-with open('README.rst') as f:
+with open('README.rst', encoding='utf-8') as f:
     README = f.read()
 
 setup(
