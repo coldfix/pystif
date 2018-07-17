@@ -40,6 +40,9 @@ class VarPermutation:
 
     @classmethod
     def from_cycle_spec(cls, cycles):
+        # NOTE: using delayed import as to avoid dependency cycle through:
+        #   io -> symmetry -> parse -> io
+        from .parse import flatten
         return flatten((c, c[1:]+c[:1]) for c in cycles)
 
     def permute_colname(self, col):

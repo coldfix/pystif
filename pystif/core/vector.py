@@ -43,7 +43,6 @@ class Vector(abc.MutableMapping):
         return self
 
     def __imul__(self, scale):
-        d = self._data.copy()
         for n in self:
             self[n] *= scale
         return self

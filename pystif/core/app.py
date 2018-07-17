@@ -1,6 +1,5 @@
 
-from contextlib import contextmanager
-from functools import wraps, partial
+from functools import partial
 import os
 import time
 
@@ -8,7 +7,7 @@ from docopt import docopt
 import yaml
 
 from .geom import ConvexCone
-from .io import System, SystemFile, StatusInfo
+from .io import System, SystemFile, StatusInfo, default_column_labels
 from .symmetry import SymmetryGroup
 from .util import cachedproperty
 

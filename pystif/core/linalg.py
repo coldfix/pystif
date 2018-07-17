@@ -5,7 +5,8 @@ Linear algebra utilities.
 import numpy as np
 
 from functools import reduce
-from math import acos, atan2
+from math import acos, atan2, cos, sin
+import cmath
 
 
 __all__ = [
@@ -177,7 +178,6 @@ def hyperspherical_to_cartesian(angles):
         xₙ   = sin(φ₁) sin(φ₂) sin(φ₃) … sin(φₙ₋₁) cos(φₙ)
         xₙ₊₁ = sin(φ₁) sin(φ₂) sin(φ₃) … sin(φₙ₋₁) sin(φₙ)
     """
-    dim = angles.size + 1
     c = [cos(x) for x in angles] + [1]
     s = [1] + [sin(x) for x in angles]
     return np.array([ci * si for ci, si in zip(c, np.cumprod(s))])

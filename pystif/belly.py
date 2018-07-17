@@ -177,7 +177,7 @@ class TermCombo1:
         self.lo = lo
         self.hs = hs = set(hi)
         self.ls = ls = set(lo)
-        self.ok = ok = ls <= hs
+        self.ok      = ls <= hs
 
     def parametrization(self):
         return range(self.len_hi-1)

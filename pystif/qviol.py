@@ -21,10 +21,10 @@ Options:
     -q, --quiet                         Don't list the inequalities
 """
 
-from operator import matmul, add
-from functools import reduce, partial
+from operator import matmul
+from functools import reduce
 from itertools import product
-from math import log2, sin, cos, pi, sqrt
+from math import log2, pi, sqrt
 import cmath
 import sys
 
@@ -35,10 +35,9 @@ import yaml
 from .core.app import application
 from .core.symmetry import SymmetryGroup, group_by_symmetry
 from .core.util import _varset
-from .core.io import (System, yaml_dump, format_human_readable,
-                      read_system_from_file)
+from .core.io import System, yaml_dump, format_human_readable
 from .core.linalg import (projector, measurement, random_direction_vector,
-                          cartesian_to_spherical, kron, to_unit_vector,
+                          kron, to_unit_vector,
                           to_quantum_state, ptrace, ptranspose, dagger,
                           as_column_vector)
 

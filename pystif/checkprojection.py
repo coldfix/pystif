@@ -12,6 +12,8 @@ Options:
     -y SYM, --symmetry SYM      Symmetry group generators
 """
 
+import sys
+
 from docopt import docopt
 
 from .core.geom import ConvexCone

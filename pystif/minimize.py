@@ -13,8 +13,6 @@ Options:
     -p, --pretty                    Pretty print output inequalities
 """
 
-from docopt import docopt
-
 from .core.app import application
 from .core.lp import Minimize
 from .core.io import StatusInfo

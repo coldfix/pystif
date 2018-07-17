@@ -3,8 +3,7 @@ import numpy as np
 
 from .array import scale_to_int, make_int_exact
 from .linalg import (matrix_imker_nice, matrix_nullspace, matrix_rowspace,
-                     random_direction_vector, basis_vector, plane_normal,
-                     as_column_vector)
+                     random_direction_vector, basis_vector)
 from .lp import Problem
 from .util import PointSet, cached
 
@@ -111,7 +110,6 @@ class ConvexCone:
         m = np.empty(dim)
         assert len(q) == dim
         k = next(k for k, qk in enumerate(q) if qk != 0)
-        inf = float("inf")
 
         lp = self.lp.copy()
         h = lp.minimum(q, embed=True)

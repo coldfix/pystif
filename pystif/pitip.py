@@ -11,15 +11,8 @@ Options:
 import numpy as np
 
 from .core.app import application
-from .core.io import System, format_human_readable, column_varname_labels
+from .core.io import System, column_varname_labels
 from .core.it import elemental_inequalities, elemental_forms
-
-
-def _format_dual_coef(system, index, coef):
-    expr = format_human_readable(system.matrix[index], system.columns)[:-4]
-    if np.isclose(coef, 1):
-        return expr
-    return "{} * ({})".format(coef, expr)
 
 
 def _format_dual_coef(system, index, coef):

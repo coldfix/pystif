@@ -72,7 +72,6 @@ class AFI2(AFI):
 
 def rfd2(polyhedron, symmetries, recursions, found_cb, runs, status, info, verbosity):
 
-    face = np.ones(polyhedron.dim)
     seen = VectorMemory()
 
     afi = AFI2(polyhedron, symmetries, recursions, info, verbosity)
