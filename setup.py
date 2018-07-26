@@ -21,7 +21,7 @@ setup(
     author='Thomas Gläßle',
     author_email='t_glaessle@gmx.de',
     url='https://github.com/coldfix/pystif',
-    license='GPLv3',
+    license='GPLv3+',
     packages=[
         'pystif',
         'pystif.core',
@@ -69,6 +69,6 @@ setup(
         'Programming Language :: Python :: 3.5',
         'Topic :: Scientific/Engineering',
         'Intended Audience :: Science/Research',
-        'License :: CC0 1.0 Universal (CC0 1.0) Public Domain Dedication',
+        'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',
     ],
 )
